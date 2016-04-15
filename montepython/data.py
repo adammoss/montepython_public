@@ -15,6 +15,7 @@ import re
 import io_mp  # Needs to talk to io_mp.py file for the logging
                                # of parameters
 import prior
+from scipy.optimize import fsolve
 
 # A modified version of Python dictionary in order to keep track of the order
 # in it (much the same as in an array). In case an older version of Python is
@@ -787,9 +788,46 @@ class Data(object):
                 self.cosmo_arguments['n_cdi'] = self.cosmo_arguments['n_s']
             elif elem == 'beta':
                 self.cosmo_arguments['alpha'] = 2.*self.cosmo_arguments['beta']
+            elif elem == 'M_tot_NH':
+                if not self.cosmo_arguments['N_ncdm'] == 3:
+                    raise ValueError('N_ncdm is not equal to 3. This value should be exactly 3.')
+                delta_m_squared_atm=2.45e-3
+                delta_m_squared_sol=7.50e-5
+                m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
+                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments['M_tot_NH']/3.,(self.cosmo_arguments['M_tot_NH'],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
+                if not success == 1:
+                    raise ValueError('Failed to estimate m1. Reason: '+output_message+' Exiting run.')
+                m1 = m1[0]
+                m2 = (delta_m_squared_sol + m1**2.)**0.5
+                m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
+                if m1+m2+m3 > self.cosmo_arguments['M_tot_NH']+0.001*self.cosmo_arguments['M_tot_NH']:
+                    raise ValueError('Failed to estimate m1 resulting in sum(m_i) > M_tot.  Exiting run.')
+                self.cosmo_arguments['m_ncdm'] = r'%g, %g, %g' % (m1,m2,m3)
+                del self.cosmo_arguments[elem]
+            elif elem == 'M_tot_IH':
+                if not self.cosmo_arguments['N_ncdm'] == 3:
+                    raise ValueError('N_ncdm is not equal to 3. This value should be exactly 3.')
+                delta_m_squared_atm=-2.45e-3
+                delta_m_squared_sol=7.50e-5
+                m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
+                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments['M_tot_IH']/3.,(self.cosmo_arguments['M_tot_IH'],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
+                if not success == 1:
+                    raise ValueError('Failed to estimate m1. Reason: '+output_message+' Exiting run.')
+                m1 = m1[0]
+                m2 = (delta_m_squared_sol + m1**2.)**0.5
+                m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
+                if m1+m2+m3 > self.cosmo_arguments['M_tot_IH']+0.001*self.cosmo_arguments['M_tot_IH']:
+                    raise ValueError('Failed to estimate m1 resulting in sum(m_i) > M_tot.  Exiting run.')
+                self.cosmo_arguments['m_ncdm'] = r'%g, %g, %g' % (m1,m2,m3)
+                del self.cosmo_arguments[elem]
             elif elem == 'M_tot':
+                if not self.cosmo_arguments['N_ncdm'] == 1:
+                    raise ValueError('N_ncdm is not equal to 1. This value should be exactly 1.')
+                if not self.cosmo_arguments['deg_ncdm'] == 3:
+                    raise ValueError('deg_ncdm is not equal to 3. This value should be exactly 3.')
                 self.cosmo_arguments['m_ncdm'] = self.cosmo_arguments['M_tot']/3.
                 del self.cosmo_arguments[elem]
+
             # Finally, deal with all the parameters ending with __i, where i is
             # an integer. Replace them all with their name without the trailing
             # double underscore, concatenated with each other. The test is
@@ -811,7 +849,6 @@ class Data(object):
                 for index in range(1, len(values)+1):
                     del self.cosmo_arguments[
                         original_name + '__%i' % index]
-
     @staticmethod
     def folder_is_initialised(folder):
         """
