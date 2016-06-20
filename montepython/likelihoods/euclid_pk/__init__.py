@@ -1,9 +1,9 @@
 from montepython.likelihood_class import Likelihood
 import os
 import numpy as np
+import warnings
 from numpy import newaxis as na
 from math import exp, log, pi, log10
-
 
 class euclid_pk(Likelihood):
 
@@ -13,7 +13,7 @@ class euclid_pk(Likelihood):
 
         self.need_cosmo_arguments(data, {'output': 'mPk'})
         self.need_cosmo_arguments(data, {'z_max_pk': self.zmax})
-        self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 1.5*self.kmax})
+        self.need_cosmo_arguments(data, {'P_k_max_h/Mpc': 1.9*self.kmax})
 
         #################
         # find number of galaxies for each mean redshift value
@@ -54,16 +54,28 @@ class euclid_pk(Likelihood):
         ################
 
         self.n_g = np.zeros(self.nbin, 'float64')
-        self.n_g = np.array([6844.945, 7129.45,
-                             7249.912, 7261.722,
-                             7203.825, 7103.047,
-                             6977.571, 6839.546,
-                             6696.957, 5496.988,
-                             4459.240, 3577.143,
-                             2838.767, 2229.282,
-                             1732.706, 1333.091])
 
-        self.n_g = self.n_g * self.efficiency * 41253.
+        # obsolete settings from 2012
+        #self.n_g = np.array([6844.945, 7129.45,
+        #                     7249.912, 7261.722,
+        #                     7203.825, 7103.047,
+        #                     6977.571, 6839.546,
+        #                     6696.957, 5496.988,
+        #                     4459.240, 3577.143,
+        #                     2838.767, 2229.282,
+        #                     1732.706, 1333.091])
+        #self.n_g = self.n_g * self.efficiency * 41253.
+
+        # euclid 2016 settings
+        self.n_g = np.array([2434.280, 4364.812,
+                             4728.559, 4825.798,
+                             4728.797, 4507.625,
+                             4269.851, 3720.657,
+                             3104.309, 2308.975,
+                             1514.831, 1474.707,
+                             893.716, 497.613])
+
+        self.n_g = self.n_g * self.fsky * 41253 #sky coverage in deg ^2
 
         # If the file exists, initialize the fiducial values, the spectrum will
         # be read first, with k_size values of k and nbin values of z. Then,
@@ -157,9 +169,10 @@ class euclid_pk(Likelihood):
                     fid_file.write('%.8g %.8g\n' % (H[index_z], D_A[index_z]))
                 for index_z in xrange(self.nbin):
                     fid_file.write('%.8g\n' % sigma_r[index_z])
-            print '\n\n /|\  Writing fiducial model in {0}'.format(
-                fid_file_path)
-            print '/_o_\ for {0} likelihood'.format(self.name)
+            print '\n'
+            warnings.warn(
+                "Writing fiducial model in %s, for %s likelihood\n" % (
+                    self.data_directory+'/'+self.fiducial_file, self.name))
             return 1j
 
         # NOTE: Many following loops will be hidden in a very specific numpy
@@ -196,11 +209,15 @@ class euclid_pk(Likelihood):
             for index_z in xrange(2*self.nbin+1):
                 self.k[index_k,index_z,:] = np.sqrt((1.-mu[:]**2)*self.D_A_fid[index_z]**2/D_A[index_z]**2 + mu[:]**2*H[index_z]**2/self.H_fid[index_z]**2 )*self.k_fid[index_k]
 
-
         # Recover the non-linear power spectrum from the cosmological module on all
         # the z_boundaries, to compute afterwards beta. This is pk_nl_th from the
         # notes.
         pk_nl_th = np.zeros((self.k_size,2*self.nbin+1,self.mu_size),'float64')
+
+        # The next line is the bottleneck.
+        # TODO: the likelihood could be sped up if this could be vectorised, either here,
+        # or inside classy where there are three loops in the function get_pk
+        # (maybe with a different strategy for the arguments of the function)
         pk_nl_th = cosmo.get_pk(self.k,self.z,self.k_size,2*self.nbin+1,self.mu_size)
 
         # Recover the non_linear scale computed by halofit. If no scale was

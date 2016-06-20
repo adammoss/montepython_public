@@ -617,12 +617,20 @@ def compute_posterior(information_instances):
                         # Benabed). Note that only the 1 and 2 sigma contours are
                         # displayed (due to the line with info.levels[:2])
                         try:
-                            contours = ax2dsub.contourf(
-                                info.y_centers, info.x_centers, info.n,
-                                extent=info.extent, levels=ctr_level(
-                                    info.n, info.levels[:2]),
-                                zorder=4, cmap=info.cmaps[info.id],
-                                alpha=info.alphas[info.id])
+                            if info.contours_only:
+                                contours = ax2dsub.contour(
+                                    info.y_centers, info.x_centers, info.n,
+                                    extent=info.extent, levels=ctr_level(
+                                        info.n, info.levels[:2]),
+                                    zorder=4, colors=info.cm[info.id],
+                                    linewidths=info.line_width)
+                            else:
+                                contours = ax2dsub.contourf(
+                                    info.y_centers, info.x_centers, info.n,
+                                    extent=info.extent, levels=ctr_level(
+                                        info.n, info.levels[:2]),
+                                    zorder=4, cmap=info.cmaps[info.id],
+                                    alpha=info.alphas[info.id])
                         except Warning:
                             warnings.warn(
                                 "The routine could not find the contour of the " +
@@ -675,7 +683,7 @@ def compute_posterior(information_instances):
                     # store the coordinates of the points for further
                     # plotting.
                     store_contour_coordinates(
-                        conf, standard_name, second_standard_name, contours)
+                        conf, standard_name, second_standard_name, cotours)
 
                     for info in information_instances:
                         if not info.ignore_param and info.has_second_param:
