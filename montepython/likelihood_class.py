@@ -1115,6 +1115,15 @@ class Likelihood_mock_cmb(Likelihood):
             self.unlensed_clTTTEEE
         except:
             self.unlensed_clTTTEEE = False
+        # - do not exclude TTEE by default:
+        try:
+            self.ExcludeTTTEEE
+            if self.ExcludeTTTEEE and not self.LensingExtraction:
+                raise io_mp.LikelihoodError("Mock CMB likelihoods where TTTEEE is not used have only been "
+                                            "implemented for the deflection spectrum (i.e. not for B-modes), "
+                                            "but you do not seem to have lensing extraction enabled")
+        except:
+            self.ExcludeTTTEEE = False
 
         ##############################################
         # Delensing noise: implemented by  S. Clesse #
@@ -1151,7 +1160,11 @@ class Likelihood_mock_cmb(Likelihood):
         ###############################################################
 
         # default:
-        numCls = 3
+        if not self.ExcludeTTTEEE:
+            numCls = 3
+        # default 0 if excluding TT EE
+        else:
+            numCls = 0
 
         # deal with BB:
         if self.Bmodes:
@@ -1162,8 +1175,9 @@ class Likelihood_mock_cmb(Likelihood):
         if self.LensingExtraction:
             self.index_pp = numCls
             numCls += 1
-            self.index_tp = numCls
-            numCls += 1
+            if not self.ExcludeTTTEEE:
+                self.index_tp = numCls
+                numCls += 1
 
             # provide a file containing NlDD (noise for the extracted
             # deflection field spectrum) This option is temporary
@@ -1211,9 +1225,10 @@ class Likelihood_mock_cmb(Likelihood):
                 line = fid_file.readline()
             for l in range(self.l_min, self.l_max+1):
                 ll = int(line.split()[0])
-                self.Cl_fid[0, ll] = float(line.split()[1])
-                self.Cl_fid[1, ll] = float(line.split()[2])
-                self.Cl_fid[2, ll] = float(line.split()[3])
+                if not self.ExcludeTTTEEE:
+                    self.Cl_fid[0, ll] = float(line.split()[1])
+                    self.Cl_fid[1, ll] = float(line.split()[2])
+                    self.Cl_fid[2, ll] = float(line.split()[3])
                 # read BB:
                 if self.Bmodes:
                     try:
@@ -1225,7 +1240,8 @@ class Likelihood_mock_cmb(Likelihood):
                 if self.LensingExtraction:
                     try:
                         self.Cl_fid[self.index_pp, ll] = float(line.split()[self.index_pp+1])
-                        self.Cl_fid[self.index_tp, ll] = float(line.split()[self.index_tp+1])
+                        if not self.ExcludeTTTEEE:
+                            self.Cl_fid[self.index_tp, ll] = float(line.split()[self.index_tp+1])
                     except:
                         raise io_mp.LikelihoodError(
                             "The fiducial model does not have enough columns.")
@@ -1256,6 +1272,10 @@ class Likelihood_mock_cmb(Likelihood):
             print "  neglect_TD is True"
         else:
             print "  neglect_TD is False"
+        if self.ExcludeTTTEEE:
+            print "  ExcludeTTTEEE is True"
+        else:
+            print "  ExcludeTTTEEE is False"
         print ""
 
         # end of initialisation
@@ -1304,9 +1324,10 @@ class Likelihood_mock_cmb(Likelihood):
             fid_file.write('\n')
             for l in range(self.l_min, self.l_max+1):
                 fid_file.write("%5d  " % l)
-                fid_file.write("%.8g  " % (cl['tt'][l]+self.noise_T[l]))
-                fid_file.write("%.8g  " % (cl['ee'][l]+self.noise_P[l]))
-                fid_file.write("%.8g  " % cl['te'][l])
+                if not self.ExcludeTTTEEE:
+                    fid_file.write("%.8g  " % (cl['tt'][l]+self.noise_T[l]))
+                    fid_file.write("%.8g  " % (cl['ee'][l]+self.noise_P[l]))
+                    fid_file.write("%.8g  " % cl['te'][l])
                 if self.Bmodes:
                     # next three lines added by S. Clesse for delensing
                     if self.delensing:
@@ -1317,7 +1338,8 @@ class Likelihood_mock_cmb(Likelihood):
                     # we want to store clDD = l(l+1) clpp
                     # and ClTD = sqrt(l(l+1)) Cltp
                     fid_file.write("%.8g  " % (l*(l+1.)*cl['pp'][l] + self.Nldd[l]))
-                    fid_file.write("%.8g  " % (math.sqrt(l*(l+1.))*cl['tp'][l]))
+                    if not self.ExcludeTTTEEE:
+                        fid_file.write("%.8g  " % (math.sqrt(l*(l+1.))*cl['tp'][l]))
                 fid_file.write("\n")
             print '\n'
             warnings.warn(
@@ -1329,12 +1351,16 @@ class Likelihood_mock_cmb(Likelihood):
 
         chi2 = 0
 
-        # cound number of modes.
+        # count number of modes.
         # number of modes is different form number of spectra
         # modes = T,E,[B],[D=deflection]
         # spectra = TT,EE,TE,[BB],[DD,TD]
         # default:
-        num_modes=2
+        if not self.ExcludeTTTEEE:
+            num_modes=2
+        # default 0 if excluding TT EE
+        else:
+            num_modes=0
         # add B mode:
         if self.Bmodes:
             num_modes += 1
@@ -1349,7 +1375,7 @@ class Likelihood_mock_cmb(Likelihood):
         for l in range(self.l_min, self.l_max+1):
 
             if self.Bmodes and self.LensingExtraction:
-                raise io_mp.LikelihoodError("We have implemented a version of the liklihood with B modes, a version with lensing extraction, but not yet a version with both at the same time. You can implement it.")
+                raise io_mp.LikelihoodError("We have implemented a version of the likelihood with B modes, a version with lensing extraction, but not yet a version with both at the same time. You can implement it.")
 
             # case with B modes:
             elif self.Bmodes:
@@ -1370,13 +1396,21 @@ class Likelihood_mock_cmb(Likelihood):
                         [0, 0, cl['bb'][l]+self.noise_P[l]]])
 
             # case with lensing
-            # note that the likelihood is base on ClDD (deflection spectrum)
+            # note that the likelihood is based on ClDD (deflection spectrum)
             # rather than Clpp (lensing potential spectrum)
             # But the Bolztmann code input is Clpp
             # So we make the conversion using ClDD = l*(l+1.)*Clpp
             # So we make the conversion using ClTD = sqrt(l*(l+1.))*Cltp
-            elif self.LensingExtraction:
 
+            # just DD, i.e. no TT or EE.
+            elif self.LensingExtraction and self.ExcludeTTTEEE:
+                cldd_fid = self.Cl_fid[self.index_pp, l]
+                cldd = l*(l+1.)*cl['pp'][l]
+                Cov_obs = np.array([[cldd_fid]])
+                Cov_the = np.array([[cldd+self.Nldd[l]]])
+
+            # Usual TTTEEE plus DD and TD
+            elif self.LensingExtraction:
                 cldd_fid = self.Cl_fid[self.index_pp, l]
                 cldd = l*(l+1.)*cl['pp'][l]
                 if self.neglect_TD:
