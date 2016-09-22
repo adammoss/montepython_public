@@ -792,6 +792,7 @@ class Data(object):
             elif elem == 'beta':
                 self.cosmo_arguments['alpha'] = 2.*self.cosmo_arguments['beta']
             elif elem == 'M_tot_NH':
+                # By T. Brinckmann
                 # Normal hierarchy massive neutrinos. Calculates the individual
                 # neutrino masses from M_tot_NH and deletes M_tot_NH
                 if not self.cosmo_arguments['N_ncdm'] == 3:
@@ -816,6 +817,7 @@ class Data(object):
                 self.cosmo_arguments['m_ncdm'] = r'%g, %g, %g' % (m1,m2,m3)
                 del self.cosmo_arguments[elem]
             elif elem == 'M_tot_IH':
+                # By T. Brinckmann
                 # Inverted hierarchy massive neutrinos. Calculates the individual
                 # neutrino masses from M_tot_IH and deletes M_tot_IH
                 if not self.cosmo_arguments['N_ncdm'] == 3:
@@ -840,17 +842,23 @@ class Data(object):
                 self.cosmo_arguments['m_ncdm'] = r'%g, %g, %g' % (m1,m2,m3)
                 del self.cosmo_arguments[elem]
             elif elem == 'M_tot':
+                # By T. Brinckmann
                 # Massive neutrinos with identical non-zero mass. Calculates the
                 # individual neutrino masses from M_tot and deletes M_tot
                 if not self.cosmo_arguments['N_ncdm'] == 1:
                     raise ValueError(
                         "N_ncdm is not equal to 1."
                         " This value should be exactly 1.")
-                #if not self.cosmo_arguments['deg_ncdm'] == 3:
-                #    raise ValueError(
-                #        "deg_ncdm is not equal to 3."
-                #        " This value should be exactly 3.")
                 self.cosmo_arguments['m_ncdm'] = self.cosmo_arguments['M_tot']/self.cosmo_arguments['deg_ncdm']
+                del self.cosmo_arguments[elem]
+            elif elem == 'm_s_eff':
+                # By T. Brinckmann
+                # conversion from effective sterile neutrino mass to physical sterile neutrino mass, assuming that this
+                # is the ncdm species number 2 and that it is Dodelson-Widrow like (i.e same temperature as active neutrinos)
+                #print self.cosmo_arguments
+                #self.cosmo_arguments['m_ncdm__2'] = self.cosmo_arguments['deg_ncdm__2']*self.cosmo_arguments[elem]
+                m_s_eff = self.cosmo_arguments[elem]/self.cosmo_arguments['deg_ncdm__2']
+                self.cosmo_arguments['m_ncdm'] = r'%g, %g' % (float(self.cosmo_arguments['m_ncdm']), m_s_eff)
                 del self.cosmo_arguments[elem]
 
             # Finally, deal with all the parameters ending with __i, where i is
