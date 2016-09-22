@@ -166,88 +166,6 @@ def get_covariance_matrix(cosmo, data, command_line):
     except:
         command_line.quiet = False
 
-    if command_line.fisher and not command_line.cov:
-        # We will work out the fisher matrix for all the parameters and
-        # write it to a file
-        if not command_line.silent:
-            warnings.warn("Fisher implementation is being tested")
-
-        # Let us create a separate copy of data
-        from copy import deepcopy
-        # Do not modify data, instead copy
-        temp_data = deepcopy(data)
-        done = False
-
-        # Create the center dictionary, which will hold the center point
-        # information (or best-fit) TODO
-        # This dictionary will be updated in case it was too far from the
-        # best-fit, and found a non positive-definite symmetric fisher matrix.
-        center = {}
-        if not command_line.bf:
-            for elem in parameter_names:
-                temp_data.mcmc_parameters[elem]['current'] = (
-                    data.mcmc_parameters[elem]['initial'][0])
-                center[elem] = data.mcmc_parameters[elem]['initial'][0]
-        else:
-            read_args_from_bestfit(temp_data, command_line.bf)
-            for elem in parameter_names:
-                temp_data.mcmc_parameters[elem]['current'] = (
-                    temp_data.mcmc_parameters[elem]['last_accepted'])
-                center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
-
-        # Have a security index that prevents looping indefinitely
-        security = 0
-        while not done and security < 10:
-            security += 1
-            # Compute the Fisher matrix and the gradient array at the center
-            # point.
-            fisher_matrix, gradient = compute_fisher(
-                temp_data, cosmo, center, 0.01)
-
-            # Compute inverse of the fisher matrix, catch LinAlgError exception
-            fisher_invert_success = True
-            try:
-                if not command_line.silent:
-                    print("Fisher matrix computed:")
-                    print(fisher_matrix)
-                cov_matrix = np.linalg.inv(fisher_matrix)
-            except np.linalg.LinAlgError:
-                raise io_mp.ConfigurationError(
-                    "Could not find Fisher matrix, please remove the "
-                    "option --fisher and run with Metropolis-Hastings "
-                    "or another sampling method.")
-                fisher_invert_success = False
-                done = True
-
-            # Write it to the file
-            if fisher_invert_success:
-                io_mp.write_covariance_matrix(
-                    cov_matrix, parameter_names,
-                    os.path.join(command_line.folder, 'covariance_fisher.mat'))
-
-                command_line.cov = os.path.join(
-                    command_line.folder, 'covariance_fisher.mat')
-
-                done = True
-                # Check if the diagonal elements are non-negative
-                for h, elem in enumerate(parameter_names):
-                    if cov_matrix[h][h] < 0:
-                        warnings.warn(
-                            "Covariance has negative values on diagonal, "
-                            "moving to a better point and repeating "
-                            "the Fisher computation")
-                        done = False
-                        break
-
-                if not done:
-                    # Solve for a step
-                    step = np.dot(cov_matrix, gradient)
-                    # Now modify data_parameters TODO HERE update center
-                    for k, elem in enumerate(parameter_names):
-                        data.mcmc_parameters[elem]['initial'][0] = data.mcmc_parameters[elem]['initial'][0]-step[k]
-                        temp_data.mcmc_parameters[elem]['initial'][0] = temp_data.mcmc_parameters[elem]['initial'][0]-step[k]
-                        print "Moved %s to:"%(elem),data.mcmc_parameters[elem]['initial'][0]
-
     # if the user provides a .covmat file or if user asks to compute a fisher matrix
     if command_line.cov is not None:
 
@@ -400,6 +318,100 @@ def get_covariance_matrix(cosmo, data, command_line):
 
     #inverse, and diagonalization
     eigv, eigV = np.linalg.eig(np.linalg.inv(matrix))
+
+    if command_line.fisher:
+        eigv, eigV, matrix = get_fisher_matrix(cosmo, data, command_line, matrix)
+
+    return eigv, eigV, matrix
+
+
+def get_fisher_matrix(cosmo, data, command_line, matrix):
+    # Adapted by T. Brinckmann
+    # We will work out the fisher matrix for all the parameters and
+    # write it to a file
+    if not command_line.silent:
+        warnings.warn("Fisher implementation is being tested")
+
+    # Let us create a separate copy of data
+    from copy import deepcopy
+    # Do not modify data, instead copy
+    temp_data = deepcopy(data)
+    done = False
+
+    # Create the center dictionary, which will hold the center point
+    # information (or best-fit) TODO
+    # This dictionary will be updated in case it was too far from the
+    # best-fit, and found a non positive-definite symmetric fisher matrix.
+    center = {}
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    if not command_line.bf:
+        for elem in parameter_names:
+            temp_data.mcmc_parameters[elem]['current'] = (
+                data.mcmc_parameters[elem]['initial'][0])
+            center[elem] = data.mcmc_parameters[elem]['initial'][0]
+    else:
+        read_args_from_bestfit(temp_data, command_line.bf)
+        for elem in parameter_names:
+            temp_data.mcmc_parameters[elem]['current'] = (
+                temp_data.mcmc_parameters[elem]['last_accepted'])
+            center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
+
+    # Load stepsize from input covmat or covmat generated from param file
+    stepsize = np.zeros(len(parameter_names))
+    for index in range(len(parameter_names)):
+        stepsize[index] = (matrix[index][index])**0.5
+
+    # Have a security index that prevents looping indefinitely
+    security = 0
+    while not done and security < 10:
+        security += 1
+        # Compute the Fisher matrix and the gradient array at the center
+        # point.
+        fisher_matrix, gradient = compute_fisher(
+            temp_data, cosmo, center, stepsize)
+
+        # Compute inverse of the fisher matrix, catch LinAlgError exception
+        fisher_invert_success = True
+        try:
+            if not command_line.silent:
+                print("Fisher matrix computed:")
+                print(fisher_matrix)
+            cov_matrix = np.linalg.inv(fisher_matrix)
+        except np.linalg.LinAlgError:
+            raise io_mp.ConfigurationError(
+                "Could not find Fisher matrix, please remove the "
+                "option --fisher and run with Metropolis-Hastings "
+                "or another sampling method.")
+            fisher_invert_success = False
+            done = True
+
+        # Write it to the file
+        if fisher_invert_success:
+            io_mp.write_covariance_matrix(
+                cov_matrix, parameter_names,
+                os.path.join(command_line.folder, 'covariance_fisher.mat'))
+
+            command_line.cov = os.path.join(
+                command_line.folder, 'covariance_fisher.mat')
+
+            done = True
+            # Check if the diagonal elements are non-negative
+            for h, elem in enumerate(parameter_names):
+                if cov_matrix[h][h] < 0:
+                    warnings.warn(
+                        "Covariance has negative values on diagonal, "
+                        "moving to a better point and repeating "
+                        "the Fisher computation")
+                    done = False
+                    break
+
+            if not done:
+                raise ValueError("Negative values on diagonal, please use a better bestfit and/or covmat - aborting run")
+
+    # Load the computed fisher matrix as the new starting covariance matrix
+    command_line.fisher = False
+    eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)
+
     return eigv, eigV, matrix
 
 
@@ -491,6 +503,11 @@ def compute_lkl(cosmo, data):
         try:
             cosmo.compute(["lensing"])
         except CosmoComputationError as failure_message:
+            # could be useful to uncomment for debugging:
+            #np.set_printoptions(precision=30, linewidth=150)
+            #print 'cosmo params'
+            #print data.cosmo_arguments
+            #print data.cosmo_arguments['tau_reio']
             sys.stderr.write(str(failure_message)+'\n')
             sys.stderr.flush()
             return data.boundary_loglike
@@ -564,7 +581,7 @@ def compute_lkl(cosmo, data):
 
 
 def compute_fisher(data, cosmo, center, step_size):
-
+    # Adapted by T. Brinckmann
     parameter_names = data.get_mcmc_parameters(['varying'])
     fisher_matrix = np.zeros(
         (len(parameter_names), len(parameter_names)), 'float64')
@@ -572,13 +589,13 @@ def compute_fisher(data, cosmo, center, step_size):
     gradient = np.zeros(len(parameter_names), 'float64')
 
     for k, elem_k in enumerate(parameter_names):
-        kdiff = center[elem_k]*step_size
+        kdiff = center[elem_k]*step_size[k]
         if kdiff == 0.0:
-            kdiff = step_size
+            kdiff = step_size[k]
         for h, elem_h in enumerate(parameter_names):
-            hdiff = center[elem_h]*step_size
+            hdiff = center[elem_h]*step_size[h]
             if hdiff == 0.0:
-                hdiff = step_size
+                hdiff = step_size[h]
             # Since the matrix is symmetric, we only compute the
             # elements of one half of it plus the diagonal.
             if k > h:
