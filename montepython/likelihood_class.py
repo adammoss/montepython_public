@@ -1060,31 +1060,79 @@ class Likelihood_mock_cmb(Likelihood):
         # Noise spectrum
         ################
 
-        # convert arcmin to radians
-        self.theta_fwhm *= np.array([math.pi/60/180])
-        self.sigma_T *= np.array([math.pi/60/180])
-        self.sigma_P *= np.array([math.pi/60/180])
+        try:
+            self.noise_from_file
+        except:
+            self.noise_from_file = False
 
-        # compute noise in muK**2
-        self.noise_T = np.zeros(self.l_max+1, 'float64')
-        self.noise_P = np.zeros(self.l_max+1, 'float64')
+        if self.noise_from_file:
 
-        for l in range(self.l_min, self.l_max+1):
-            self.noise_T[l] = 0
-            self.noise_P[l] = 0
-            for channel in range(self.num_channels):
-                self.noise_T[l] += self.sigma_T[channel]**-2 *\
-                    math.exp(
-                        -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
-                self.noise_P[l] += self.sigma_P[channel]**-2 *\
-                    math.exp(
-                        -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
-            self.noise_T[l] = 1/self.noise_T[l]
-            self.noise_P[l] = 1/self.noise_P[l]
+            try:
+                self.noise_file
+            except:
+                raise io_mp.LikelihoodError("For reading noise from file, you must provide noise_file")
+
+            self.noise_T = np.zeros(self.l_max+1, 'float64')
+            self.noise_P = np.zeros(self.l_max+1, 'float64')
+            if self.LensingExtraction:
+                self.Nldd = np.zeros(self.l_max+1, 'float64')
+
+            if os.path.exists(os.path.join(self.data_directory, self.noise_file)):
+                noise = open(os.path.join(
+                    self.data_directory, self.noise_file), 'r')
+                line = noise.readline()
+                while line.find('#') != -1:
+                    line = noise.readline()
+
+                for l in range(self.l_min, self.l_max+1):
+                    ll = int(float(line.split()[0]))
+                    if l != ll:
+                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
+                    # read noise for C_l in muK**2
+                    self.noise_T[l] = float(line.split()[1])
+                    self.noise_P[l] = float(line.split()[2])
+                    if self.LensingExtraction:
+                        try:
+                            # read noise for C_l^dd = l(l+1) C_l^pp
+                            self.Nldd[l] = float(line.split()[3])/(l*(l+1)/2./math.pi)
+                        except:
+                            raise io_mp.LikelihoodError("For reading lensing noise from file, you must provide one more column")
+                    line = noise.readline()
+            else:
+                raise io_mp.LikelihoodError("Could not find file ",self.noise_file)
+
+
+        else:
+            # convert arcmin to radians
+            self.theta_fwhm *= np.array([math.pi/60/180])
+            self.sigma_T *= np.array([math.pi/60/180])
+            self.sigma_P *= np.array([math.pi/60/180])
+
+            # compute noise in muK**2
+            self.noise_T = np.zeros(self.l_max+1, 'float64')
+            self.noise_P = np.zeros(self.l_max+1, 'float64')
+
+            for l in range(self.l_min, self.l_max+1):
+                self.noise_T[l] = 0
+                self.noise_P[l] = 0
+                for channel in range(self.num_channels):
+                    self.noise_T[l] += self.sigma_T[channel]**-2 *\
+                                       math.exp(
+                                           -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
+                    self.noise_P[l] += self.sigma_P[channel]**-2 *\
+                                       math.exp(
+                                           -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
+                    self.noise_T[l] = 1/self.noise_T[l]
+                    self.noise_P[l] = 1/self.noise_P[l]
 
         # impose that the cosmological code computes Cl's up to maximum l
         # needed by the window function
         self.need_cosmo_arguments(data, {'l_max_scalars': self.l_max})
+
+        # if you want to print the noise spectra:
+        # test = open('test','w')
+        # for l in range(self.l_min, self.l_max+1):
+        #     test.write('%d  %e  %e\n'%(l,self.noise_T[l],self.noise_P[l]))
 
         ###########################################################################
         # implementation of default settings for flags describing the likelihood: #
@@ -1179,35 +1227,36 @@ class Likelihood_mock_cmb(Likelihood):
                 self.index_tp = numCls
                 numCls += 1
 
-            # provide a file containing NlDD (noise for the extracted
-            # deflection field spectrum) This option is temporary
-            # because at some point this module will compute NlDD
-            # itself, when logging the fiducial model spectrum.
-            try:
-                self.temporary_Nldd_file
-            except:
-                raise io_mp.LikelihoodError("For lensing extraction, you must provide a temporary_Nldd_file")
+            if not self.noise_from_file:
+                # provide a file containing NlDD (noise for the extracted
+                # deflection field spectrum) This option is temporary
+                # because at some point this module will compute NlDD
+                # itself, when logging the fiducial model spectrum.
+                try:
+                    self.temporary_Nldd_file
+                except:
+                    raise io_mp.LikelihoodError("For lensing extraction, you must provide a temporary_Nldd_file")
 
-            # read the NlDD file
-            self.Nldd = np.zeros(self.l_max+1, 'float64')
+                # read the NlDD file
+                self.Nldd = np.zeros(self.l_max+1, 'float64')
 
-            if os.path.exists(os.path.join(self.data_directory, self.temporary_Nldd_file)):
-                fid_file = open(os.path.join(self.data_directory, self.temporary_Nldd_file), 'r')
-                line = fid_file.readline()
-                while line.find('#') != -1:
+                if os.path.exists(os.path.join(self.data_directory, self.temporary_Nldd_file)):
+                    fid_file = open(os.path.join(self.data_directory, self.temporary_Nldd_file), 'r')
                     line = fid_file.readline()
-                while (line.find('\n') != -1 and len(line) == 1):
-                    line = fid_file.readline()
-                for l in range(self.l_min, self.l_max+1):
-                    ll = int(float(line.split()[0]))
-                    if l != ll:
-                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
-                    # this lines assumes that Nldd is stored in the
-                    # 4th column (can be customised)
-                    self.Nldd[ll] = float(line.split()[3])/(l*(l+1.)/2./math.pi)
-                    line = fid_file.readline()
-            else:
-                raise io_mp.LikelihoodError("Could not find file ",self.temporary_Nldd_file)
+                    while line.find('#') != -1:
+                        line = fid_file.readline()
+                    while (line.find('\n') != -1 and len(line) == 1):
+                        line = fid_file.readline()
+                    for l in range(self.l_min, self.l_max+1):
+                        ll = int(float(line.split()[0]))
+                        if l != ll:
+                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        # this lines assumes that Nldd is stored in the
+                        # 4th column (can be customised)
+                        self.Nldd[ll] = float(line.split()[3])/(l*(l+1.)/2./math.pi)
+                        line = fid_file.readline()
+                else:
+                    raise io_mp.LikelihoodError("Could not find file ",self.temporary_Nldd_file)
 
         # deal with fiducial model:
         # If the file exists, initialize the fiducial values
