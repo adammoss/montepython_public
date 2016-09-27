@@ -1125,6 +1125,18 @@ class Likelihood_mock_cmb(Likelihood):
                     self.noise_T[l] = 1/self.noise_T[l]
                     self.noise_P[l] = 1/self.noise_P[l]
 
+
+        # trick to remove any information from polarisation for l<30
+        try:
+            self.no_small_l_pol
+        except:
+            self.no_small_l_pol = False
+
+        if self.no_small_l_pol:
+            for l in range(self.l_min,30):
+                self.noise_P[l] *= 100.
+
+
         # impose that the cosmological code computes Cl's up to maximum l
         # needed by the window function
         self.need_cosmo_arguments(data, {'l_max_scalars': self.l_max})
