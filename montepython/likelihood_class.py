@@ -1122,8 +1122,8 @@ class Likelihood_mock_cmb(Likelihood):
                     self.noise_P[l] += self.sigma_P[channel]**-2 *\
                                        math.exp(
                                            -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
-                    self.noise_T[l] = 1/self.noise_T[l]
-                    self.noise_P[l] = 1/self.noise_P[l]
+                self.noise_T[l] = 1/self.noise_T[l]
+                self.noise_P[l] = 1/self.noise_P[l]
 
 
         # trick to remove any information from polarisation for l<30
@@ -1142,9 +1142,9 @@ class Likelihood_mock_cmb(Likelihood):
         self.need_cosmo_arguments(data, {'l_max_scalars': self.l_max})
 
         # if you want to print the noise spectra:
-        # test = open('test','w')
-        # for l in range(self.l_min, self.l_max+1):
-        #     test.write('%d  %e  %e\n'%(l,self.noise_T[l],self.noise_P[l]))
+        #test = open('noise_T_P','w')
+        #for l in range(self.l_min, self.l_max+1):
+        #    test.write('%d  %e  %e\n'%(l,self.noise_T[l],self.noise_P[l]))
 
         ###########################################################################
         # implementation of default settings for flags describing the likelihood: #
