@@ -13,7 +13,7 @@ fake_planck_realistic.fiducial_file      = 'fake_planck_realistic_fiducial.dat'
 
 fake_planck_realistic.l_min              = 2
 fake_planck_realistic.l_max              = 2500
-fake_planck_realistic.f_sky              = 0.65
+fake_planck_realistic.f_sky              = 0.57
 
 fake_planck_realistic.noise_from_file = True
 fake_planck_realistic.noise_file = 'fake_planck_realistic.dat'
