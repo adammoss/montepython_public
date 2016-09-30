@@ -1134,7 +1134,8 @@ class Likelihood_mock_cmb(Likelihood):
 
         if self.no_small_l_pol:
             for l in range(self.l_min,30):
-                self.noise_P[l] *= 100.
+                # plug a noise level of 100 muK**2, equivalent to no detection at all of polarisation
+                self.noise_P[l] = 100.
 
 
         # impose that the cosmological code computes Cl's up to maximum l
