@@ -15,6 +15,8 @@ import math
 import warnings
 import re
 import scipy.constants as const
+import scipy.integrate
+import scipy.interpolate
 
 import io_mp
 
@@ -1549,12 +1551,14 @@ class Likelihood_mpk(Likelihood):
         self.k = np.zeros((self.k_size), 'float64')
         self.kh = np.zeros((self.k_size), 'float64')
 
-        datafile = open(self.data_directory+self.kbands_file, 'r')
+        datafile = open(os.path.join(self.data_directory, self.kbands_file), 'r')
 
         for i in range(self.num_mpk_kbands_full):
             line = datafile.readline()
-            if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
-                self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
+            if i+2 > self.min_mpk_kbands_use and i-1 < self.max_mpk_kbands_use:
+            #if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
+                self.kh[i-self.min_mpk_kbands_use] = float(line.split()[0])
+                #self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
         datafile.close()
 
         khmax = self.kh[-1]
@@ -1564,6 +1568,13 @@ class Likelihood_mpk(Likelihood):
             self.use_giggleZ
         except:
             self.use_giggleZ = False
+
+        # sdssDR7 adapted from A. Cuesta by T. Brinckmann
+        # Based on Reid et al. 2010 arXiv:0907.1657 - Note: arXiv version not updated
+        try:
+            self.use_sdssDR7
+        except:
+            self.use_sdssDR7 = False
 
         # Try a new model, with an additional nuisance parameter. Note
         # that the flag use_giggleZPP0 being True requires use_giggleZ
@@ -1588,7 +1599,7 @@ class Likelihood_mpk(Likelihood):
                     "'use_giggleZPP0' is set to true for WiggleZ")
 
         if self.use_giggleZ:
-            datafile = open(self.data_directory+self.giggleZ_fidpk_file, 'r')
+            datafile = open(os.path.join(self.data_directory,self.giggleZ_fidpk_file), 'r')
 
             line = datafile.readline()
             k = float(line.split()[0])
@@ -1610,8 +1621,13 @@ class Likelihood_mpk(Likelihood):
             khmax *= 2
 
         # require k_max and z_max from the cosmological module
-        self.need_cosmo_arguments(
-            data, {'P_k_max_h/Mpc': khmax, 'z_max_pk': self.redshift})
+        if self.use_sdssDR7:
+            self.need_cosmo_arguments(data, {'z_max_pk': self.zmax})
+            #self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 1.5*self.kmax})
+            self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 5.*self.kmax})
+        else:
+            self.need_cosmo_arguments(
+                data, {'P_k_max_h/Mpc': khmax, 'z_max_pk': self.redshift})
 
         # read information on different regions in the sky
         try:
@@ -1640,35 +1656,47 @@ class Likelihood_mpk(Likelihood):
         self.window = np.zeros(
             (self.num_regions, self.n_size, self.k_size), 'float64')
 
-        datafile = open(self.data_directory+self.windows_file, 'r')
+        datafile = open(os.path.join(self.data_directory, self.windows_file), 'r')
         for i_region in range(self.num_regions):
-            if self.num_regions > 1:
-                line = datafile.readline()
-            for i in range(self.num_mpk_points_full):
+            if not self.use_sdssDR7:
+                if self.num_regions > 1:
+                    line = datafile.readline()
+            for i in range(self.num_mpk_points_full+1):
+            #for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
                 if (i+2 > self.min_mpk_points_use and
-                        i < self.max_mpk_points_use):
+                        i < self.max_mpk_points_use+1):
+                        #i < self.max_mpk_points_use):
                     for j in range(self.k_size):
-                        self.window[i_region, i-self.min_mpk_points_use+1, j]=\
-                            float(line.split()[j+self.min_mpk_kbands_use-1])
+                        self.window[i_region, i-self.min_mpk_points_use, j]=\
+                            float(line.split()[j+self.min_mpk_kbands_use])
+                            #float(line.split()[j+self.min_mpk_kbands_use-1])
+                        #self.window[i_region, i-self.min_mpk_points_use+1, j]=\
+                        #    float(line.split()[j+self.min_mpk_kbands_use-1])
         datafile.close()
 
         # read measurements
         self.P_obs = np.zeros((self.num_regions, self.n_size), 'float64')
         self.P_err = np.zeros((self.num_regions, self.n_size), 'float64')
 
-        datafile = open(self.data_directory+self.measurements_file, 'r')
+        datafile = open(os.path.join(self.data_directory, self.measurements_file), 'r')
         for i_region in range(self.num_regions):
             for i in range(2):
                 line = datafile.readline()
-            for i in range(self.num_mpk_points_full):
+            for i in range(self.num_mpk_points_full+1):
+            #for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
                 if (i+2 > self.min_mpk_points_use and
-                        i < self.max_mpk_points_use):
-                    self.P_obs[i_region, i-self.min_mpk_points_use+1] = \
+                        i < self.max_mpk_points_use+1):
+                        #i < self.max_mpk_points_use):
+                    self.P_obs[i_region, i-self.min_mpk_points_use] = \
                         float(line.split()[3])
-                    self.P_err[i_region, i-self.min_mpk_points_use+1] = \
+                    #self.P_obs[i_region, i-self.min_mpk_points_use+1] = \
+                    #    float(line.split()[3])
+                    self.P_err[i_region, i-self.min_mpk_points_use] = \
                         float(line.split()[4])
+                    #self.P_err[i_region, i-self.min_mpk_points_use+1] = \
+                    #    float(line.split()[4])
         datafile.close()
 
         # read covariance matrices
@@ -1685,21 +1713,32 @@ class Likelihood_mpk(Likelihood):
             cov = np.zeros((self.n_size, self.n_size), 'float64')
             invcov_tmp = np.zeros((self.n_size, self.n_size), 'float64')
 
-            datafile = open(self.data_directory+self.covmat_file, 'r')
+            datafile = open(os.path.join(self.data_directory, self.covmat_file), 'r')
             for i_region in range(self.num_regions):
-                for i in range(1):
-                    line = datafile.readline()
-                for i in range(self.num_mpk_points_full):
+                if not self.use_sdssDR7:
+                    for i in range(1):
+                        line = datafile.readline()
+                for i in range(self.num_mpk_points_full+1):
+                #for i in range(self.num_mpk_points_full):
                     line = datafile.readline()
                     if (i+2 > self.min_mpk_points_use and
-                            i < self.max_mpk_points_use):
-                        for j in range(self.num_mpk_points_full):
+                            i < self.max_mpk_points_use+1):
+                            #i < self.max_mpk_points_use):
+                        for j in range(self.num_mpk_points_full+1):
+                        #for j in range(self.num_mpk_points_full):
                             if (j+2 > self.min_mpk_points_use and
-                                    j < self.max_mpk_points_use):
-                                cov[i-self.min_mpk_points_use+1,
-                                    j-self.min_mpk_points_use+1] =\
+                                    j < self.max_mpk_points_use+1):
+                                    #j < self.max_mpk_points_use):
+                                cov[i-self.min_mpk_points_use,
+                                    j-self.min_mpk_points_use] =\
                                     float(line.split()[j])
-                invcov_tmp = np.linalg.inv(cov)
+                                #cov[i-self.min_mpk_points_use+1,
+                                #    j-self.min_mpk_points_use+1] =\
+                                #    float(line.split()[j])
+                if self.use_invcov:
+                    invcov_tmp = cov
+                else:
+                    invcov_tmp = np.linalg.inv(cov)
                 for i in range(self.n_size):
                     for j in range(self.n_size):
                         self.invcov[i_region, i, j] = invcov_tmp[i, j]
@@ -1714,7 +1753,7 @@ class Likelihood_mpk(Likelihood):
         if self.use_giggleZ:
             self.P_fid = np.zeros((self.k_fid_size), 'float64')
             self.k_fid = np.zeros((self.k_fid_size), 'float64')
-            datafile = open(self.data_directory+self.giggleZ_fidpk_file, 'r')
+            datafile = open(os.path.join(self.data_directory,self.giggleZ_fidpk_file), 'r')
             for i in range(ifid_discard):
                 line = datafile.readline()
             for i in range(self.k_fid_size):
@@ -1723,7 +1762,129 @@ class Likelihood_mpk(Likelihood):
                 self.P_fid[i] = float(line.split()[1])
             datafile.close()
 
+        # read integral constraint
+        if self.use_sdssDR7:
+            self.zerowindowfxn = np.zeros((self.k_size), 'float64')
+            datafile = open(os.path.join(self.data_directory,self.zerowindowfxn_file), 'r')
+            for i in range(self.k_size):
+                line = datafile.readline()
+                self.zerowindowfxn[i] = float(line.split()[0])
+            datafile.close()
+            self.zerowindowfxnsubtractdat = np.zeros((self.n_size), 'float64')
+            datafile = open(os.path.join(self.data_directory,self.zerowindowfxnsubtractdat_file), 'r')
+            line = datafile.readline()
+            self.zerowindowfxnsubtractdatnorm = float(line.split()[0])
+            for i in range(self.n_size):
+                line = datafile.readline()
+            self.zerowindowfxnsubtractdat[i] = float(line.split()[0])
+            datafile.close()
+
+        # initialize array of values for the nuisance parameters a1,a2
+        if self.use_sdssDR7:
+            nptsa1=self.nptsa1
+            nptsa2=self.nptsa2
+            a1maxval=self.a1maxval
+            self.a1list=np.zeros(self.nptstot)
+            self.a2list=np.zeros(self.nptstot)
+            da1 = a1maxval/(nptsa1/2)
+            da2 = self.a2maxpos(-a1maxval) / (nptsa2/2)
+            count=0
+            for i in range(-nptsa1/2, nptsa1/2+1):
+                for j in range(-nptsa2/2, nptsa2/2+1):
+                    a1val = da1*i
+                    a2val = da2*j
+                    if ((a2val >= 0.0 and a2val <= self.a2maxpos(a1val) and a2val >= self.a2minfinalpos(a1val)) or \
+                        (a2val <= 0.0 and a2val <= self.a2maxfinalneg(a1val) and a2val >= self.a2minneg(a1val))):
+                        if (self.testa1a2(a1val,a2val) == False):
+                            raise io_mp.LikelihoodError(
+                                'Error in likelihood %s ' % (self.name) +
+                                'Nuisance parameter values not valid: %s %s' % (a1,a2) )
+                        if(count >= self.nptstot):
+                            raise io_mp.LikelihoodError(
+                                'Error in likelihood %s ' % (self.name) +
+                                'count > nptstot failure' )
+                        self.a1list[count]=a1val
+                        self.a2list[count]=a2val
+                        count=count+1
+
         return
+
+    # functions added for nuisance parameter space checks.
+    def a2maxpos(self,a1val):
+        a2max = -1.0
+        if (a1val <= min(self.s1/self.k1,self.s2/self.k2)):
+            a2max = min(self.s1/self.k1**2 - a1val/self.k1, self.s2/self.k2**2 - a1val/self.k2)
+        return a2max
+
+    def a2min1pos(self,a1val):
+        a2min1 = 0.0
+        if(a1val <= 0.0):
+            a2min1 = max(-self.s1/self.k1**2 - a1val/self.k1, -self.s2/self.k2**2 - a1val/self.k2, 0.0)
+        return a2min1
+
+    def a2min2pos(self,a1val):
+        a2min2 = 0.0
+        if(abs(a1val) >= 2.0*self.s1/self.k1 and a1val <= 0.0):
+            a2min2 = a1val**2/self.s1*0.25
+        return a2min2
+
+    def a2min3pos(self,a1val):
+        a2min3 = 0.0
+        if(abs(a1val) >= 2.0*self.s2/self.k2 and a1val <= 0.0):
+            a2min3 = a1val**2/self.s2*0.25
+        return a2min3
+
+    def a2minfinalpos(self,a1val):
+        a2minpos = max(self.a2min1pos(a1val),self.a2min2pos(a1val),self.a2min3pos(a1val))
+        return a2minpos
+
+    def a2minneg(self,a1val):
+        if (a1val >= max(-self.s1/self.k1,-self.s2/self.k2)):
+            a2min = max(-self.s1/self.k1**2 - a1val/self.k1, -self.s2/self.k2**2 - a1val/self.k2)
+        else:
+            a2min = 1.0
+        return a2min
+
+    def a2max1neg(self,a1val):
+        if(a1val >= 0.0):
+            a2max1 = min(self.s1/self.k1**2 - a1val/self.k1, self.s2/self.k2**2 - a1val/self.k2, 0.0)
+        else:
+            a2max1 = 0.0
+        return a2max1
+
+    def a2max2neg(self,a1val):
+        a2max2 = 0.0
+        if(abs(a1val) >= 2.0*self.s1/self.k1 and a1val >= 0.0):
+            a2max2 = -a1val**2/self.s1*0.25
+        return a2max2
+
+    def a2max3neg(self,a1val):
+        a2max3 = 0.0
+        if(abs(a1val) >= 2.0*self.s2/self.k2 and a1val >= 0.0):
+            a2max3 = -a1val**2/self.s2*0.25
+        return a2max3
+
+    def a2maxfinalneg(self,a1val):
+        a2maxneg = min(self.a2max1neg(a1val),self.a2max2neg(a1val),self.a2max3neg(a1val))
+        return a2maxneg
+
+    def testa1a2(self,a1val, a2val):
+        testresult = True
+        # check if there's an extremum; either a1val or a2val has to be negative, not both
+        if (a2val==0.):
+             return testresult #not in the original code, but since a2val=0 returns True this way I avoid zerodivisionerror
+        kext = -a1val/2.0/a2val
+        diffval = abs(a1val*kext + a2val*kext**2)
+        if(kext > 0.0 and kext <= self.k1 and diffval > self.s1):
+            testresult = False
+        if(kext > 0.0 and kext <= self.k2 and diffval > self.s2):
+            testresult = False
+        if (abs(a1val*self.k1 + a2val*self.k1**2) > self.s1):
+            testresult = False
+        if (abs(a1val*self.k2 + a2val*self.k2**2) > self.s2):
+            testresult = False
+        return testresult
+
 
     def add_common_knowledge(self, common_dictionary):
         """
@@ -1758,12 +1919,21 @@ class Likelihood_mpk(Likelihood):
         if self.use_scaling:
             # angular diameter distance at this redshift, in Mpc
             d_angular = cosmo.angular_distance(self.redshift)
-
+            print 'z,dA'
+            print self.redshift
+            print d_angular
             # radial distance at this redshift, in Mpc, is simply 1/H (itself
             # in Mpc^-1). Hz is an array, with only one element.
             r, Hz = cosmo.z_of_r([self.redshift])
             d_radial = 1/Hz[0]
-
+            print 'r,Hz,d_r'
+            print r
+            print Hz[0]
+            print d_radial
+            print 'a_angular',d_angular/self.d_angular_fid
+            print 'a_radial',d_radial/self.d_radial_fid
+            print 'a',((d_angular/self.d_angular_fid)**2. * (d_radial/self.d_radial_fid))**(1./3.)
+            print 'a',1./((d_angular/self.d_angular_fid)**2. * (d_radial/self.d_radial_fid))**(1./3.)
             # scaling factor = (d_angular**2 * d_radial)^(1/3) for the
             # fiducial cosmology used in the data files of the observations
             # divided by the same quantity for the cosmology we are comparing with.
@@ -1773,9 +1943,11 @@ class Likelihood_mpk(Likelihood):
             scaling = pow(
                 (self.d_angular_fid/d_angular)**2 *
                 (self.d_radial_fid/d_radial), 1./3.)
+            print d_angular, d_radial
         else:
             scaling = 1
-
+        print 'scaling'
+        print scaling
         # get rescaled values of k in 1/Mpc
         self.k = self.kh*h*scaling
 
@@ -1809,6 +1981,207 @@ class Likelihood_mpk(Likelihood):
                 # get P_lin by interpolation. It is still in (Mpc/h)**3
                 P_lin = np.interp(self.kh, self.k_fid, P)
 
+        elif self.use_sdssDR7:
+            kh = np.logspace(math.log(1e-3),math.log(1.0),num=(math.log(1.0)-math.log(1e-3))/0.01+1,base=math.exp(1.0)) # k in h/Mpc
+            scaling = scaling * (0.701/h)
+            k = kh*h#*scaling # k in 1/Mpc
+
+            # Redshift 0 for scaling purposes
+            z = 0.0
+            # Analytical growth factor at this redshift
+            D0_growth = cosmo.analytic_growth_factor(z)
+
+            # Define redshift bins and associated bao 2 sigma value [NEAR, MID, FAR]
+            z = np.array([0.235, 0.342, 0.421])
+            sigma2bao = np.array([86.9988, 85.1374, 84.5958])
+            # Initialize arrays
+            # Analytical growth factor for each redshift bin
+            D_growth = np.zeros(len(z))
+            # Pk *with* wiggles, both linear and nonlinear
+            Plin = np.zeros(len(k), 'float64')
+            Pnl = np.zeros(len(k), 'float64')
+            # Pk *without* wiggles, both linear and nonlinear
+            Psmooth = np.zeros(len(k), 'float64')
+            Psmooth_nl = np.zeros(len(k), 'float64')
+            fdamp = np.zeros([len(k), len(z)], 'float64')
+            Psmear = np.zeros([len(k), len(z)], 'float64')
+            nlratio = np.zeros([len(k), len(z)], 'float64')
+            # Loop over each redshift bin
+            for j in range(len(z)):
+                # Compute analytical growth factor at each redshift
+                D_growth[j] = cosmo.analytic_growth_factor(z[j])
+                # Compute Pk *with* wiggles, both linear and nonlinear
+                # Get P(k) at right values of k in Mpc**3, convert it to (Mpc/h)^3 and rescale it
+                # Get values of P(k) in Mpc**3
+                for i in range(len(k)):
+                    Plin[i] = cosmo.pk_lin(k[i], z[j]) # If halofit is enabled, I assume it won't affect Plin
+                    Pnl[i] = cosmo.pk(k[i], z[j]) # I think we should use halofit here
+                # Get rescaled values of P(k) in (Mpc/h)**3
+                Plin *= (h/scaling)**3
+                Pnl *= (h/scaling)**3
+                # Compute Pk *without* wiggles, both linear and nonlinear
+                Psmooth = self.remove_bao(kh,Plin)
+                Psmooth_nl = self.remove_bao(kh,Pnl)
+                fdamp[:,j] = np.exp(-0.5*sigma2bao[j]*kh**2)
+                Psmear[:,j] = Plin*fdamp[:,j]+Psmooth*(1.0-fdamp[:,j])
+                nlratio[:,j] = Psmooth_nl/Psmooth
+            """
+            # NEAR redshift bin
+            z=0.235
+            sigma2bao=86.9988
+            # analytical growth factor at this redshift
+            DNEAR = cosmo.analytic_growth_factor(z)
+            # Compute Pk *with* wiggles, both linear and nonlinear
+            # get P(k) at right values of k, convert it to (Mpc/h)^3 and rescale it
+            Plin = np.zeros(len(k), 'float64')
+            Pnl = np.zeros(len(k), 'float64')
+            # get values of P(k) in Mpc**3
+            for i in range(len(k)):
+                Plin[i] = cosmo.pk_lin(k[i], z)
+                Pnl[i] = cosmo.pk(k[i], z)
+            # get rescaled values of P(k) in (Mpc/h)**3
+            Plin *= (h/scaling)**3
+            Pnl *= (h/scaling)**3
+            # Compute Pk *without* wiggles, both linear and nonlinear
+            #T=hmf.Transfer(lnk_min=math.log(1e-3),lnk_max=math.log(1.0),dlnk=0.01,z=z,transfer_fit="EH",sigma_8=cosmo.sigma8(),n=cosmo.n_s(),w=cosmo.w0_fld(),N_nu=cosmo.Neff(),N_nu_massive=cosmo.N_nu(),h=cosmo.h(),omegab_h2=cosmo.omega_b(),omegac_h2=cosmo.omega_c(),omegav=cosmo.Omega_Lambda(),omegan=cosmo.Omega_nu,force_flat=True,takahashi=True) # Need to replace with nw spectra
+            #Psmooth=np.exp(T.power) # Need to get module from Andrei to get Pnw
+            #Psmooth_nl=np.exp(T.nonlinear_power) # Need to get module from Andrei to get Pnw_nl
+            Psmooth=remove_bao(kh,Plin)
+            Psmooth_nl=remove_bao(kh,Pnl)
+            fdamp=np.exp(-0.5*sigma2bao*kh**2)
+            PsmearNEAR=Plin*fdamp+Psmooth*(1.0-fdamp)
+            nlratioNEAR=Psmooth_nl/Psmooth
+            # Need to add section creating fiducial:
+            #arr=np.zeros((np.size(kh),2))
+            #arr[:,0]=kh
+            #arr[:,1]=nlratioNEAR
+            #np.savetxt('data/sdss_lrgDR7_fiducialmodel_zNEAR_takahashi.dat',arr)
+
+            # MID redshift bin
+            z=0.342
+            sigma2bao=85.1374
+            # analytical growth factor at this redshift
+            DMID = cosmo.analytic_growth_factor(z)
+            # Compute Pk *with* wiggles, both linear and nonlinear
+            # get P(k) at right values of k, convert it to (Mpc/h)^3 and rescale it
+            Plin = np.zeros(len(k), 'float64')
+            Pnl = np.zeros(len(k), 'float64')
+            # get values of P(k) in Mpc**3
+            for i in range(len(k)):
+                Plin[i] = cosmo.pk_lin(k[i], z)
+                Pnl[i] = cosmo.pk(k[i], z)
+            # get rescaled values of P(k) in (Mpc/h)**3
+            Plin *= (h/scaling)**3
+            Pnl *= (h/scaling)**3
+            # Compute Pk *without* wiggles, both linear and nonlinear
+            #T=hmf.Transfer(lnk_min=math.log(1e-3),lnk_max=math.log(1.0),dlnk=0.01,z=z,transfer_fit="EH",sigma_8=cosmo.sigma8(),n=cosmo.n_s(),w=cosmo.w0_fld(),N_nu=cosmo.Neff(),N_nu_massive=cosmo.N_nu(),h=cosmo.h(),omegab_h2=cosmo.omega_b(),omegac_h2=cosmo.omega_c(),omegav=cosmo.Omega_Lambda(),omegan=cosmo.Omega_nu,force_flat=True,takahashi=True) # Need to replace with nw spectra
+            #Psmooth=np.exp(T.power) # Need to get module from Andrei to get Pnw
+            #Psmooth_nl=np.exp(T.nonlinear_power) # Need to get module from Andrei to get Pnw_nl
+            Psmooth=remove_bao(kh,Plin)
+            Psmooth_nl=remove_bao(kh,Pnl)
+            fdamp=np.exp(-0.5*sigma2bao*kh**2)
+            PsmearMID=Plin*fdamp+Psmooth*(1.0-fdamp)
+            nlratioMID=Psmooth_nl/Psmooth
+            # Need to add section creating fiducial:
+            #arr=np.zeros((np.size(kh),2))
+            #arr[:,0]=kh
+            #arr[:,1]=nlratioMID
+            #np.savetxt('data/sdss_lrgDR7_fiducialmodel_zMID_takahashi.dat',arr)
+
+            # FAR redshift bin
+            z=0.421
+            sigma2bao=84.5958
+            # analytical growth factor at this redshift
+            DFAR = cosmo.analytic_growth_factor(z)
+            # Compute Pk *with* wiggles, both linear and nonlinear
+            # get P(k) at right values of k, convert it to (Mpc/h)^3 and rescale it
+            Plin = np.zeros(len(k), 'float64')
+            Pnl = np.zeros(len(k), 'float64')
+            # get values of P(k) in Mpc**3
+            for i in range(len(k)):
+                Plin[i] = cosmo.pk_lin(k[i], z)
+                Pnl[i] = cosmo.pk(k[i], z)
+            # get rescaled values of P(k) in (Mpc/h)**3
+            Plin *= (h/scaling)**3
+            Pnl *= (h/scaling)**3
+            # Compute Pk *without* wiggles, both linear and nonlinear
+            #T=hmf.Transfer(lnk_min=math.log(1e-3),lnk_max=math.log(1.0),dlnk=0.01,z=z,transfer_fit="EH",sigma_8=cosmo.sigma8(),n=cosmo.n_s(),w=cosmo.w0_fld(),N_nu=cosmo.Neff(),N_nu_massive=cosmo.N_nu(),h=cosmo.h(),omegab_h2=cosmo.omega_b(),omegac_h2=cosmo.omega_c(),omegav=cosmo.Omega_Lambda(),omegan=cosmo.Omega_nu,force_flat=True,takahashi=True) # Need to replace with nw spectra
+            #Psmooth=np.exp(T.power) # Need to get module from Andrei to get Pnw
+            #Psmooth_nl=np.exp(T.nonlinear_power) # Need to get module from Andrei to get Pnw_nl
+            Psmooth=remove_bao(kh,Plin)
+            Psmooth_nl=remove_bao(kh,Pnl)
+            fdamp=np.exp(-0.5*sigma2bao*kh**2)
+            PsmearFAR=Plin*fdamp+Psmooth*(1.0-fdamp)
+            nlratioFAR=Psmooth_nl/Psmooth
+            # Need to add section creating fiducial:
+            #arr=np.zeros((np.size(kh),2))
+            #arr[:,0]=kh
+            #arr[:,1]=nlratioFAR
+            #np.savetxt('data/sdss_lrgDR7_fiducialmodel_zFAR_takahashi.dat',arr)
+            """
+            # Polynomials to shape small scale behavior from N-body sims
+            #kdata=np.loadtxt(self.data_directory+self.fiducialmodel_z0_file,skiprows=1)[:,0]
+            kdata=kh
+            fidpolyNEAR=np.zeros(np.size(kdata))
+            fidpolyNEAR[kdata<=0.194055] = (1.0 - 0.680886*kdata[kdata<=0.194055] + 6.48151*kdata[kdata<=0.194055]**2)
+            fidpolyNEAR[kdata>0.194055] = (1.0 - 2.13627*kdata[kdata>0.194055] + 21.0537*kdata[kdata>0.194055]**2 - 50.1167*kdata[kdata>0.194055]**3 + 36.8155*kdata[kdata>0.194055]**4)*1.04482
+            fidpolyMID=np.zeros(np.size(kdata))
+            fidpolyMID[kdata<=0.19431] = (1.0 - 0.530799*kdata[kdata<=0.19431] + 6.31822*kdata[kdata<=0.19431]**2)
+            fidpolyMID[kdata>0.19431] = (1.0 - 1.97873*kdata[kdata>0.19431] + 20.8551*kdata[kdata>0.19431]**2 - 50.0376*kdata[kdata>0.19431]**3 + 36.4056*kdata[kdata>0.19431]**4)*1.04384
+            fidpolyFAR=np.zeros(np.size(kdata))
+            fidpolyFAR[kdata<=0.19148] = (1.0 - 0.475028*kdata[kdata<=0.19148] + 6.69004*kdata[kdata<=0.19148]**2)
+            fidpolyFAR[kdata>0.19148] = (1.0 - 1.84891*kdata[kdata>0.19148] + 21.3479*kdata[kdata>0.19148]**2 - 52.4846*kdata[kdata>0.19148]**3 + 38.9541*kdata[kdata>0.19148]**4)*1.03753
+
+            # Divide by rationwhalofit
+            #fidnlratioNEAR = np.loadtxt(self.data_directory+self.fiducialmodel_zNEAR_file,skiprows=1)[:,3]
+            #fidnlratioMID = np.loadtxt(self.data_directory+self.fiducialmodel_zMID_file,skiprows=1)[:,3]
+            #fidnlratioFAR = np.loadtxt(self.data_directory+self.fiducialmodel_zFAR_file,skiprows=1)[:,3]
+
+            #fidnlratioNEAR = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zNEAR_takahashi.dat')[:,1]
+            #fidnlratioMID = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zMID_takahashi.dat')[:,1]
+            #fidnlratioFAR = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zFAR_takahashi.dat')[:,1]
+
+            #khfid = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zFAR.dat',skiprows=1)[:,0]
+            #arr=np.zeros((np.size(kh),4))
+            #arr[:,0]=kh
+            #arr[:,1]=nlratioNEAR/np.interp(kh,khfid,fidnlratioNEAR)
+            #arr[:,2]=nlratioMID/np.interp(kh,khfid,fidnlratioMID)
+
+            # Save fiducial model for non-linear corrections
+            #fidNEAR=np.interp(kh,kdata,fidpolyNEAR)#/fidnlratioNEAR)
+            #fidMID=np.interp(kh,kdata,fidpolyMID)#/fidnlratioMID)
+            #fidFAR=np.interp(kh,kdata,fidpolyFAR)#/fidnlratioFAR)
+            #arr=np.zeros((np.size(kh),7))
+            #arr[:,0]=kh
+            #arr[:,1]=fidNEAR
+            #arr[:,2]=fidMID
+            #arr[:,3]=fidFAR
+            #arr[:,4:7]=nlratio
+            #np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
+            #print 'Fiducial created, exiting'
+            #exit()
+            
+            # Load fiducial model
+            fiducial = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
+            fid = fiducial[:,1:4]
+            fidnlratio = fiducial[:,4:7]
+
+            # Put all factors together
+            Pnear=np.interp(kh,kh,Psmear[:,0]*(nlratio[:,0]/fidnlratio[:,0])*fid[:,0]*(D0_growth/D_growth[0])**2)
+            Pmid =np.interp(kh,kh,Psmear[:,1]*(nlratio[:,1]/fidnlratio[:,1])*fid[:,1]*(D0_growth/D_growth[1])**2)
+            Pfar =np.interp(kh,kh,Psmear[:,2]*(nlratio[:,2]/fidnlratio[:,2])*fid[:,2]*(D0_growth/D_growth[2])**2)
+            #Pnear=np.interp(self.kh,kh,Psmear[:,0]*(nlratio[:,0]/fidnlratio[:,0])*fid[:,0]*(D0_growth/D_growth[0])**2)
+            #Pmid =np.interp(self.kh,kh,Psmear[:,1]*(nlratio[:,1]/fidnlratio[:,1])*fid[:,1]*(D0_growth/D_growth[1])**2)
+            #Pfar =np.interp(self.kh,kh,Psmear[:,2]*(nlratio[:,2]/fidnlratio[:,2])*fid[:,2]*(D0_growth/D_growth[2])**2)
+
+            # weighted mean
+            #scaling=scaling*(0.701/h) # the value for h used for the N-body calibration simulations
+            print 'new scaling',scaling
+            self.k=self.kh*h*scaling
+            P_lin=(0.395*Pnear+0.355*Pmid+0.250*Pfar)
+            P_lin=np.interp(self.k,kh*h,P_lin)#*(1./scaling)**3 # remember self.k is scaled but self.kh isn't
+            #P_lin=np.interp(self.k,self.kh*h,P_lin)*(1./scaling)**3 # remember self.k is scaled but self.kh isn't
+
         else:
             # get rescaled values of k in 1/Mpc
             self.k = self.kh*h*scaling
@@ -1818,62 +2191,215 @@ class Likelihood_mpk(Likelihood):
             # get rescaled values of P(k) in (Mpc/h)**3
             P_lin *= (h/scaling)**3
 
-        W_P_th = np.zeros((self.n_size), 'float64')
-
-        # starting analytic marginalisation over bias
-
-        # Define quantities living in all the regions possible. If only a few
-        # regions are selected in the .data file, many elements from these
-        # arrays will stay at 0.
-        P_data_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-        W_P_th_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-        cov_dat_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-        cov_th_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-
-        normV = 0
-
         # infer P_th from P_lin. It is still in (Mpc/h)**3. TODO why was it
         # called P_lin in the first place ? Couldn't we use now P_th all the
         # way ?
         P_th = P_lin
 
-        # Loop over all the available regions
-        for i_region in range(self.num_regions):
-            # In each region that was selected with the array of flags
-            # self.used_region, define boundaries indices, and fill in the
-            # corresponding windowed power spectrum. All the unused regions
-            # will still be set to zero as from the initialization, which will
-            # not contribute anything in the final sum.
-            if self.used_region[i_region]:
-                imin = i_region*self.n_size
-                imax = (i_region+1)*self.n_size-1
+        if self.use_sdssDR7:
+            chisq =np.zeros(self.nptstot)
+            chisqmarg = np.zeros(self.nptstot)
 
-                W_P_th = np.dot(self.window[i_region, :], P_th)
-                for i in range(self.n_size):
-                    P_data_large[imin+i] = self.P_obs[i_region, i]
-                    W_P_th_large[imin+i] = W_P_th[i]
-                    cov_dat_large[imin+i] = np.dot(
-                        self.invcov[i_region, i, :],
-                        self.P_obs[i_region, :])
-                    cov_th_large[imin+i] = np.dot(
-                        self.invcov[i_region, i, :],
-                        W_P_th[:])
+            Pth = P_th
+            Pth_k = P_th*(self.k/h) # self.k has the scaling included, so self.k/h != self.kh
+            Pth_k2 = P_th*(self.k/h)**2
 
-        # Explain what it is TODO
-        normV += np.dot(W_P_th_large, cov_th_large)
-        # Sort of bias TODO ?
-        b_out = np.sum(W_P_th_large*cov_dat_large) / \
-            np.sum(W_P_th_large*cov_th_large)
+            WPth = np.dot(self.window[0,:], Pth)
+            WPth_k = np.dot(self.window[0,:], Pth_k)
+            WPth_k2 = np.dot(self.window[0,:], Pth_k2)
 
-        # Explain this formula better, link to article ?
-        chisq = np.dot(P_data_large, cov_dat_large) - \
-            np.dot(W_P_th_large, cov_dat_large)**2/normV
+            sumzerow_Pth = np.sum(self.zerowindowfxn*Pth)/self.zerowindowfxnsubtractdatnorm
+            sumzerow_Pth_k = np.sum(self.zerowindowfxn*Pth_k)/self.zerowindowfxnsubtractdatnorm
+            sumzerow_Pth_k2 = np.sum(self.zerowindowfxn*Pth_k2)/self.zerowindowfxnsubtractdatnorm
+
+            covdat = np.dot(self.invcov[0,:,:],self.P_obs[0,:])
+            covth  = np.dot(self.invcov[0,:,:],WPth)
+            covth_k  = np.dot(self.invcov[0,:,:],WPth_k)
+            covth_k2  = np.dot(self.invcov[0,:,:],WPth_k2)
+            covth_zerowin  = np.dot(self.invcov[0,:,:],self.zerowindowfxnsubtractdat)
+            print 'debugging start'
+            #print self.invcov
+            #print self.P_obs
+            #print self.window
+            #print self.zerowindowfxn
+            #print self.zerowindowfxnsubtractdatnorm
+            np.set_printoptions(precision=8)
+            arr=np.zeros((np.size(self.k),2))
+            arr[:,0]=self.k/h
+            arr[:,1]=P_th
+            np.savetxt('./k_Pk_montepython_a_scl.txt',arr)
+            #exit()
+            print '----'
+            print P_th
+            print '----'
+            print self.k/h
+            print 'debugging end'
+            sumDD = np.sum(self.P_obs[0,:] * covdat)
+            sumDT = np.sum(self.P_obs[0,:] * covth)
+            sumDT_k = np.sum(self.P_obs[0,:] * covth_k)
+            sumDT_k2 = np.sum(self.P_obs[0,:] * covth_k2)
+            sumDT_zerowin = np.sum(self.P_obs[0,:] * covth_zerowin)
+
+            sumTT = np.sum(WPth*covth)
+            sumTT_k = np.sum(WPth*covth_k)
+            sumTT_k2 = np.sum(WPth*covth_k2)
+            sumTT_k_k = np.sum(WPth_k*covth_k)
+            sumTT_k_k2 = np.sum(WPth_k*covth_k2)
+            sumTT_k2_k2 = np.sum(WPth_k2*covth_k2)
+            sumTT_zerowin = np.sum(WPth*covth_zerowin)
+            sumTT_k_zerowin = np.sum(WPth_k*covth_zerowin)
+            sumTT_k2_zerowin = np.sum(WPth_k2*covth_zerowin)
+            sumTT_zerowin_zerowin = np.sum(self.zerowindowfxnsubtractdat*covth_zerowin)
+
+            currminchisq = 1000.0
+
+            # analytic marginalization over a1,a2
+            for i in range(self.nptstot):
+                a1val = self.a1list[i]
+                a2val = self.a2list[i]
+                zerowinsub = -(sumzerow_Pth + a1val*sumzerow_Pth_k + a2val*sumzerow_Pth_k2)
+                sumDT_tot = sumDT + a1val*sumDT_k + a2val*sumDT_k2 + zerowinsub*sumDT_zerowin
+                sumTT_tot = sumTT + a1val**2.0*sumTT_k_k + a2val**2.0*sumTT_k2_k2 + \
+                    zerowinsub**2.0*sumTT_zerowin_zerowin + \
+                    2.0*a1val*sumTT_k + 2.0*a2val*sumTT_k2 + 2.0*a1val*a2val*sumTT_k_k2 + \
+                    2.0*zerowinsub*sumTT_zerowin + 2.0*zerowinsub*a1val*sumTT_k_zerowin + \
+                    2.0*zerowinsub*a2val*sumTT_k2_zerowin
+                minchisqtheoryamp = sumDT_tot/sumTT_tot
+                chisq[i] = sumDD - 2.0*minchisqtheoryamp*sumDT_tot + minchisqtheoryamp**2.0*sumTT_tot
+                chisqmarg[i] = sumDD - sumDT_tot**2.0/sumTT_tot + math.log(sumTT_tot) - \
+                    2.0*math.log(1.0 + math.erf(sumDT_tot/2.0/math.sqrt(sumTT_tot)))
+                if(i == 0 or chisq[i] < currminchisq):
+                    myminchisqindx = i
+                    currminchisq = chisq[i]
+                    currminchisqmarg = chisqmarg[i]
+                    minchisqtheoryampminnuis = minchisqtheoryamp
+                if(i == int(self.nptstot/2)):
+                    chisqnonuis = chisq[i]
+                    minchisqtheoryampnonuis = minchisqtheoryamp
+                    if(abs(a1val) > 0.001 or abs(a2val) > 0.001):
+                         print 'ahhhh! violation!!', a1val, a2val
+
+            #print myminchisqindx,self.nptstot,self.a1list[myminchisqindx],self.a2list[myminchisqindx]
+            #print minchisqtheoryampminnuis,minchisqtheoryampnonuis
+            # numerically marginalize over a1,a2 now using values stored in chisq
+            minchisq = np.min(chisqmarg)
+            maxchisq = np.max(chisqmarg)
+
+            LnLike = np.sum(np.exp(-(chisqmarg-minchisq)/2.0)/(self.nptstot*1.0))
+            if(LnLike == 0):
+                #LnLike = LogZero
+                raise io_mp.LikelihoodError(
+                    'Error in likelihood %s ' % (self.name) +
+                    'LRG LnLike LogZero error.' )
+            else:
+                chisq = -2.*math.log(LnLike) + minchisq
+            #print 'DR7 chi2/2=',chisq/2.
+
+        #if we are not using DR7
+        else:
+            W_P_th = np.zeros((self.n_size), 'float64')
+
+            # starting analytic marginalisation over bias
+
+            # Define quantities living in all the regions possible. If only a few
+            # regions are selected in the .data file, many elements from these
+            # arrays will stay at 0.
+            P_data_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+            W_P_th_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+            cov_dat_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+            cov_th_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+
+            normV = 0
+
+            # Loop over all the available regions
+            for i_region in range(self.num_regions):
+                # In each region that was selected with the array of flags
+                # self.used_region, define boundaries indices, and fill in the
+                # corresponding windowed power spectrum. All the unused regions
+                # will still be set to zero as from the initialization, which will
+                # not contribute anything in the final sum.
+
+                if self.used_region[i_region]:
+                    imin = i_region*self.n_size
+                    imax = (i_region+1)*self.n_size-1
+
+                    W_P_th = np.dot(self.window[i_region, :], P_th)
+                    print W_P_th
+                    for i in range(self.n_size):
+                        P_data_large[imin+i] = self.P_obs[i_region, i]
+                        W_P_th_large[imin+i] = W_P_th[i]
+                        cov_dat_large[imin+i] = np.dot(
+                            self.invcov[i_region, i, :],
+                            self.P_obs[i_region, :])
+                        cov_th_large[imin+i] = np.dot(
+                            self.invcov[i_region, i, :],
+                            W_P_th[:])
+
+            # Explain what it is TODO
+            normV += np.dot(W_P_th_large, cov_th_large)
+            # Sort of bias TODO ?
+            b_out = np.sum(W_P_th_large*cov_dat_large) / \
+                np.sum(W_P_th_large*cov_th_large)
+
+            # Explain this formula better, link to article ?
+            chisq = np.dot(P_data_large, cov_dat_large) - \
+                np.dot(W_P_th_large, cov_dat_large)**2/normV
+            #print 'WiggleZ chi2=',chisq/2.
 
         return -chisq/2
+
+    def remove_bao(self,k_in,pk_in):
+        # By M. Ballardini
+        # Load the linear power spectrum from CLASS: 
+        #data = np.loadtxt('./Files/04_pk.dat')
+
+        # Read the linear matter power spectrum from CLASS:
+        #k_in, pk_in = data[:,0], data[:,1]
+
+        # This have to contain the BAO:
+        k_ref=[2.8e-2, 4.5e-1]
+
+        # Get interpolating function for input P(k) in log-log space:
+        _interp_pk = scipy.interpolate.interp1d( np.log(k_in), np.log(pk_in),
+                                                 kind='quadratic', bounds_error=False )
+        interp_pk = lambda x: np.exp(_interp_pk(np.log(x)))
+
+        # Spline all (log-log) points outside k_ref range:
+        idxs = np.where(np.logical_or(k_in <= k_ref[0], k_in >= k_ref[1]))
+        _pk_smooth = scipy.interpolate.UnivariateSpline( np.log(k_in[idxs]),
+                                                         np.log(pk_in[idxs]), k=3, s=0 )
+        pk_smooth = lambda x: np.exp(_pk_smooth(np.log(x)))
+
+        # Find second derivative of each spline:
+        fwiggle = scipy.interpolate.UnivariateSpline(k_in, pk_in / pk_smooth(k_in), k=3, s=0)
+        derivs = np.array([fwiggle.derivatives(_k) for _k in k_in]).T
+        d2 = scipy.interpolate.UnivariateSpline(k_in, derivs[2], k=3, s=1.0)
+
+        # Find maxima and minima of the gradient (zeros of 2nd deriv.), then put a
+        # low-order spline through zeros to subtract smooth trend from wiggles fn.
+        wzeros = d2.roots()
+        wzeros = wzeros[np.where(np.logical_and(wzeros >= k_ref[0], wzeros <= k_ref[1]))]
+        wzeros = np.concatenate((wzeros, [k_ref[1],]))
+        wtrend = scipy.interpolate.UnivariateSpline(wzeros, fwiggle(wzeros), k=3, s=0)
+
+        # Construct smooth no-BAO:
+        idxs = np.where(np.logical_and(k_in > k_ref[0], k_in < k_ref[1]))
+        pk_nobao = pk_smooth(k_in)
+        pk_nobao[idxs] *= wtrend(k_in[idxs])
+
+        # Construct interpolating functions:
+        ipk = scipy.interpolate.interp1d( k_in, pk_nobao, kind='linear',
+                                          bounds_error=False, fill_value=0. )
+
+        pk_nobao = ipk(k_in)
+
+        #DataOut = np.column_stack((k_in,pk_nobao))
+        #np.savetxt('./Files/04_pk_nobao.dat', DataOut)
+        return pk_nobao
 
 
 class Likelihood_sn(Likelihood):
