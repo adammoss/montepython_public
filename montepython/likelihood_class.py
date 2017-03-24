@@ -1556,9 +1556,7 @@ class Likelihood_mpk(Likelihood):
         for i in range(self.num_mpk_kbands_full):
             line = datafile.readline()
             if i+2 > self.min_mpk_kbands_use and i-1 < self.max_mpk_kbands_use:
-            #if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
                 self.kh[i-self.min_mpk_kbands_use] = float(line.split()[0])
-                #self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
         datafile.close()
 
         khmax = self.kh[-1]
@@ -1623,8 +1621,7 @@ class Likelihood_mpk(Likelihood):
         # require k_max and z_max from the cosmological module
         if self.use_sdssDR7:
             self.need_cosmo_arguments(data, {'z_max_pk': self.zmax})
-            #self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 1.5*self.kmax})
-            self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 5.*self.kmax})
+            self.need_cosmo_arguments(data, {'P_k_max_h/Mpc': 7.5*self.kmax})
         else:
             self.need_cosmo_arguments(
                 data, {'P_k_max_h/Mpc': khmax, 'z_max_pk': self.redshift})
@@ -1662,17 +1659,12 @@ class Likelihood_mpk(Likelihood):
                 if self.num_regions > 1:
                     line = datafile.readline()
             for i in range(self.num_mpk_points_full+1):
-            #for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
                 if (i+2 > self.min_mpk_points_use and
                         i < self.max_mpk_points_use+1):
-                        #i < self.max_mpk_points_use):
                     for j in range(self.k_size):
                         self.window[i_region, i-self.min_mpk_points_use, j]=\
                             float(line.split()[j+self.min_mpk_kbands_use])
-                            #float(line.split()[j+self.min_mpk_kbands_use-1])
-                        #self.window[i_region, i-self.min_mpk_points_use+1, j]=\
-                        #    float(line.split()[j+self.min_mpk_kbands_use-1])
         datafile.close()
 
         # read measurements
@@ -1684,19 +1676,13 @@ class Likelihood_mpk(Likelihood):
             for i in range(2):
                 line = datafile.readline()
             for i in range(self.num_mpk_points_full+1):
-            #for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
                 if (i+2 > self.min_mpk_points_use and
                         i < self.max_mpk_points_use+1):
-                        #i < self.max_mpk_points_use):
                     self.P_obs[i_region, i-self.min_mpk_points_use] = \
                         float(line.split()[3])
-                    #self.P_obs[i_region, i-self.min_mpk_points_use+1] = \
-                    #    float(line.split()[3])
                     self.P_err[i_region, i-self.min_mpk_points_use] = \
                         float(line.split()[4])
-                    #self.P_err[i_region, i-self.min_mpk_points_use+1] = \
-                    #    float(line.split()[4])
         datafile.close()
 
         # read covariance matrices
@@ -1719,22 +1705,15 @@ class Likelihood_mpk(Likelihood):
                     for i in range(1):
                         line = datafile.readline()
                 for i in range(self.num_mpk_points_full+1):
-                #for i in range(self.num_mpk_points_full):
                     line = datafile.readline()
                     if (i+2 > self.min_mpk_points_use and
                             i < self.max_mpk_points_use+1):
-                            #i < self.max_mpk_points_use):
                         for j in range(self.num_mpk_points_full+1):
-                        #for j in range(self.num_mpk_points_full):
                             if (j+2 > self.min_mpk_points_use and
                                     j < self.max_mpk_points_use+1):
-                                    #j < self.max_mpk_points_use):
                                 cov[i-self.min_mpk_points_use,
                                     j-self.min_mpk_points_use] =\
                                     float(line.split()[j])
-                                #cov[i-self.min_mpk_points_use+1,
-                                #    j-self.min_mpk_points_use+1] =\
-                                #    float(line.split()[j])
                 if self.use_invcov:
                     invcov_tmp = cov
                 else:
@@ -1915,25 +1894,16 @@ class Likelihood_mpk(Likelihood):
         # reduced Hubble parameter
         h = cosmo.h()
 
-        # WiggleZ specific
+        # WiggleZ and sdssDR7 specific
         if self.use_scaling:
             # angular diameter distance at this redshift, in Mpc
             d_angular = cosmo.angular_distance(self.redshift)
-            print 'z,dA'
-            print self.redshift
-            print d_angular
+
             # radial distance at this redshift, in Mpc, is simply 1/H (itself
             # in Mpc^-1). Hz is an array, with only one element.
             r, Hz = cosmo.z_of_r([self.redshift])
             d_radial = 1/Hz[0]
-            print 'r,Hz,d_r'
-            print r
-            print Hz[0]
-            print d_radial
-            print 'a_angular',d_angular/self.d_angular_fid
-            print 'a_radial',d_radial/self.d_radial_fid
-            print 'a',((d_angular/self.d_angular_fid)**2. * (d_radial/self.d_radial_fid))**(1./3.)
-            print 'a',1./((d_angular/self.d_angular_fid)**2. * (d_radial/self.d_radial_fid))**(1./3.)
+
             # scaling factor = (d_angular**2 * d_radial)^(1/3) for the
             # fiducial cosmology used in the data files of the observations
             # divided by the same quantity for the cosmology we are comparing with.
@@ -1943,11 +1913,8 @@ class Likelihood_mpk(Likelihood):
             scaling = pow(
                 (self.d_angular_fid/d_angular)**2 *
                 (self.d_radial_fid/d_radial), 1./3.)
-            print d_angular, d_radial
         else:
             scaling = 1
-        print 'scaling'
-        print scaling
         # get rescaled values of k in 1/Mpc
         self.k = self.kh*h*scaling
 
@@ -1983,13 +1950,10 @@ class Likelihood_mpk(Likelihood):
 
         elif self.use_sdssDR7:
             kh = np.logspace(math.log(1e-3),math.log(1.0),num=(math.log(1.0)-math.log(1e-3))/0.01+1,base=math.exp(1.0)) # k in h/Mpc
+            # Rescale the scaling factor by the fiducial value for h divided by the sampled value
+            # h=0.701 was used for the N-body calibration simulations
             scaling = scaling * (0.701/h)
-            k = kh*h#*scaling # k in 1/Mpc
-
-            # Redshift 0 for scaling purposes
-            z = 0.0
-            # Analytical growth factor at this redshift
-            D0_growth = cosmo.analytic_growth_factor(z)
+            k = kh*h # k in 1/Mpc
 
             # Define redshift bins and associated bao 2 sigma value [NEAR, MID, FAR]
             z = np.array([0.235, 0.342, 0.421])
@@ -1997,130 +1961,41 @@ class Likelihood_mpk(Likelihood):
             # Initialize arrays
             # Analytical growth factor for each redshift bin
             D_growth = np.zeros(len(z))
-            # Pk *with* wiggles, both linear and nonlinear
+            # P(k) *with* wiggles, both linear and nonlinear
             Plin = np.zeros(len(k), 'float64')
             Pnl = np.zeros(len(k), 'float64')
-            # Pk *without* wiggles, both linear and nonlinear
+            # P(k) *without* wiggles, both linear and nonlinear
             Psmooth = np.zeros(len(k), 'float64')
             Psmooth_nl = np.zeros(len(k), 'float64')
+            # Damping function and smeared P(k)
             fdamp = np.zeros([len(k), len(z)], 'float64')
             Psmear = np.zeros([len(k), len(z)], 'float64')
+            # Ratio of smoothened non-linear to linear P(k)
             nlratio = np.zeros([len(k), len(z)], 'float64')
             # Loop over each redshift bin
             for j in range(len(z)):
-                # Compute analytical growth factor at each redshift
-                D_growth[j] = cosmo.analytic_growth_factor(z[j])
+                # Compute growth factor at each redshift
+                # This growth factor is normalized by the growth factor today
+                D_growth[j] = cosmo.scale_independent_growth_factor(z[j])
                 # Compute Pk *with* wiggles, both linear and nonlinear
                 # Get P(k) at right values of k in Mpc**3, convert it to (Mpc/h)^3 and rescale it
                 # Get values of P(k) in Mpc**3
                 for i in range(len(k)):
-                    Plin[i] = cosmo.pk_lin(k[i], z[j]) # If halofit is enabled, I assume it won't affect Plin
-                    Pnl[i] = cosmo.pk(k[i], z[j]) # I think we should use halofit here
+                    Plin[i] = cosmo.pk_lin(k[i], z[j])
+                    Pnl[i] = cosmo.pk(k[i], z[j])
                 # Get rescaled values of P(k) in (Mpc/h)**3
-                Plin *= (h/scaling)**3
-                Pnl *= (h/scaling)**3
+                Plin *= h**3 #(h/scaling)**3
+                Pnl *= h**3 #(h/scaling)**3
                 # Compute Pk *without* wiggles, both linear and nonlinear
                 Psmooth = self.remove_bao(kh,Plin)
                 Psmooth_nl = self.remove_bao(kh,Pnl)
+                # Apply Gaussian damping due to non-linearities
                 fdamp[:,j] = np.exp(-0.5*sigma2bao[j]*kh**2)
                 Psmear[:,j] = Plin*fdamp[:,j]+Psmooth*(1.0-fdamp[:,j])
+                # Take ratio of smoothened non-linear to linear P(k)
                 nlratio[:,j] = Psmooth_nl/Psmooth
-            """
-            # NEAR redshift bin
-            z=0.235
-            sigma2bao=86.9988
-            # analytical growth factor at this redshift
-            DNEAR = cosmo.analytic_growth_factor(z)
-            # Compute Pk *with* wiggles, both linear and nonlinear
-            # get P(k) at right values of k, convert it to (Mpc/h)^3 and rescale it
-            Plin = np.zeros(len(k), 'float64')
-            Pnl = np.zeros(len(k), 'float64')
-            # get values of P(k) in Mpc**3
-            for i in range(len(k)):
-                Plin[i] = cosmo.pk_lin(k[i], z)
-                Pnl[i] = cosmo.pk(k[i], z)
-            # get rescaled values of P(k) in (Mpc/h)**3
-            Plin *= (h/scaling)**3
-            Pnl *= (h/scaling)**3
-            # Compute Pk *without* wiggles, both linear and nonlinear
-            #T=hmf.Transfer(lnk_min=math.log(1e-3),lnk_max=math.log(1.0),dlnk=0.01,z=z,transfer_fit="EH",sigma_8=cosmo.sigma8(),n=cosmo.n_s(),w=cosmo.w0_fld(),N_nu=cosmo.Neff(),N_nu_massive=cosmo.N_nu(),h=cosmo.h(),omegab_h2=cosmo.omega_b(),omegac_h2=cosmo.omega_c(),omegav=cosmo.Omega_Lambda(),omegan=cosmo.Omega_nu,force_flat=True,takahashi=True) # Need to replace with nw spectra
-            #Psmooth=np.exp(T.power) # Need to get module from Andrei to get Pnw
-            #Psmooth_nl=np.exp(T.nonlinear_power) # Need to get module from Andrei to get Pnw_nl
-            Psmooth=remove_bao(kh,Plin)
-            Psmooth_nl=remove_bao(kh,Pnl)
-            fdamp=np.exp(-0.5*sigma2bao*kh**2)
-            PsmearNEAR=Plin*fdamp+Psmooth*(1.0-fdamp)
-            nlratioNEAR=Psmooth_nl/Psmooth
-            # Need to add section creating fiducial:
-            #arr=np.zeros((np.size(kh),2))
-            #arr[:,0]=kh
-            #arr[:,1]=nlratioNEAR
-            #np.savetxt('data/sdss_lrgDR7_fiducialmodel_zNEAR_takahashi.dat',arr)
 
-            # MID redshift bin
-            z=0.342
-            sigma2bao=85.1374
-            # analytical growth factor at this redshift
-            DMID = cosmo.analytic_growth_factor(z)
-            # Compute Pk *with* wiggles, both linear and nonlinear
-            # get P(k) at right values of k, convert it to (Mpc/h)^3 and rescale it
-            Plin = np.zeros(len(k), 'float64')
-            Pnl = np.zeros(len(k), 'float64')
-            # get values of P(k) in Mpc**3
-            for i in range(len(k)):
-                Plin[i] = cosmo.pk_lin(k[i], z)
-                Pnl[i] = cosmo.pk(k[i], z)
-            # get rescaled values of P(k) in (Mpc/h)**3
-            Plin *= (h/scaling)**3
-            Pnl *= (h/scaling)**3
-            # Compute Pk *without* wiggles, both linear and nonlinear
-            #T=hmf.Transfer(lnk_min=math.log(1e-3),lnk_max=math.log(1.0),dlnk=0.01,z=z,transfer_fit="EH",sigma_8=cosmo.sigma8(),n=cosmo.n_s(),w=cosmo.w0_fld(),N_nu=cosmo.Neff(),N_nu_massive=cosmo.N_nu(),h=cosmo.h(),omegab_h2=cosmo.omega_b(),omegac_h2=cosmo.omega_c(),omegav=cosmo.Omega_Lambda(),omegan=cosmo.Omega_nu,force_flat=True,takahashi=True) # Need to replace with nw spectra
-            #Psmooth=np.exp(T.power) # Need to get module from Andrei to get Pnw
-            #Psmooth_nl=np.exp(T.nonlinear_power) # Need to get module from Andrei to get Pnw_nl
-            Psmooth=remove_bao(kh,Plin)
-            Psmooth_nl=remove_bao(kh,Pnl)
-            fdamp=np.exp(-0.5*sigma2bao*kh**2)
-            PsmearMID=Plin*fdamp+Psmooth*(1.0-fdamp)
-            nlratioMID=Psmooth_nl/Psmooth
-            # Need to add section creating fiducial:
-            #arr=np.zeros((np.size(kh),2))
-            #arr[:,0]=kh
-            #arr[:,1]=nlratioMID
-            #np.savetxt('data/sdss_lrgDR7_fiducialmodel_zMID_takahashi.dat',arr)
-
-            # FAR redshift bin
-            z=0.421
-            sigma2bao=84.5958
-            # analytical growth factor at this redshift
-            DFAR = cosmo.analytic_growth_factor(z)
-            # Compute Pk *with* wiggles, both linear and nonlinear
-            # get P(k) at right values of k, convert it to (Mpc/h)^3 and rescale it
-            Plin = np.zeros(len(k), 'float64')
-            Pnl = np.zeros(len(k), 'float64')
-            # get values of P(k) in Mpc**3
-            for i in range(len(k)):
-                Plin[i] = cosmo.pk_lin(k[i], z)
-                Pnl[i] = cosmo.pk(k[i], z)
-            # get rescaled values of P(k) in (Mpc/h)**3
-            Plin *= (h/scaling)**3
-            Pnl *= (h/scaling)**3
-            # Compute Pk *without* wiggles, both linear and nonlinear
-            #T=hmf.Transfer(lnk_min=math.log(1e-3),lnk_max=math.log(1.0),dlnk=0.01,z=z,transfer_fit="EH",sigma_8=cosmo.sigma8(),n=cosmo.n_s(),w=cosmo.w0_fld(),N_nu=cosmo.Neff(),N_nu_massive=cosmo.N_nu(),h=cosmo.h(),omegab_h2=cosmo.omega_b(),omegac_h2=cosmo.omega_c(),omegav=cosmo.Omega_Lambda(),omegan=cosmo.Omega_nu,force_flat=True,takahashi=True) # Need to replace with nw spectra
-            #Psmooth=np.exp(T.power) # Need to get module from Andrei to get Pnw
-            #Psmooth_nl=np.exp(T.nonlinear_power) # Need to get module from Andrei to get Pnw_nl
-            Psmooth=remove_bao(kh,Plin)
-            Psmooth_nl=remove_bao(kh,Pnl)
-            fdamp=np.exp(-0.5*sigma2bao*kh**2)
-            PsmearFAR=Plin*fdamp+Psmooth*(1.0-fdamp)
-            nlratioFAR=Psmooth_nl/Psmooth
-            # Need to add section creating fiducial:
-            #arr=np.zeros((np.size(kh),2))
-            #arr[:,0]=kh
-            #arr[:,1]=nlratioFAR
-            #np.savetxt('data/sdss_lrgDR7_fiducialmodel_zFAR_takahashi.dat',arr)
-            """
             # Polynomials to shape small scale behavior from N-body sims
-            #kdata=np.loadtxt(self.data_directory+self.fiducialmodel_z0_file,skiprows=1)[:,0]
             kdata=kh
             fidpolyNEAR=np.zeros(np.size(kdata))
             fidpolyNEAR[kdata<=0.194055] = (1.0 - 0.680886*kdata[kdata<=0.194055] + 6.48151*kdata[kdata<=0.194055]**2)
@@ -2132,55 +2007,51 @@ class Likelihood_mpk(Likelihood):
             fidpolyFAR[kdata<=0.19148] = (1.0 - 0.475028*kdata[kdata<=0.19148] + 6.69004*kdata[kdata<=0.19148]**2)
             fidpolyFAR[kdata>0.19148] = (1.0 - 1.84891*kdata[kdata>0.19148] + 21.3479*kdata[kdata>0.19148]**2 - 52.4846*kdata[kdata>0.19148]**3 + 38.9541*kdata[kdata>0.19148]**4)*1.03753
 
-            # Divide by rationwhalofit
-            #fidnlratioNEAR = np.loadtxt(self.data_directory+self.fiducialmodel_zNEAR_file,skiprows=1)[:,3]
-            #fidnlratioMID = np.loadtxt(self.data_directory+self.fiducialmodel_zMID_file,skiprows=1)[:,3]
-            #fidnlratioFAR = np.loadtxt(self.data_directory+self.fiducialmodel_zFAR_file,skiprows=1)[:,3]
-
-            #fidnlratioNEAR = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zNEAR_takahashi.dat')[:,1]
-            #fidnlratioMID = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zMID_takahashi.dat')[:,1]
-            #fidnlratioFAR = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zFAR_takahashi.dat')[:,1]
-
-            #khfid = np.loadtxt('data/sdss_lrgDR7_fiducialmodel_zFAR.dat',skiprows=1)[:,0]
-            #arr=np.zeros((np.size(kh),4))
-            #arr[:,0]=kh
-            #arr[:,1]=nlratioNEAR/np.interp(kh,khfid,fidnlratioNEAR)
-            #arr[:,2]=nlratioMID/np.interp(kh,khfid,fidnlratioMID)
-
-            # Save fiducial model for non-linear corrections
-            #fidNEAR=np.interp(kh,kdata,fidpolyNEAR)#/fidnlratioNEAR)
-            #fidMID=np.interp(kh,kdata,fidpolyMID)#/fidnlratioMID)
-            #fidFAR=np.interp(kh,kdata,fidpolyFAR)#/fidnlratioFAR)
-            #arr=np.zeros((np.size(kh),7))
-            #arr[:,0]=kh
-            #arr[:,1]=fidNEAR
-            #arr[:,2]=fidMID
-            #arr[:,3]=fidFAR
-            #arr[:,4:7]=nlratio
-            #np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
-            #print 'Fiducial created, exiting'
-            #exit()
+            # Save fiducial model for non-linear corrections using the flat fiducial
+            # Omega_b = 0.25, Omega_L = 0.75, h = 0.701
+            # Re-run if changes are made to how non-linear corrections are done
+            # e.g. the halofit implementation in CLASS
+            # To re-run fiducial, set <experiment>.create_fid = True in .data file
+            try:
+                self.create_fid
+            except:
+                self.create_fid = False
+            
+            if self.create_fid == True:
+                print 'Creating fiducial file.'
+                print 'This only makes sense for a flat fiducial with'
+                print 'Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
+                print 'and with the flag -f 0'
+                # Save non-linear corrections from N-body sims for each redshift bin
+                fidNEAR=np.interp(kh,kdata,fidpolyNEAR)
+                fidMID=np.interp(kh,kdata,fidpolyMID)
+                fidFAR=np.interp(kh,kdata,fidpolyFAR)
+                arr=np.zeros((np.size(kh),7))
+                arr[:,0]=kh
+                arr[:,1]=fidNEAR
+                arr[:,2]=fidMID
+                arr[:,3]=fidFAR
+                # Save non-linear corrections from halofit for each redshift bin
+                arr[:,4:7]=nlratio
+                np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
+                print 'Fiducial created, exiting'
+                exit()
             
             # Load fiducial model
             fiducial = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
             fid = fiducial[:,1:4]
             fidnlratio = fiducial[:,4:7]
 
-            # Put all factors together
-            Pnear=np.interp(kh,kh,Psmear[:,0]*(nlratio[:,0]/fidnlratio[:,0])*fid[:,0]*(D0_growth/D_growth[0])**2)
-            Pmid =np.interp(kh,kh,Psmear[:,1]*(nlratio[:,1]/fidnlratio[:,1])*fid[:,1]*(D0_growth/D_growth[1])**2)
-            Pfar =np.interp(kh,kh,Psmear[:,2]*(nlratio[:,2]/fidnlratio[:,2])*fid[:,2]*(D0_growth/D_growth[2])**2)
-            #Pnear=np.interp(self.kh,kh,Psmear[:,0]*(nlratio[:,0]/fidnlratio[:,0])*fid[:,0]*(D0_growth/D_growth[0])**2)
-            #Pmid =np.interp(self.kh,kh,Psmear[:,1]*(nlratio[:,1]/fidnlratio[:,1])*fid[:,1]*(D0_growth/D_growth[1])**2)
-            #Pfar =np.interp(self.kh,kh,Psmear[:,2]*(nlratio[:,2]/fidnlratio[:,2])*fid[:,2]*(D0_growth/D_growth[2])**2)
+            # Put all factors together to obtain the P(k) for each redshift bin
+            Pnear=np.interp(kh,kh,Psmear[:,0]*(nlratio[:,0]/fidnlratio[:,0])*fid[:,0]*D_growth[0]**(-2.))
+            Pmid =np.interp(kh,kh,Psmear[:,1]*(nlratio[:,1]/fidnlratio[:,1])*fid[:,1]*D_growth[1]**(-2.))
+            Pfar =np.interp(kh,kh,Psmear[:,2]*(nlratio[:,2]/fidnlratio[:,2])*fid[:,2]*D_growth[2]**(-2.))
 
-            # weighted mean
-            #scaling=scaling*(0.701/h) # the value for h used for the N-body calibration simulations
-            print 'new scaling',scaling
+            # Define and rescale k
             self.k=self.kh*h*scaling
+            # Weighted mean of the P(k) for each redshift bin
             P_lin=(0.395*Pnear+0.355*Pmid+0.250*Pfar)
-            P_lin=np.interp(self.k,kh*h,P_lin)#*(1./scaling)**3 # remember self.k is scaled but self.kh isn't
-            #P_lin=np.interp(self.k,self.kh*h,P_lin)*(1./scaling)**3 # remember self.k is scaled but self.kh isn't
+            P_lin=np.interp(self.k,kh*h,P_lin)*(1./scaling)**3 # remember self.k is scaled but self.kh isn't
 
         else:
             # get rescaled values of k in 1/Mpc
@@ -2217,23 +2088,6 @@ class Likelihood_mpk(Likelihood):
             covth_k  = np.dot(self.invcov[0,:,:],WPth_k)
             covth_k2  = np.dot(self.invcov[0,:,:],WPth_k2)
             covth_zerowin  = np.dot(self.invcov[0,:,:],self.zerowindowfxnsubtractdat)
-            print 'debugging start'
-            #print self.invcov
-            #print self.P_obs
-            #print self.window
-            #print self.zerowindowfxn
-            #print self.zerowindowfxnsubtractdatnorm
-            np.set_printoptions(precision=8)
-            arr=np.zeros((np.size(self.k),2))
-            arr[:,0]=self.k/h
-            arr[:,1]=P_th
-            np.savetxt('./k_Pk_montepython_a_scl.txt',arr)
-            #exit()
-            print '----'
-            print P_th
-            print '----'
-            print self.k/h
-            print 'debugging end'
             sumDD = np.sum(self.P_obs[0,:] * covdat)
             sumDT = np.sum(self.P_obs[0,:] * covth)
             sumDT_k = np.sum(self.P_obs[0,:] * covth_k)
@@ -2279,8 +2133,6 @@ class Likelihood_mpk(Likelihood):
                     if(abs(a1val) > 0.001 or abs(a2val) > 0.001):
                          print 'ahhhh! violation!!', a1val, a2val
 
-            #print myminchisqindx,self.nptstot,self.a1list[myminchisqindx],self.a2list[myminchisqindx]
-            #print minchisqtheoryampminnuis,minchisqtheoryampnonuis
             # numerically marginalize over a1,a2 now using values stored in chisq
             minchisq = np.min(chisqmarg)
             maxchisq = np.max(chisqmarg)
@@ -2354,11 +2206,6 @@ class Likelihood_mpk(Likelihood):
 
     def remove_bao(self,k_in,pk_in):
         # By M. Ballardini
-        # Load the linear power spectrum from CLASS: 
-        #data = np.loadtxt('./Files/04_pk.dat')
-
-        # Read the linear matter power spectrum from CLASS:
-        #k_in, pk_in = data[:,0], data[:,1]
 
         # This have to contain the BAO:
         k_ref=[2.8e-2, 4.5e-1]
@@ -2397,8 +2244,6 @@ class Likelihood_mpk(Likelihood):
 
         pk_nobao = ipk(k_in)
 
-        #DataOut = np.column_stack((k_in,pk_nobao))
-        #np.savetxt('./Files/04_pk_nobao.dat', DataOut)
         return pk_nobao
 
 

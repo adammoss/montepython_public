@@ -8,17 +8,6 @@ sdss_lrgDR7.min_mpk_points_use = 0
 sdss_lrgDR7.max_mpk_points_use = 44
 sdss_lrgDR7.min_mpk_kbands_use = 0
 sdss_lrgDR7.max_mpk_kbands_use = 249
-## as in the Tegmark papers therefore use non linear corrections
-
-## decide which kbands to use N.B. P(k) is set to zero outside
-## these limits.
-## Since the windows file starts at k/h=1e-4 then truncate
-## to matter_power_minkh in cmbtypes.
-## This time the windows file goes to k/h=1.
-##sdss_lrgDR7.Q_marge     = True
-##flat prior on b^2*Q, marginalized analytically
-##sdss_lrgDR7.Q_flat      = True
-##sdss_lrgDR7.Ag          = 1.4
 
 # parameter for the rescaling with respect to a fiducial model
 sdss_lrgDR7.use_scaling         = True
@@ -31,18 +20,8 @@ sdss_lrgDR7.redshift		= 0.312782
 sdss_lrgDR7.zmax		= 0.5
 # kmax for analysis
 sdss_lrgDR7.kmax		= 0.2
-# recalculated for WMAP5 cosmology. Recompute if changing relevant quantities.
-#sdss_lrgDR7.d_angular_fid       = 1032.0543
-#sdss_lrgDR7.d_radial_fid        = 3665.5692
-#sdss_lrgDR7.d_angular_fid       = 956.7661
-#sdss_lrgDR7.d_radial_fid        = 3161.4342
-# values for zeff=0.35
-#sdss_lrgDR7.d_angular_fid       = 1026.2323
-#sdss_lrgDR7.d_radial_fid        = 3614.2465
-# values for zeff=0.312782
-#sdss_lrgDR7.d_angular_fid       = 951.8190
-#sdss_lrgDR7.d_radial_fid        = 3687.7972
-# values for zeff=0.312782 using a flat fid Omega_m = 0.25 Omega_L = 0.75, h=0.701
+# Values for zeff=0.312782 using a flat fid Omega_m = 0.25 Omega_L = 0.75, h=0.701
+# Recompute if changing relevant quantities.
 sdss_lrgDR7.d_angular_fid       = 955.0314
 sdss_lrgDR7.d_radial_fid        = 3728.3035
 
@@ -50,10 +29,12 @@ sdss_lrgDR7.d_radial_fid        = 3728.3035
 sdss_lrgDR7.windows_file		     = 'sdss_lrgDR7/lrgdr7_windows.txt'
 sdss_lrgDR7.kbands_file         	     = 'sdss_lrgDR7/lrgdr7_kbands.txt'
 sdss_lrgDR7.measurements_file   	     = 'sdss_lrgDR7/lrgdr7_ccmeasurements.txt'
-#sdss_lrgDR7.covmat_file			     = 'sdss_lrgDR7/lrgdr7_cov.txt'
-sdss_lrgDR7.covmat_file         	     = 'sdss_lrgDR7/lrgdr7_invcov.txt'
 sdss_lrgDR7.zerowindowfxn_file  	     = 'sdss_lrgDR7/lrgdr7_zerowindowfxn.txt'
 sdss_lrgDR7.zerowindowfxnsubtractdat_file    = 'sdss_lrgDR7/lrgdr7_zerowindowfxnsubtractdat.txt'
+# can provide either a covmat or inverse covmat
+sdss_lrgDR7.use_invcov = True
+#sdss_lrgDR7.covmat_file		     = 'sdss_lrgDR7/lrgdr7_cov.txt'
+sdss_lrgDR7.covmat_file         	     = 'sdss_lrgDR7/lrgdr7_invcov.txt'
 
 # constants for nuisance parameter marginalization
 sdss_lrgDR7.nptsa1 = 41
@@ -65,8 +46,14 @@ sdss_lrgDR7.s2 = 0.10
 sdss_lrgDR7.k1 = 0.1
 sdss_lrgDR7.k2 = 0.2
 
-# additional options
-sdss_lrgDR7.use_sdssDR7 = True
-sdss_lrgDR7.use_invcov = True
 # use halofit to model cosmological dependence of non-linear corrections
 sdss_lrgDR7.use_halofit = True
+
+# set to true to save fiducial model for non-linear corrections
+# using the flat fiducial Omega_b = 0.25, Omega_L = 0.75, h = 0.701
+# re-run if changes are made to how non-linear corrections are done
+# e.g. the halofit implementation in CLASS
+sdss_lrgDR7.create_fid = False
+
+# additional options
+sdss_lrgDR7.use_sdssDR7 = True
