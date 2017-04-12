@@ -359,7 +359,7 @@ def create_parser():
             Note that the list of parameters in the input covariance matrix and
             in the run do not necessarily coincide.<++>
         <**>-j<**> : str
-            <++>jumping method<++> (`global` (default), `sequential` or `fast`)
+            <++>jumping method<++> (`global`, `sequential` or `fast` (default))
             (*OPT*).
 
             With the `global` method the code generates a new random direction
@@ -373,8 +373,8 @@ def create_parser():
             generate a covariance matrix to be used later with the `default`
             jumping method.
 
-            The `fast` method implements the Cholesky decomposition presented
-            in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
+            The `fast` method (default) implements the Cholesky decomposition
+            presented in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
         <**>-m<**> : str
             <++>sampling method<++>, by default 'MH' for Metropolis-Hastings,
             can be set to 'NS' for Nested Sampling (using Multinest wrapper
@@ -384,9 +384,53 @@ def create_parser():
             Note that when running with Importance sampling, you need to
             specify a folder to start from.<++>
         <**>--update<**> : int
-            <++>update frequency for Metropolis Hastings.<++>
+            <++>Enabled by default. Method for periodic update of the covariance
+            matrix. Input: covmat update frequency for Metropolis Hastings.<++>
+            If greater than zero, number of steps after which the proposal
+            covariance matrix is updated automatically.
+            Leaving this option enabled should help speed up convergence.
+            Can set to zero to disable, i.e. if starting from a good covmat.
+
+            The Markovian properties of the MCMC are maintained by the MontePython
+            analyze module, which will only analyze steps after the last covariance
+            matrix update.
+
+            Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
+
+            Note: the covmat saved to the folder is the last updated one.
+            Use this covmat for restarting chains.<++>
+        <**>--superupdate<**> : int
+            <++>Disabled by default. Method for updating jumping factor and covariance
+            matrix for Metropolis Hastings. Input: Number of steps to wait after updating
+            the covmat before adapting the jumping factor. Enable to speed up convergence.<++>
+            For optimizing the acceptance rate. If enabled, should be set to at
+            least 100. Recommended value is 100.
+
+            The Markovian properties of the MCMC are maintained by the MontePython
+            analyze module, which will only analyze steps after the last covariance
+            matrix update and last step where the jumping factor was changed.
+
+            Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
+            Adapting jumping factor stops when above criteria is not fulfilled, plus
+            the acceptance rate of (25 +/- 2) percent is achieved, and the a.r.
+            changing by less than 1 percent over the last 100 steps.<++>
+
+            Note: the covmat saved to the folder is the last updated one.
+            Use this covmat for restarting chains (*OPT*).<++>
+        <**>--adaptive<**> : int
+            <++>Disabled by default. Method for continuous adaptation of covariance matrix
+            and jumping factor. Input: Starting step for adaptive Metropolis Hastings.<++>
             If greater than zero, number of steps after which the proposal covariance
-            matrix is updated automatically (*OPT*).<++>
+            matrix is updated automatically (*OPT*).
+
+            The Markovian properties of the MCMC is not guaranteed, but as the change
+            of the covariance matrix and jumping factor is gradual and decreases over
+            time, the ergodic properties of the chain remains.
+
+            Not compatible with multiple chains. TODO: Implement adaptive for MPI.(*OPT*)<++>
+        <**>--adaptive-ts<**> : int
+            <++>For use with --adaptive. Starting step for adapting the jumping factor.<++>
+            For optimizing the acceptance rate (*OPT*).<++>
         <**>-f<**> : float
             <++>jumping factor<++> (>= 0, default to 2.4) (*OPT*).
 
@@ -598,7 +642,17 @@ def create_parser():
                            choices=['MH', 'NS', 'CH', 'IS', 'Der'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
-                           default=0)
+                           dest='update', default=300)
+    # -- update Metropolis Hastings with an adaptive jumping factor (OPTIONAL)
+    runparser.add_argument('--superupdate', help=helpdict['superupdate'], type=int,
+                           dest='superupdate', default=0)
+    # -- adaptive jumping factor Metropolis Hastings (OPTIONAL)
+    runparser.add_argument('--adaptive', help=helpdict['adaptive'], type=int,
+                           dest='adaptive', default=0)
+    # -- adaptive ts argument (OPTIONAL)
+    runparser.add_argument('--adaptive-ts', help=helpdict['adaptive-ts'], type=int,
+                           dest='adaptive_ts', default=1000)
+
     # -- jumping factor (OPTIONAL)
     runparser.add_argument('-f', help=helpdict['f'], type=float,
                            dest='jumping_factor', default=2.4)
