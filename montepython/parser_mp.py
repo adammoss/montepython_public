@@ -387,7 +387,7 @@ def create_parser():
             <++>Enabled by default. Method for periodic update of the covariance
             matrix. Input: covmat update frequency for Metropolis Hastings.<++>
             If greater than zero, number of steps after which the proposal
-            covariance matrix is updated automatically.
+            covariance matrix is updated automatically (recommended: 300).
             Leaving this option enabled should help speed up convergence.
             Can set to zero to disable, i.e. if starting from a good covmat.
 
@@ -404,7 +404,7 @@ def create_parser():
             matrix for Metropolis Hastings. Input: Number of steps to wait after updating
             the covmat before adapting the jumping factor. Enable to speed up convergence.<++>
             For optimizing the acceptance rate. If enabled, should be set to at
-            least 100. Recommended value is 100.
+            least 100 (recommended: 100).
 
             The Markovian properties of the MCMC are maintained by the MontePython
             analyze module, which will only analyze steps after the last covariance
@@ -412,8 +412,8 @@ def create_parser():
 
             Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
             Adapting jumping factor stops when above criteria is not fulfilled, plus
-            the acceptance rate of (25 +/- 2) percent is achieved, and the a.r.
-            changing by less than 1 percent over the last 100 steps.<++>
+            the acceptance rate of (25 +/- 2) percent is achieved, and the jumping factor
+            changed by less than 1 percent compared to the mean of the last 100 steps.<++>
 
             Note: the covmat saved to the folder is the last updated one.
             Use this covmat for restarting chains (*OPT*).<++>
@@ -421,7 +421,7 @@ def create_parser():
             <++>Disabled by default. Method for continuous adaptation of covariance matrix
             and jumping factor. Input: Starting step for adaptive Metropolis Hastings.<++>
             If greater than zero, number of steps after which the proposal covariance
-            matrix is updated automatically (*OPT*).
+            matrix is updated automatically (recommended: 10*dimension) (*OPT*).
 
             The Markovian properties of the MCMC is not guaranteed, but as the change
             of the covariance matrix and jumping factor is gradual and decreases over
@@ -430,7 +430,7 @@ def create_parser():
             Not compatible with multiple chains. TODO: Implement adaptive for MPI.(*OPT*)<++>
         <**>--adaptive-ts<**> : int
             <++>For use with --adaptive. Starting step for adapting the jumping factor.<++>
-            For optimizing the acceptance rate (*OPT*).<++>
+            For optimizing the acceptance rate (recommended: 100*dimension) (*OPT*).<++>
         <**>-f<**> : float
             <++>jumping factor<++> (>= 0, default to 2.4) (*OPT*).
 
