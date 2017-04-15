@@ -96,9 +96,17 @@ def analyze(command_line):
         except:
             # in case it was not defined (i.e. when analyze() is called directly by user), set it to False
             command_line.update = 0
+        # check if analyze() is called directly by the user, or by the mcmc loop at the start of an adaptive run
+        try:
+            # command_line.adaptive is defined when called by the mcmc loop
+            command_line.adaptive
+        except:
+            # in case it was not defined (i.e. when analyze() is called directly by user), set it to False
+            command_line.adaptive = 0
 
-        # compute covariance matrix, excepted when we are in update mode and convergence is too bad or too good
-        if command_line.update and (np.amax(info.R) > 3. or np.amax(info.R) < 0.4):
+        # compute covariance matrix, except when we are in update mode and convergence is too bad or good enough
+        # or if we are in adaptive mode and only want a first guess for the covmat
+        if command_line.update and (np.amax(info.R) > 3. or np.amax(info.R) < 0.4) and not command_line.adaptive:
             print '--> Not computing covariance matrix'
         else:
             try:
@@ -1388,6 +1396,13 @@ def remove_bad_points(info):
         except:
             # in case it was not defined (i.e. when analyze() is called directly by user), set it to False
             info.update = 0
+        # check if analyze() is called directly by the user, or by the mcmc loop during an updating phase
+        try:
+            # command_line.adaptive is defined when called by the mcmc loop
+            info.adaptive
+        except:
+            # in case it was not defined (i.e. when analyze() is called directly by user), set it to False
+            info.adaptive = 0
 
         # Removing non-markovian part, burn-in, and fraction= (1 - keep-fraction)
         start = 0
@@ -1402,8 +1417,10 @@ def remove_bad_points(info):
                 markovian = start
 
             # Remove burn-in, defined as all points until the likelhood reaches min_minus_lkl+LOG_LKL_CUTOFF
-            while cheese[start, 1] > info.min_minus_lkl+LOG_LKL_CUTOFF:
-                start += 1
+            # except when it is run in adaptive mode
+            if not info.adaptive:
+                while cheese[start, 1] > info.min_minus_lkl+LOG_LKL_CUTOFF:
+                        start += 1
             burnin = start-markovian
 
             # Remove fixed fraction as requested by user (usually not useful if non-markovian is also removed)
