@@ -1995,18 +1995,6 @@ class Likelihood_mpk(Likelihood):
                 # Take ratio of smoothened non-linear to linear P(k)
                 nlratio[:,j] = Psmooth_nl/Psmooth
 
-            # Polynomials to shape small scale behavior from N-body sims
-            #kdata=kh
-            #fidpolyNEAR=np.zeros(np.size(kdata))
-            #fidpolyNEAR[kdata<=0.194055] = (1.0 - 0.680886*kdata[kdata<=0.194055] + 6.48151*kdata[kdata<=0.194055]**2)
-            #fidpolyNEAR[kdata>0.194055] = (1.0 - 2.13627*kdata[kdata>0.194055] + 21.0537*kdata[kdata>0.194055]**2 - 50.1167*kdata[kdata>0.194055]**3 + 36.8155*kdata[kdata>0.194055]**4)*1.04482
-            #fidpolyMID=np.zeros(np.size(kdata))
-            #fidpolyMID[kdata<=0.19431] = (1.0 - 0.530799*kdata[kdata<=0.19431] + 6.31822*kdata[kdata<=0.19431]**2)
-            #fidpolyMID[kdata>0.19431] = (1.0 - 1.97873*kdata[kdata>0.19431] + 20.8551*kdata[kdata>0.19431]**2 - 50.0376*kdata[kdata>0.19431]**3 + 36.4056*kdata[kdata>0.19431]**4)*1.04384
-            #fidpolyFAR=np.zeros(np.size(kdata))
-            #fidpolyFAR[kdata<=0.19148] = (1.0 - 0.475028*kdata[kdata<=0.19148] + 6.69004*kdata[kdata<=0.19148]**2)
-            #fidpolyFAR[kdata>0.19148] = (1.0 - 1.84891*kdata[kdata>0.19148] + 21.3479*kdata[kdata>0.19148]**2 - 52.4846*kdata[kdata>0.19148]**3 + 38.9541*kdata[kdata>0.19148]**4)*1.03753
-
             # Save fiducial model for non-linear corrections using the flat fiducial
             # Omega_m = 0.25, Omega_L = 0.75, h = 0.701
             # Re-run if changes are made to how non-linear corrections are done
@@ -2019,15 +2007,11 @@ class Likelihood_mpk(Likelihood):
                 self.create_fid = False
             
             if self.create_fid == True:
-                print 'Creating fiducial file with'
-                print 'Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
+                print 'Creating fiducial file with Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
                 print 'Required for non-linear modeling'
                 # Calculate relevant flat fiducial quantities
                 fidnlratio, fidNEAR, fidMID, fidFAR = self.get_flat_fid(cosmo,data,kh,z,sigma2bao)
                 # Save non-linear corrections from N-body sims for each redshift bin
-                #fidNEAR=np.interp(kh,kdata,fidpolyNEAR)
-                #fidMID=np.interp(kh,kdata,fidpolyMID)
-                #fidFAR=np.interp(kh,kdata,fidpolyFAR)
                 arr=np.zeros((np.size(kh),7))
                 arr[:,0]=kh
                 arr[:,1]=fidNEAR
@@ -2038,13 +2022,10 @@ class Likelihood_mpk(Likelihood):
                 np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
                 self.create_fid = False
                 print 'Fiducial created'
-                #exit()
 
             # Load fiducial model
             fiducial = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
             fid = fiducial[:,1:4]
-            ### flat fid test
-            #print fiducial[:,4:7] - fidnlratio
             fidnlratio = fiducial[:,4:7]
 
             # Put all factors together to obtain the P(k) for each redshift bin
