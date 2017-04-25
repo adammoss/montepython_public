@@ -246,7 +246,7 @@ def chain(cosmo, data, command_line):
     # Workaround in order to have one master chain and several slave chains even when
     # communication fails between MPI chains. It could malfunction on some hardware.
     # TODO: Would like to merge with MPI initialization above and make robust and logical
-    if command_line.superupdate:
+    if command_line.superupdate and data.jumping_factor:
         try:
             jump_file = open(command_line.folder + '/jumping_factor.txt','r')
 	    rank = 1
@@ -292,7 +292,8 @@ def chain(cosmo, data, command_line):
 
     # If the update mode was selected, the previous (or original) matrix should be stored
     if command_line.update:
-        print 'Update routine is enabled with value %d (recommended: 300)' % command_line.update
+        if not rank:
+            print 'Update routine is enabled with value %d (recommended: 300)' % command_line.update
         previous = (sigma_eig, U, C, Cholesky)
 
     # Local acceptance rate of last 100 steps
@@ -324,7 +325,8 @@ def chain(cosmo, data, command_line):
 
     # Initialize superupdate
     if command_line.superupdate:
-        print 'Superupdate routine is enabled with value %d (recommended: 100)' % command_line.superupdate
+        if not rank:
+            print 'Superupdate routine is enabled with value %d (recommended: 100)' % command_line.superupdate
         # Define needed parameters
 	parameter_names = data.get_mcmc_parameters(['varying'])
         updated_steps = 0
@@ -333,7 +335,8 @@ def chain(cosmo, data, command_line):
         R_minus_one = np.array([100.,100.])
         # Make sure update is enabled
         if command_line.update == 0:
-            print 'Update routine required by superupdate. Setting --update 300'
+            if not rank:
+                print 'Update routine required by superupdate. Setting --update 300'
             command_line.update = 300
 
     # If restart wanted, pick initial value for arguments
@@ -570,7 +573,7 @@ def chain(cosmo, data, command_line):
             else:
                 # Start of slave superupdate routine
 		# Update the jumping factor every 5 steps in superupdate
-		if not k % 5 and k > command_line.superupdate and command_line.superupdate and not stop_c:
+		if not k % 5 and k > command_line.superupdate and command_line.superupdate and (not stop_c or (stop_c and k % command_line.update)):
 		    try:
                         jump_file = open(command_line.folder + '/jumping_factor.txt','r')
                         # If there is a # in the file, the master has stopped adapting c
@@ -582,11 +585,12 @@ def chain(cosmo, data, command_line):
                             else:
                                 jump_file.seek(0)
                                 jump_value = jump_file.read().replace('# ','')
-                                data.jumping_factor = float(jump_value)
-                                stop_c = True
-                                data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
-                                if not command_line.silent:
-                                    print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(ar))
+                                if not stop_c or (stop_c and not float(jump_value) == data.jumping_factor):
+                                    data.jumping_factor = float(jump_value)
+                                    stop_c = True
+                                    data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
+                                    if not command_line.silent:
+                                        print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(ar))
                         jump_file.close()
 		    except:
                         if not command_line.silent:
