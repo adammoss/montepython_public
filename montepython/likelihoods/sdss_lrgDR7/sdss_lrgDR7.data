@@ -53,7 +53,8 @@ sdss_lrgDR7.use_halofit = True
 # using the flat fiducial Omega_b = 0.25, Omega_L = 0.75, h = 0.701
 # re-run if changes are made to how non-linear corrections are done
 # e.g. the halofit implementation in CLASS
-sdss_lrgDR7.create_fid = False
+# Can keep enabled, as it will only compute at the start of the run
+sdss_lrgDR7.create_fid = True
 
 # additional options
 sdss_lrgDR7.use_sdssDR7 = True
