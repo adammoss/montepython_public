@@ -1996,50 +1996,55 @@ class Likelihood_mpk(Likelihood):
                 nlratio[:,j] = Psmooth_nl/Psmooth
 
             # Polynomials to shape small scale behavior from N-body sims
-            kdata=kh
-            fidpolyNEAR=np.zeros(np.size(kdata))
-            fidpolyNEAR[kdata<=0.194055] = (1.0 - 0.680886*kdata[kdata<=0.194055] + 6.48151*kdata[kdata<=0.194055]**2)
-            fidpolyNEAR[kdata>0.194055] = (1.0 - 2.13627*kdata[kdata>0.194055] + 21.0537*kdata[kdata>0.194055]**2 - 50.1167*kdata[kdata>0.194055]**3 + 36.8155*kdata[kdata>0.194055]**4)*1.04482
-            fidpolyMID=np.zeros(np.size(kdata))
-            fidpolyMID[kdata<=0.19431] = (1.0 - 0.530799*kdata[kdata<=0.19431] + 6.31822*kdata[kdata<=0.19431]**2)
-            fidpolyMID[kdata>0.19431] = (1.0 - 1.97873*kdata[kdata>0.19431] + 20.8551*kdata[kdata>0.19431]**2 - 50.0376*kdata[kdata>0.19431]**3 + 36.4056*kdata[kdata>0.19431]**4)*1.04384
-            fidpolyFAR=np.zeros(np.size(kdata))
-            fidpolyFAR[kdata<=0.19148] = (1.0 - 0.475028*kdata[kdata<=0.19148] + 6.69004*kdata[kdata<=0.19148]**2)
-            fidpolyFAR[kdata>0.19148] = (1.0 - 1.84891*kdata[kdata>0.19148] + 21.3479*kdata[kdata>0.19148]**2 - 52.4846*kdata[kdata>0.19148]**3 + 38.9541*kdata[kdata>0.19148]**4)*1.03753
+            #kdata=kh
+            #fidpolyNEAR=np.zeros(np.size(kdata))
+            #fidpolyNEAR[kdata<=0.194055] = (1.0 - 0.680886*kdata[kdata<=0.194055] + 6.48151*kdata[kdata<=0.194055]**2)
+            #fidpolyNEAR[kdata>0.194055] = (1.0 - 2.13627*kdata[kdata>0.194055] + 21.0537*kdata[kdata>0.194055]**2 - 50.1167*kdata[kdata>0.194055]**3 + 36.8155*kdata[kdata>0.194055]**4)*1.04482
+            #fidpolyMID=np.zeros(np.size(kdata))
+            #fidpolyMID[kdata<=0.19431] = (1.0 - 0.530799*kdata[kdata<=0.19431] + 6.31822*kdata[kdata<=0.19431]**2)
+            #fidpolyMID[kdata>0.19431] = (1.0 - 1.97873*kdata[kdata>0.19431] + 20.8551*kdata[kdata>0.19431]**2 - 50.0376*kdata[kdata>0.19431]**3 + 36.4056*kdata[kdata>0.19431]**4)*1.04384
+            #fidpolyFAR=np.zeros(np.size(kdata))
+            #fidpolyFAR[kdata<=0.19148] = (1.0 - 0.475028*kdata[kdata<=0.19148] + 6.69004*kdata[kdata<=0.19148]**2)
+            #fidpolyFAR[kdata>0.19148] = (1.0 - 1.84891*kdata[kdata>0.19148] + 21.3479*kdata[kdata>0.19148]**2 - 52.4846*kdata[kdata>0.19148]**3 + 38.9541*kdata[kdata>0.19148]**4)*1.03753
 
             # Save fiducial model for non-linear corrections using the flat fiducial
-            # Omega_b = 0.25, Omega_L = 0.75, h = 0.701
+            # Omega_m = 0.25, Omega_L = 0.75, h = 0.701
             # Re-run if changes are made to how non-linear corrections are done
             # e.g. the halofit implementation in CLASS
             # To re-run fiducial, set <experiment>.create_fid = True in .data file
+            # Can leave option enabled, as it will only compute once at the start
             try:
                 self.create_fid
             except:
                 self.create_fid = False
             
             if self.create_fid == True:
-                print 'Creating fiducial file.'
-                print 'This only makes sense for a flat fiducial with'
+                print 'Creating fiducial file with'
                 print 'Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
-                print 'and with the flag -f 0'
+                print 'Required for non-linear modeling'
+                # Calculate relevant flat fiducial quantities
+                fidnlratio, fidNEAR, fidMID, fidFAR = self.get_flat_fid(cosmo,data,kh,z,sigma2bao)
                 # Save non-linear corrections from N-body sims for each redshift bin
-                fidNEAR=np.interp(kh,kdata,fidpolyNEAR)
-                fidMID=np.interp(kh,kdata,fidpolyMID)
-                fidFAR=np.interp(kh,kdata,fidpolyFAR)
+                #fidNEAR=np.interp(kh,kdata,fidpolyNEAR)
+                #fidMID=np.interp(kh,kdata,fidpolyMID)
+                #fidFAR=np.interp(kh,kdata,fidpolyFAR)
                 arr=np.zeros((np.size(kh),7))
                 arr[:,0]=kh
                 arr[:,1]=fidNEAR
                 arr[:,2]=fidMID
                 arr[:,3]=fidFAR
                 # Save non-linear corrections from halofit for each redshift bin
-                arr[:,4:7]=nlratio
+                arr[:,4:7]=fidnlratio
                 np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
-                print 'Fiducial created, exiting'
-                exit()
-            
+                self.create_fid = False
+                print 'Fiducial created'
+                #exit()
+
             # Load fiducial model
             fiducial = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
             fid = fiducial[:,1:4]
+            ### flat fid test
+            #print fiducial[:,4:7] - fidnlratio
             fidnlratio = fiducial[:,4:7]
 
             # Put all factors together to obtain the P(k) for each redshift bin
@@ -2246,6 +2251,70 @@ class Likelihood_mpk(Likelihood):
 
         return pk_nobao
 
+    def get_flat_fid(self,cosmo,data,kh,z,sigma2bao):
+        # SDSS DR7 LRG specific function
+        # Compute fiducial properties for a flat fiducial
+        # with Omega_m = 0.25, Omega_L = 0.75, h = 0.701
+        param_backup = data.cosmo_arguments
+        data.cosmo_arguments = {'P_k_max_h/Mpc': 1.5, 'ln10^{10}A_s': 3.0, 'N_ur': 3.04, 'h': 0.701,
+                                'omega_b': 0.035*0.701**2, 'non linear': ' halofit ', 'YHe': 0.24, 'k_pivot': 0.05,
+                                'n_s': 0.96, 'tau_reio': 0.084, 'z_max_pk': 0.5, 'output': ' mPk ',
+                                'omega_cdm': 0.215*0.701**2, 'T_cmb': 2.726}
+        cosmo.struct_cleanup()
+        cosmo.set(data.cosmo_arguments)
+        cosmo.compute(['lensing'])
+        h = data.cosmo_arguments['h']
+        k = kh*h
+        # P(k) *with* wiggles, both linear and nonlinear
+        Plin = np.zeros(len(k), 'float64')
+        Pnl = np.zeros(len(k), 'float64')
+        # P(k) *without* wiggles, both linear and nonlinear
+        Psmooth = np.zeros(len(k), 'float64')
+        Psmooth_nl = np.zeros(len(k), 'float64')
+        # Damping function and smeared P(k)
+        fdamp = np.zeros([len(k), len(z)], 'float64')
+        Psmear = np.zeros([len(k), len(z)], 'float64')
+        # Ratio of smoothened non-linear to linear P(k)
+        fidnlratio = np.zeros([len(k), len(z)], 'float64')
+        # Loop over each redshift bin
+        for j in range(len(z)):
+            # Compute Pk *with* wiggles, both linear and nonlinear
+            # Get P(k) at right values of k in Mpc**3, convert it to (Mpc/h)^3 and rescale it
+            # Get values of P(k) in Mpc**3
+            for i in range(len(k)):
+                Plin[i] = cosmo.pk_lin(k[i], z[j])
+                Pnl[i] = cosmo.pk(k[i], z[j])
+            # Get rescaled values of P(k) in (Mpc/h)**3
+            Plin *= h**3 #(h/scaling)**3
+            Pnl *= h**3 #(h/scaling)**3
+            # Compute Pk *without* wiggles, both linear and nonlinear
+            Psmooth = self.remove_bao(kh,Plin)
+            Psmooth_nl = self.remove_bao(kh,Pnl)
+            # Apply Gaussian damping due to non-linearities
+            fdamp[:,j] = np.exp(-0.5*sigma2bao[j]*kh**2)
+            Psmear[:,j] = Plin*fdamp[:,j]+Psmooth*(1.0-fdamp[:,j])
+            # Take ratio of smoothened non-linear to linear P(k)
+            fidnlratio[:,j] = Psmooth_nl/Psmooth
+
+        # Polynomials to shape small scale behavior from N-body sims
+        kdata=kh
+        fidpolyNEAR=np.zeros(np.size(kdata))
+        fidpolyNEAR[kdata<=0.194055] = (1.0 - 0.680886*kdata[kdata<=0.194055] + 6.48151*kdata[kdata<=0.194055]**2)
+        fidpolyNEAR[kdata>0.194055] = (1.0 - 2.13627*kdata[kdata>0.194055] + 21.0537*kdata[kdata>0.194055]**2 - 50.1167*kdata[kdata>0.194055]**3 + 36.8155*kdata[kdata>0.194055]**4)*1.04482
+        fidpolyMID=np.zeros(np.size(kdata))
+        fidpolyMID[kdata<=0.19431] = (1.0 - 0.530799*kdata[kdata<=0.19431] + 6.31822*kdata[kdata<=0.19431]**2)
+        fidpolyMID[kdata>0.19431] = (1.0 - 1.97873*kdata[kdata>0.19431] + 20.8551*kdata[kdata>0.19431]**2 - 50.0376*kdata[kdata>0.19431]**3 + 36.4056*kdata[kdata>0.19431]**4)*1.04384
+        fidpolyFAR=np.zeros(np.size(kdata))
+        fidpolyFAR[kdata<=0.19148] = (1.0 - 0.475028*kdata[kdata<=0.19148] + 6.69004*kdata[kdata<=0.19148]**2)
+        fidpolyFAR[kdata>0.19148] = (1.0 - 1.84891*kdata[kdata>0.19148] + 21.3479*kdata[kdata>0.19148]**2 - 52.4846*kdata[kdata>0.19148]**3 + 38.9541*kdata[kdata>0.19148]**4)*1.03753
+
+        fidNEAR=np.interp(kh,kdata,fidpolyNEAR)
+        fidMID=np.interp(kh,kdata,fidpolyMID)
+        fidFAR=np.interp(kh,kdata,fidpolyFAR)
+
+        data.cosmo_arguments = param_backup
+
+        return fidnlratio, fidNEAR, fidMID, fidFAR
 
 class Likelihood_sn(Likelihood):
 
