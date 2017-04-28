@@ -622,7 +622,7 @@ def chain(cosmo, data, command_line):
                                 pass
                         previous = (sigma_eig, U, C, Cholesky)
 
-                    except IOError:
+                    except:
                         pass
                 # End of slave update routine
             # End of update routine
