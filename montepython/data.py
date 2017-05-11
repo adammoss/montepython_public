@@ -799,7 +799,7 @@ class Data(object):
                     raise ValueError(
                         "N_ncdm is not equal to 3."
                         " This value should be exactly 3.")
-		# From Gonzalez-Garcia et al. 2014. Updated 2016: https://arxiv.org/abs/1409.5439v2
+                # From Gonzalez-Garcia et al. 2014. Updated 2016: https://arxiv.org/abs/1409.5439v2
                 delta_m_squared_atm=2.484e-3 #2.45e-3
                 delta_m_squared_sol=7.49e-5 #7.50e-5
                 m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
@@ -825,7 +825,7 @@ class Data(object):
                     raise ValueError(
                         "N_ncdm is not equal to 3."
                         " This value should be exactly 3.")
-		# From Gonzalez-Garcia et al. 2014. Updated 2016: https://arxiv.org/abs/1409.5439v2
+                # From Gonzalez-Garcia et al. 2014. Updated 2016: https://arxiv.org/abs/1409.5439v2
                 delta_m_squared_atm=-2.467e-3 #-2.45e-3
                 delta_m_squared_sol=7.49e-5 #7.50e-5
                 m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
