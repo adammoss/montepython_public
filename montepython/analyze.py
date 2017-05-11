@@ -796,8 +796,8 @@ def minimum_credible_intervals(info):
     bounds = np.zeros((len(levels), 2))
     j = 0
     delta = bincenters[1]-bincenters[0]
-    left_edge = np.max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0.)
-    right_edge = np.max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0.)
+    left_edge = np.max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0)
+    right_edge = np.max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0)
     failed = False
     for level in levels:
         norm = float(
@@ -1442,7 +1442,7 @@ def remove_bad_points(info):
         # ham contains cheese without the burn-in, if there are any points
         # left (more than 5)
         if np.shape(cheese)[0] > start+5:
-            ham = np.copy(cheese[start::])
+            ham = np.copy(cheese[int(start)::])
 
             # Deal with single file case
             if len(info.files) == 1:

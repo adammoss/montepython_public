@@ -9,6 +9,7 @@
 # See google doc document prepared by the Euclid IST - Splinter 2
 #
 # Modified by J. Lesgourgues in March 2016 to vectorise and speed up
+# Modified by Tim Sprenger in May 2017 to include z-dependent k_max
 
 from montepython.likelihood_class import Likelihood
 import io_mp
