@@ -3,18 +3,26 @@
 # and IST-Forecasting subgroup on galaxy clustering
 # Those specifications can be found in the googledoc document
 # prepared by the Euclid IST - Splinter Group 3
+# File update by Tim Sprenger to use old number counts and
+# new nuisance parameter sigma_NL, a nonlinear cutoff option
+# and a use_halofit flag
 
 euclid_pk.data_directory = data.path['data']
 euclid_pk.fiducial_file  = "euclid_pk_fiducial.dat"
 
 # Uncomment the line with epsilon to use the theoretical error
-euclid_pk.use_nuisance = ['P_shot']
+# sigma_NL (1405.1452v2: 4-10 Mpc^-1, mean 7 Mpc^-1)
+#euclid_pk.use_nuisance = ['sigma_NL','epsilon']
+euclid_pk.use_nuisance = ['sigma_NL']
+#euclid_pk.use_nuisance = ['epsilon']
+#euclid_pk.use_nuisance = ['P_shot']
 #euclid_pk.use_nuisance = ['P_shot','epsilon']
 
+# redshift range (do not change!)
 # number of bins of the survey
-euclid_pk.nbin  = 14
+euclid_pk.nbin  = 16
 # range of redshifts covered by survey.
-euclid_pk.zmin = 0.7
+euclid_pk.zmin = 0.5
 euclid_pk.zmax  = 2.0
 # sky coverage
 euclid_pk.fsky  = 0.3636
@@ -25,12 +33,18 @@ euclid_pk.mu_size = 9
 euclid_pk.k_size = 100
 
 # integration boundaries for k (in 1/Mpc)
-euclid_pk.kmin = 0.001
-euclid_pk.kmax = 0.2
+# kmax=0: use nonlinear cutoff (Bull, 1509.07562v2 p.5)
+# kmax will be multiplied by k_max_factor in both cases
+euclid_pk.k_max_factor = 1.
+euclid_pk.kmin = 0.02
+euclid_pk.kmax = 0
 
-# precision of the halofit method (set to zero by default)
-euclid_pk.theoretical_error = 0
-euclid_pk.coefficient_f_nu = 0
+# use halofit method
+euclid_pk.use_halofit = True
 
-# efficiency (not used in current version)
-#euclid_pk.efficiency = 1.0
+# theoretical errors (>0 enforces halofit)
+euclid_pk.theoretical_error = 0.
+euclid_pk.coefficient_f_nu = 1.
+
+# efficiency
+euclid_pk.efficiency = 1.0
