@@ -577,7 +577,7 @@ def compute_lkl(cosmo, data):
                 "with each other. If everything looks fine, "
                 "you may now start a new run.")
 
-    return loglike
+    return loglike/data.command_line.temperature
 
 
 def compute_fisher(data, cosmo, center, step_size):
