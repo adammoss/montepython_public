@@ -24,9 +24,13 @@ class euclid_pk(Likelihood):
         self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 1.5*self.k_cut(self.zmax)})
 
         # TS;Compute non-linear power spectrum if requested
-        if (self.theoretical_error>0. or self.use_halofit):
+        if (self.theoretical_error!=0. or self.use_halofit):
             	self.need_cosmo_arguments(data, {'non linear':'halofit'})
 		print("Using halofit")
+
+	# TS;Print warning for combining theo. error and NL cutoff
+	if (self.kmax==0 and self.theoretical_error!=0.):
+		warnings.warn("You are using a theoretical error together with a nonlinear cutoff, which should be redundant!")
 
         #################
         # find number of galaxies for each mean redshift value
@@ -140,7 +144,7 @@ class euclid_pk(Likelihood):
         return galaxy_dist
 
     def k_cut(self, z):
-	# compute kmax according to highest redshift linear cutoff (Bull 2016)		#ts- include dynamical kmax
+	# compute kmax according to highest redshift linear cutoff (1509.07562v2)
 	if (self.kmax==0):
 	# n_s from Planck 2015
 		k_lc = self.k_max_factor*0.14*pow(1.+z,2./(2.+0.9667))
@@ -165,7 +169,7 @@ class euclid_pk(Likelihood):
         for index_z in xrange(self.nbin):
             sigma_r[index_z] = 0.001*(1.+self.z_mean[index_z])/H[2*index_z+1]
 
-	# TS; Option: nuisance sigma_NL in Mpc = nonlinear dispersion scale of RSD (Bull et al., 1405.1452v2)
+	# TS; Option: nuisance sigma_NL in Mpc = nonlinear dispersion scale of RSD (1405.1452v2)
 	sigma_NL = 0.0	# fiducial would be 7 but when kept constant that is more constraining than keeping 0
 	if 'sigma_NL' in self.use_nuisance:
 		sigma_NL = data.mcmc_parameters['sigma_NL']['current']*data.mcmc_parameters['sigma_NL']['scale']
@@ -415,11 +419,14 @@ class euclid_pk(Likelihood):
         return - chi2/2.
 
     # TS; V_fid, index_k: index->argument, rescaled theoretical error (see commented)
-    #def integrand(self,index_k,index_z,index_mu):
-    #    return self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[index_k,2.*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*self.k_fid[index_k]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
+    # and added triggers to avoid computation of zero theoretical error
     def integrand(self,index_k,index_z,index_mu):
+        if (self.theoretical_error == 0.):
+            return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
+        #return self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*self.k_fid[index_k]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
         return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + 5.97*self.theoretical_error*(self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*(self.k_fid[index_k]/self.k_sigma[2*index_z+1])**3))
-    #def array_integrand(self,index_z,index_mu):
-    #    return self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[:,2.*index_z+1,index_mu]*self.tilde_P_th[:,index_z,index_mu])**2*self.k_fid[:]**3/2./pi**2*self.nbin*log(self.kmax/self.kmin)))
     def array_integrand(self,index_z,index_mu):
+        if (self.theoretical_error == 0.):
+            return (self.V_fid[index_z]/2.)*self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2))
+        #return self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[:,2*index_z+1,index_mu]*self.tilde_P_th[:,index_z,index_mu])**2*self.k_fid[:]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
         return (self.V_fid[index_z]/2.)*self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + 5.97*self.theoretical_error*(self.alpha[:,2*index_z+1,index_mu]*self.tilde_P_th[:,index_z,index_mu])**2*(self.k_fid[:]/self.k_sigma[2*index_z+1])**3))
