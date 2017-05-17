@@ -448,6 +448,8 @@ def create_parser():
 
             Using :code:`-f 0 -N 1` is a convenient way to get the likelihood
             exactly at the starting point passed in input.<++>
+        <**>-T<**> : float
+            <++>Sample from the probability distribution P^(1/T) instead of P.  (*OPT*)<++>
         <**>--conf<**> : str
             <++>configuration file<++> (default to `default.conf`) (*OPT*).
             This file contains the path to your cosmological module
@@ -527,6 +529,10 @@ def create_parser():
             <++>number of bins in the histograms<++> used to derive posterior
             probabilities and credible intervals (default to 20). Decrease this
             number for smoother plots at the expense of masking details.<++>
+        <**>-T<**> : float
+            <++>Raise posteriors to the power T.<++>
+            Interpret the chains as samples from the probability distribution 
+            P^(1/T) instead of P. (*OPT*)<++>
         <**>--no-mean<**> : None
             <++>remove the mean likelihood from the plot<++>. By default, when
             plotting marginalised 1D posteriors, the code also shows the mean
@@ -661,6 +667,9 @@ def create_parser():
     # -- jumping factor (OPTIONAL)
     runparser.add_argument('-f', help=helpdict['f'], type=float,
                            dest='jumping_factor', default=2.4)
+    # -- temperature (OPTIONAL)
+    runparser.add_argument('-T', help=helpdict['T'], type=float,
+                           dest='temperature', default=1.0)
     # -- fisher (EXPERIMENTAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
@@ -756,6 +765,9 @@ def create_parser():
     # -- number of bins (defaulting to 20)
     infoparser.add_argument('--bins', help=helpdict['bins'],
                             type=int, default=20)
+    # -- temperature (OPTIONAL)
+    infoparser.add_argument('-T', help=helpdict['T'], type=float,
+                           dest='temperature', default=1.0)
     # -- to remove the mean-likelihood line
     infoparser.add_argument('--no-mean', help=helpdict['no-mean'],
                             dest='mean_likelihood', action='store_false')

@@ -458,6 +458,8 @@ def compute_posterior(information_instances):
                     info.chain[:, info.native_index+2], bins=info.bins,
                     weights=info.chain[:, 0], normed=False, density=False)
                 info.bincenters = 0.5*(info.bin_edges[1:]+info.bin_edges[:-1])
+                # Correct for temperature
+                info.hist = info.hist**conf.temperature
 
                 # interpolated histogram (if available)
                 info.interp_hist, info.interp_grid = cubic_interpolation(
@@ -546,6 +548,7 @@ def compute_posterior(information_instances):
                     ax1d.axis([info.x_range[info.native_index][0],
                                info.x_range[info.native_index][1],
                                0, 1.05])
+
 
                     ax1d.plot(
                         info.interp_grid,
@@ -636,6 +639,9 @@ def compute_posterior(information_instances):
                             weights=info.chain[:, 0],
                             bins=(info.bins, info.bins),
                             normed=False)
+                        # Correct for temperature:
+                        info.n = info.n**conf.temperature
+
                         info.extent = [
                             info.x_range[info.native_second_index][0],
                             info.x_range[info.native_second_index][1],

@@ -21,7 +21,7 @@ euclid_pk.use_nuisance = ['sigma_NL']
 # redshift range (do not change!)
 # number of bins of the survey
 euclid_pk.nbin  = 16
-# range of redshifts covered by survey.
+# range of redshifts covered by survey (bin centers!).
 euclid_pk.zmin = 0.5
 euclid_pk.zmax  = 2.0
 # sky coverage
@@ -33,7 +33,7 @@ euclid_pk.mu_size = 9
 euclid_pk.k_size = 100
 
 # integration boundaries for k (in 1/Mpc)
-# kmax=0: use nonlinear cutoff (Bull, 1509.07562v2 p.5)
+# kmax=0: use nonlinear cutoff (1509.07562v2 p.5)
 # kmax will be multiplied by k_max_factor in both cases
 euclid_pk.k_max_factor = 1.
 euclid_pk.kmin = 0.02

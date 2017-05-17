@@ -1,0 +1,60 @@
+# SKA2 galaxy survey data
+
+ska2_pk.data_directory = data.path['data']
+ska2_pk.fiducial_file  = "ska2_pk_fiducial.dat"
+
+# Uncomment to use nuisance parameters
+# sigma_NL (1405.1452v2: 4-10 Mpc^-1, mean 7 Mpc^-1)
+ska2_pk.use_nuisance = ['sigma_NL']
+#ska2_pk.use_nuisance = ['epsilon']
+#ska2_pk.use_nuisance = ['sigma_NL','epsilon']
+
+# number of bins of the survey (step width 0.1)
+ska2_pk.nbin  = 19
+
+# range of redshifts (bin centers) covered by survey
+# 0.1-2.0 corresponds to 470-1290MHz (1509.07562v2)
+ska2_pk.zmin = 0.1
+ska2_pk.zmax  = 2.0
+
+# sky coverage in deg^2 (Yahya et al. 2015)
+ska2_pk.skycov  = 30000.
+
+# precision on the mu variable
+ska2_pk.mu_size = 9
+
+# number of equally spaced bins in log(k) space
+ska2_pk.k_size = 100
+
+# integration boundaries for k (in 1/Mpc)
+# 0.02 ~ smallest of 2pi/(10deg*r_par(z)) and 2pi/(delta_r_par(z))
+# value of kmin only interesting for numerical reasons
+ska2_pk.kmin = 0.02
+# kmax=0: use nonlinear cutoff (1509.07562v2 p.5)
+# kmax will be multiplied by k_max_factor in both cases
+ska2_pk.k_max_factor = 1.
+ska2_pk.kmax = 0
+
+# use halofit method
+ska2_pk.use_halofit = True
+
+# theoretical errors (>0 enforces halofit)
+ska2_pk.theoretical_error = 0
+ska2_pk.coefficient_f_nu = 0
+
+# c-values for number counts and bias (1412.4700v2, numbers: 1509.07562v2)
+ska2_pk.c1 = 6.319
+ska2_pk.c2 = 1.736
+ska2_pk.c3 = 5.424
+ska2_pk.c4 = 0.554
+ska2_pk.c5 = 0.783
+
+# measurement errors: (found to be negligible, so rough estimates suffice)
+
+# precision of frequency measurement in MHz
+# (10kHz slots) conservative transform to gaussian error
+# this error is neglidgible compared to (and degenerate to) sigma_NL!
+ska2_pk.sigma_nu = 0.005
+
+# Baseline in km for ang. res. (max. baseline 3000km: SKA1 System BaselineV2 Description: Dewdney et al. 2016, center ~5km)
+ska2_pk.Baseline = 5.
