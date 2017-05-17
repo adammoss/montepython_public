@@ -449,7 +449,7 @@ def create_parser():
             Using :code:`-f 0 -N 1` is a convenient way to get the likelihood
             exactly at the starting point passed in input.<++>
         <**>-T<**> : float
-            <++>Sample from the probability distribution P^(1/T) instead of P.  (*OPT*)<++>
+            <++>Sample from the probability distribution P^(1/T) instead of P.  (*OPT*)<++><++>
         <**>--conf<**> : str
             <++>configuration file<++> (default to `default.conf`) (*OPT*).
             This file contains the path to your cosmological module
