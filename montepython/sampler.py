@@ -319,6 +319,8 @@ def get_covariance_matrix(cosmo, data, command_line):
     #inverse, and diagonalization
     eigv, eigV = np.linalg.eig(np.linalg.inv(matrix))
 
+    if command_line.start_from_fisher:
+        command_line.fisher = True
     if command_line.fisher:
         eigv, eigV, matrix = get_fisher_matrix(cosmo, data, command_line, matrix)
 
@@ -379,37 +381,72 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
             cov_matrix = np.linalg.inv(fisher_matrix)
         except np.linalg.LinAlgError:
             raise io_mp.ConfigurationError(
-                "Could not find Fisher matrix, please remove the "
-                "option --fisher and run with Metropolis-Hastings "
-                "or another sampling method.")
+                "Could not find Fisher matrix, please adjust bestfit and/or input"
+                "sigma values (or covmat) or remove the option --fisher and run"
+                "with Metropolis-Hastings or another sampling method.")
             fisher_invert_success = False
             done = True
 
-        # Write it to the file
+        # Write covmat from fisher matrix to file
         if fisher_invert_success:
             io_mp.write_covariance_matrix(
                 cov_matrix, parameter_names,
-                os.path.join(command_line.folder, 'covariance_fisher.mat'))
+                os.path.join(command_line.folder, 'covariance_fisher.covmat'))
+
+            # Check fisher iteration step and write fisher matrix to file
+            file_index = 1
+            while file_index <= command_line.fisher_it:
+                try:
+                    filetest = open(command_line.folder + '/fisher'+str(file_index)+'.mat','r')
+                    filetest.close()
+                    if command_line.cov == None:
+                        warnings.warn("Running in folder with existing fisher matrix,"
+                                      "but no input covmat was provided. Existing fisher"
+                                      "matrix was not used and has been overwritten."
+                                      "If you wanted to continue iterating on an existing"
+                                      "fisher matrix, provide covmat from fisher matrix"
+                                      "as input and increase iteration number (--fisher-it).")
+                        io_mp.write_covariance_matrix(
+                            fisher_matrix, parameter_names,
+                            os.path.join(command_line.folder, 'fisher'+str(file_index)+'.mat'))
+                        print 'Fisher iteration step %d done' % file_index
+                        break
+                except:
+                    io_mp.write_covariance_matrix(
+                        fisher_matrix, parameter_names,
+                        os.path.join(command_line.folder, 'fisher'+str(file_index)+'.mat'))
+                    print 'Fisher iteration step %d done' % file_index
+                    break
+                file_index += 1
 
             command_line.cov = os.path.join(
-                command_line.folder, 'covariance_fisher.mat')
+                command_line.folder, 'covariance_fisher.covmat')
 
             done = True
             # Check if the diagonal elements are non-negative
             for h, elem in enumerate(parameter_names):
                 if cov_matrix[h][h] < 0:
                     warnings.warn(
-                        "Covariance has negative values on diagonal, "
-                        "moving to a better point and repeating "
-                        "the Fisher computation")
+                        "Covariance matrix has negative values on diagonal")
                     done = False
                     break
 
             if not done:
                 raise ValueError("Negative values on diagonal, please use a better bestfit and/or covmat - aborting run")
 
-    # Load the computed fisher matrix as the new starting covariance matrix
-    command_line.fisher = False
+    # Check if desired number of fisher iterations has been reached.
+    # If True, either exit or start MCMC.
+    if file_index == command_line.fisher_it:
+        if command_line.start_from_fisher == True:
+            print 'Fisher matrix successfully computed after %d iterations,' % command_line.fisher_it
+            print 'starting MCMC run with covmat from fisher matrix as input.'
+            command_line.fisher = False
+            command_line.start_from_fisher = False
+        else:
+            print 'Fisher matrix successfully computed after %d iterations, exiting.' % command_line.fisher_it
+            exit()
+
+    # Load the covmat from computed fisher matrix as the new starting covariance matrix
     eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)
 
     return eigv, eigV, matrix
@@ -600,6 +637,7 @@ def compute_fisher(data, cosmo, center, step_size):
             # elements of one half of it plus the diagonal.
             if k > h:
                 continue
+            print 'Computing fisher element (%d,%d)' % (k,h)
             if k != h:
                 fisher_matrix[k][h] = compute_fisher_element(
                     data, cosmo, center,
@@ -615,7 +653,6 @@ def compute_fisher(data, cosmo, center, step_size):
 
 
 def compute_fisher_element(data, cosmo, center, one, two=None):
-
     # Unwrap
     name_1, diff_1 = one
     if two:
