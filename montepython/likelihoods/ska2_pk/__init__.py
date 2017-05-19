@@ -163,7 +163,7 @@ class ska2_pk(Likelihood):
 		sigma_B = np.zeros(self.nbin,'float64')
 		sigma_A = ((1.+self.z_mean[:])**2/H[1::2]*self.sigma_nu/1420.)**2 -(
 			1.22*(1+self.z_mean[:])**2 * D_A[1::2]*2.111e-4/self.Baseline)**2
-		sigma_B = 1.22*((1+self.z_mean[:])**2 * D_A[1::2]*2.111e-4/self.Baseline)**2
+		sigma_B = (1.22*(1+self.z_mean[:])**2 * D_A[1::2]*2.111e-4/self.Baseline)**2
 
 	# sigma_NL in Mpc = nonlinear dispersion scale of RSD (1405.1452v2)
 	sigma_NL = 0.0	# fiducial would be 7 but when kept constant that is more constraining than keeping 0
@@ -299,7 +299,9 @@ class ska2_pk(Likelihood):
 		integrand_hi = 0.0
 
 		for index_z in xrange(self.nbin):
-			# TS; uncomment to display max. kmin (used to infer kmin~0.02): 
+			# uncomment printers to get contributions from individual redshift bins
+			#printer1 = chi2*delta_mu
+			# uncomment to display max. kmin (used to infer kmin~0.02): 
 			#kmin: #print("z=" + str(self.z_mean[index_z]) + " kmin=" + str(34.56/r[2*index_z+1]) + "\tor " + str(6.283/(r[2*index_z+2]-r[2*index_z])))
 			for index_k in xrange(1,self.k_size):
 				if ((self.k_cut(self.z_mean[index_z])-self.k_fid[self.k_size-index_k]) > -1.e-6):
@@ -324,6 +326,8 @@ class ska2_pk(Likelihood):
 				chi2 += (integrand_hi+integrand_low)*.5*(self.k_fid[index_k]-self.k_fid[index_k-1])
 				integrand_low = integrand_hi
 			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z])-self.k_fid[index_kmax])
+			#printer2 = chi2*delta_mu-printer1
+			#print("%s\t%s" % (self.z_mean[index_z], printer2))
 		chi2 *= delta_mu
 
 	else:
@@ -351,6 +355,7 @@ class ska2_pk(Likelihood):
 		#return self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*self.k_fid[index_k]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
 		return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + 5.97*self.theoretical_error*(self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*(self.k_fid[index_k]/self.k_sigma[2*index_z+1])**3))
 	return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
+        #return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((1.e-3*self.tilde_P_th[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
     def array_integrand(self,index_z,index_mu):
 	if self.th_error_flag :
 		#return self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[:,2*index_z+1,index_mu]*self.tilde_P_th[:,index_z,index_mu])**2*self.k_fid[:]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
