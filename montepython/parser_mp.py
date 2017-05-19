@@ -449,7 +449,7 @@ def create_parser():
             Using :code:`-f 0 -N 1` is a convenient way to get the likelihood
             exactly at the starting point passed in input.<++>
         <**>-T<**> : float
-            <++>Sample from the probability distribution P^(1/T) instead of P.  (*OPT*)<++>
+            <++>Sample from the probability distribution P^(1/T) instead of P.  (*OPT*)<++><++>
         <**>--conf<**> : str
             <++>configuration file<++> (default to `default.conf`) (*OPT*).
             This file contains the path to your cosmological module
@@ -478,6 +478,11 @@ def create_parser():
             <++>start a new chain from the bestfit file<++> computed with
             analyze.  (*OPT*)<++>
         <**>--fisher<**> : None
+            <++>Calculates the fisher matrix and its inverse<++>, which can be used
+            as proposal distribution<++>
+        <**>--fisher-it<**> : int
+            <++>Number of iterations for fisher matrix computation (Default: 1)<++>
+        <**>--start-from-fisher<**> : None
             <++>Calculates the inverse of the fisher matrix<++> to use as
             proposal distribution<++>
         <**>--silent<**> : None
@@ -668,6 +673,12 @@ def create_parser():
     # -- fisher (EXPERIMENTAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
+    # -- iterative fisher argument (EXPERIMENTAL)
+    runparser.add_argument('--fisher-it', help=helpdict['fisher'], type=int,
+                           dest='fisher_it', default=1)
+    # -- fisher as MCMC input (EXPERIMENTAL)
+    runparser.add_argument('--start-from-fisher', help=helpdict['fisher'],
+                           dest='start_from_fisher', action='store_true')
     # -- configuration file (OPTIONAL)
     runparser.add_argument('--conf', help=helpdict['conf'],
                            type=str, dest='config_file',
