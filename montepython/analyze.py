@@ -106,7 +106,7 @@ def analyze(command_line):
 
         # compute covariance matrix, except when we are in update mode and convergence is too bad or good enough
         # or if we are in adaptive mode and only want a first guess for the covmat
-        if command_line.update and (np.amax(info.R) > 3. or np.amax(info.R) < 0.4) and not command_line.adaptive:
+        if command_line.update and (np.amax(info.R) > 3. or np.amax(info.R) < 0.4 or np.isnan(np.sum(info.R))) and not command_line.adaptive:
             print '--> Not computing covariance matrix'
         else:
             try:
