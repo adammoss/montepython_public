@@ -1,7 +1,7 @@
 ########################################################
 # ska2_lensing likelihood
 ########################################################
-# Corresponding to Euclid_lensing from 05.2017
+# Copied from Euclid_lensing 05.2017
 # Tim Sprenger: changed galaxy_distribution and photo_z_distribution
 # to match ska2 specifications from 1601.03947
 
@@ -26,14 +26,15 @@ class ska2_lensing(Likelihood):
         # max(self.z) and for k up to k_max
         self.need_cosmo_arguments(data, {'output': 'mPk'})
         self.need_cosmo_arguments(data, {'z_max_pk': self.zmax})
-	if (self.k_max_1_by_Mpc == 0):
-		self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': self.k_max_factor*0.14*pow(1.+self.zmax,2./(2.+0.9667)) })
-	else:
-        	self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': self.k_max_factor*self.k_max_1_by_Mpc})
+        self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 0.75*self.k_max_h_by_Mpc})
 
         # Compute non-linear power spectrum if requested
         if (self.use_halofit):
             self.need_cosmo_arguments(data, {'non linear':'halofit'})
+
+	# Warn if theoretical error and linear cutoff are requested
+	if (self.use_lmax_lincut and self.theoretical_error!=0):
+	    warnings.warn("A lmax cutoff infered from kmax and a theoretical error are requested. This combination is not implemented and in most cases not necessary as the theoretical error should induce a cutoff by itself.")
 
         # Define array of l values, and initialize them
         # It is a logspace
@@ -227,12 +228,55 @@ class ska2_lensing(Likelihood):
                     fun[1:]+fun[:-1])*(self.r[nr+1:]-self.r[nr:-1]))
                 g[nr, Bin] *= 2.*self.r[nr]*(1.+self.z[nr])
 
+	# compute the maximum l where most contributions are linear
+	# as a function of the lower bin number
+	if self.use_lmax_lincut:
+            lintegrand_lincut_o = np.zeros((self.nzmax, self.nbin, self.nbin), 'float64')
+            lintegrand_lincut_u = np.zeros((self.nzmax, self.nbin, self.nbin), 'float64')
+            l_lincut = np.zeros((self.nbin, self.nbin), 'float64')
+            l_lincut_mean = np.zeros(self.nbin, 'float64')
+            for Bin1 in xrange(self.nbin):
+                for Bin2 in xrange(Bin1,self.nbin):
+                    lintegrand_lincut_o[1:,Bin1, Bin2] = g[1:, Bin1]*g[1:, Bin2]/(
+                        self.r[1:])
+            for Bin1 in xrange(self.nbin):
+                for Bin2 in xrange(Bin1,self.nbin):
+                    lintegrand_lincut_u[1:,Bin1, Bin2] = g[1:, Bin1]*g[1:, Bin2]/(
+                        self.r[1:]**2)
+            for Bin1 in xrange(self.nbin):
+                for Bin2 in xrange(Bin1,self.nbin):
+                    l_lincut[Bin1, Bin2] = np.sum(0.5*(
+                        lintegrand_lincut_o[1:, Bin1, Bin2] +
+                        lintegrand_lincut_o[:-1, Bin1, Bin2])*(
+                        self.r[1:]-self.r[:-1]))
+                    l_lincut[Bin1, Bin2] /= np.sum(0.5*(
+                        lintegrand_lincut_u[1:, Bin1, Bin2] +
+                        lintegrand_lincut_u[:-1, Bin1, Bin2])*(
+                        self.r[1:]-self.r[:-1]))
+	    z_peak = np.zeros((self.nbin, self.nbin), 'float64')
+            for Bin1 in xrange(self.nbin):
+                for Bin2 in xrange(Bin1,self.nbin):
+	    	    z_peak[Bin1, Bin2] = self.zmax
+                    for index_z in xrange(self.nzmax):
+			if (self.r[index_z]>l_lincut[Bin1, Bin2]):
+			    z_peak[Bin1, Bin2] = self.z[index_z]
+			    break
+                    if self.use_zscaling:
+		        l_lincut[Bin1, Bin2] *= self.kmax_hMpc*cosmo.h()*pow(1.+z_peak[Bin1, Bin2],2./(2.+cosmo.n_s()))
+                    else:
+		        l_lincut[Bin1, Bin2] *= self.kmax_hMpc*cosmo.h()
+		l_lincut_mean[Bin1] = np.sum(l_lincut[Bin1, :])/(self.nbin-Bin1)
+
+	    #for Bin1 in xrange(self.nbin):
+	        #for Bin2 in xrange(Bin1,self.nbin):
+		    #print("%s\t%s\t%s\t%s" % (Bin1, Bin2, l_lincut[Bin1, Bin2], l_lincut_mean[Bin1]))
+
+	#for nr in xrange(1, self.nzmax-1):
+	#	print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % (self.z[nr], g[nr, 0], g[nr, 1], g[nr, 2], g[nr, 3], g[nr, 4], g[nr, 5], g[nr, 6], g[nr, 7], g[nr, 8], g[nr, 9]))
+
         # Get power spectrum P(k=l/r,z(r)) from cosmological module
-	kmax_in_inv_Mpc = np.zeros(self.nzmax, 'float64')
-	if (self.k_max_1_by_Mpc == 0):
-		kmax_in_inv_Mpc = self.k_max_factor*0.14*pow(1.+self.z,2./(2.+0.9667))
-	else:
-        	kmax_in_inv_Mpc += self.k_max_factor*self.k_max_1_by_Mpc
+        kmin_in_inv_Mpc = self.k_min_h_by_Mpc * cosmo.h()
+        kmax_in_inv_Mpc = self.k_max_h_by_Mpc * cosmo.h()
         pk = np.zeros((self.nlmax, self.nzmax), 'float64')
         for index_l in xrange(self.nlmax):
             for index_z in xrange(1, self.nzmax):
@@ -246,12 +290,12 @@ class ska2_lensing(Likelihood):
 
         # These lines set P(k,z) to zero out of [k_min, k_max] range
                 k_in_inv_Mpc =  self.l[index_l]/self.r[index_z]
-                if (k_in_inv_Mpc < self.k_min_1_by_Mpc) or (k_in_inv_Mpc > kmax_in_inv_Mpc[index_z]):
+                if (k_in_inv_Mpc < kmin_in_inv_Mpc) or (k_in_inv_Mpc > kmax_in_inv_Mpc):
                     pk[index_l, index_z] = 0.
                 else:
                     pk[index_l, index_z] = cosmo.pk(self.l[index_l]/self.r[index_z], self.z[index_z])
 
-		#print("pk = %s\tat z=%s, k=%s (kmax_in_inv_Mpc = %s)" % (pk[index_l, index_z], self.z[index_z], k_in_inv_Mpc, kmax_in_inv_Mpc[index_z]))
+		#print("%s\t%s\t%s" %(self.l[index_l], self.z[index_z], pk[index_l, index_z]))
 
         # Recover the non_linear scale computed by halofit. If no scale was
         # affected, set the scale to one, and make sure that the nuisance
@@ -427,8 +471,19 @@ class ska2_lensing(Likelihood):
         # TODO parallelize this
         for index, ell in enumerate(ells):
 
-            det_theory = np.linalg.det(Cov_theory[index, :, :])
-            det_observ = np.linalg.det(Cov_observ[index, :, :])
+	    if self.use_lmax_lincut:
+                CutBin = -1
+                for zBin in xrange(self.nbin):
+                    if (ell<l_lincut_mean[zBin]):
+                        CutBin = zBin
+                        det_theory = np.linalg.det(Cov_theory[index, CutBin:, CutBin:])
+                        det_observ = np.linalg.det(Cov_observ[index, CutBin:, CutBin:])
+                        break
+                if (CutBin==-1):
+                    break
+	    else:
+                det_theory = np.linalg.det(Cov_theory[index, :, :])
+                det_observ = np.linalg.det(Cov_observ[index, :, :])
 
             if (self.theoretical_error > 0):
                 det_cross_err = 0
@@ -490,27 +545,27 @@ class ska2_lensing(Likelihood):
                     newCov[:, i] = Cov_observ[index,:, i] #MArchi#newCov[:, i] = Cov_observ[:, i]
                     det_theory_plus_error_cross_obs += np.linalg.det(newCov)
 
-		try:
-                	chi2 += (2.*ell+1.)*self.fsky*(det_theory_plus_error_cross_obs/det_theory_plus_error + math.log(det_theory_plus_error/det_observ) - self.nbin ) + dof*epsilon_l**2
-		except ValueError:
-			warnings.warn("ska2_lensing: Could not evaluate chi2 including theoretical error with the current parameters. The corresponding chi2 is now set to nan!")
-			break
-			chi2 = np.nan
+                chi2 += (2.*ell+1.)*self.fsky*(det_theory_plus_error_cross_obs/det_theory_plus_error + math.log(det_theory_plus_error/det_observ) - self.nbin ) + dof*epsilon_l**2
 
 
             else:
-                det_cross = 0.
-                for i in xrange(self.nbin):
-                    newCov = np.copy(Cov_theory[index, :, :])
-                    newCov[:, i] = Cov_observ[index, :, i]
-                    det_cross += np.linalg.det(newCov)
+		if self.use_lmax_lincut:
+                    det_cross = 0.
+                    for i in xrange(0,self.nbin-CutBin):
+                        newCov = np.copy(Cov_theory[index, CutBin:, CutBin:])
+                        newCov[:, i] = Cov_observ[index, CutBin:, CutBin+i]
+                        det_cross += np.linalg.det(newCov)
+		else:
+                    det_cross = 0.
+                    for i in xrange(self.nbin):
+                        newCov = np.copy(Cov_theory[index, :, :])
+                        newCov[:, i] = Cov_observ[index, :, i]
+                        det_cross += np.linalg.det(newCov)
 
-		try:
-                	chi2 += (2.*ell+1.)*self.fsky*(det_cross/det_theory + math.log(det_theory/det_observ) - self.nbin)
-		except ValueError:
-			warnings.warn("ska2_lensing: Could not evaluate chi2 with the current parameters. The corresponding chi2 is now set to nan!")
-			break
-			chi2 = np.nan
+		if self.use_lmax_lincut:
+                    chi2 += (2.*ell+1.)*self.fsky*(det_cross/det_theory + math.log(det_theory/det_observ) - self.nbin+CutBin)
+                else:
+                    chi2 += (2.*ell+1.)*self.fsky*(det_cross/det_theory + math.log(det_theory/det_observ) - self.nbin)
 
         # Finally adding a gaussian prior on the epsilon nuisance parameter, if
         # present
@@ -520,6 +575,6 @@ class ska2_lensing(Likelihood):
             chi2 += epsilon**2
 
         #end = time.time()
-        #print "Time in s:",end-start
+        #print "time needed in s:",(end-start)
 
         return -chi2/2.

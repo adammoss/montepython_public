@@ -7,8 +7,14 @@ euclid_lensing.fiducial_file  = "euclid_lensing_fiducial.dat"
 
 # min, max and stepsize of l values used to compute C_l
 euclid_lensing.lmin = 5
-euclid_lensing.lmax = 2000
+euclid_lensing.lmax = 500
 euclid_lensing.dlnl = 0.2
+
+# use linear cutoff infered from kmax_hMpc in h/Mpc at z=0
+# this can be scaled in redshift via pow(1+z,2/(2+n_s))
+euclid_lensing.use_lmax_lincut = True
+euclid_lensing.use_zscaling = True
+euclid_lensing.kmax_hMpc = 0.2
 
 # number of discrete z values in selection function file
 euclid_lensing.nzmax = 151
@@ -22,12 +28,9 @@ euclid_lensing.fsky  = 0.3636
 # precision with which bin edges are computed
 euclid_lensing.dz    = 0.01
 
-# (k_min, k_max) in h/Mpc
-# use k_max_1_by_Mpc = 0 for z-dependent kmax
-# kmax will be multiplied by k_max_factor in both cases
-euclid_lensing.k_max_factor = 1.
-euclid_lensing.k_min_1_by_Mpc = 0.001
-euclid_lensing.k_max_1_by_Mpc = 0
+# (k_min, k_max) in h/Mpc for Cl computing
+euclid_lensing.k_min_h_by_Mpc = 0.001
+euclid_lensing.k_max_h_by_Mpc = 1.
 # this k_max could be very high (e.g. 40) if you use a theoretical_error > 0
 
 # non-linear correction

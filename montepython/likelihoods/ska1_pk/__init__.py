@@ -124,14 +124,12 @@ class ska1_pk(Likelihood):
 	dndz = pow(10.,self.c1)*pow(z,self.c2)*np.exp(-self.c3*z)*self.skycov
 	return dndz
 
-    def k_cut(self, z):
+    def k_cut(self, z,h=0.6693,n_s=0.9619):
+	kcut = self.kmax*h
 	# compute kmax according to highest redshift linear cutoff (1509.07562v2)
-	if (self.kmax==0):
-		# n_s from Planck 2015
-		k_lc = self.k_max_factor*0.14*pow(1.+z,2./(2.+0.9667))
-		return k_lc
-	# use fixed kmax
-	return self.k_max_factor*self.kmax
+	if self.use_zscaling:
+		kcut *= pow(1.+z,2./(2.+n_s))
+	return kcut
 											
     def loglkl(self, cosmo, data):
 
@@ -161,9 +159,9 @@ class ska1_pk(Likelihood):
 	if self.fid_values_exist is False:
 		sigma_A = np.zeros(self.nbin,'float64')
 		sigma_B = np.zeros(self.nbin,'float64')
-		sigma_A = ((1.+self.z_mean[:])**2/H[1::2]*self.sigma_nu/1420.)**2 -(
-			1.22*(1+self.z_mean[:])**2 * D_A[1::2]*2.111e-4/self.Baseline)**2
-		sigma_B = (1.22*(1+self.z_mean[:])**2 * D_A[1::2]*2.111e-4/self.Baseline)**2
+		sigma_A = ((1.+self.z_mean[:])**2/H[1::2]*self.delta_nu/np.sqrt(8.*np.log(2.))/self.nu0)**2 -(
+			1./np.sqrt(8.*np.log(2.))*(1+self.z_mean[:])**2 * D_A[1::2]*2.111e-4/self.Baseline)**2
+		sigma_B = (1./np.sqrt(8.*np.log(2.))*(1+self.z_mean[:])**2 * D_A[1::2]*2.111e-4/self.Baseline)**2
 
 	# sigma_NL in Mpc = nonlinear dispersion scale of RSD (1405.1452v2)
 	sigma_NL = 0.0	# fiducial would be 7 but when kept constant that is more constraining than keeping 0
@@ -304,7 +302,7 @@ class ska1_pk(Likelihood):
 			# uncomment to display max. kmin (used to infer kmin~0.02): 
 			#kmin: #print("z=" + str(self.z_mean[index_z]) + " kmin=" + str(34.56/r[2*index_z+1]) + "\tor " + str(6.283/(r[2*index_z+2]-r[2*index_z])))
 			for index_k in xrange(1,self.k_size):
-				if ((self.k_cut(self.z_mean[index_z])-self.k_fid[self.k_size-index_k]) > -1.e-6):
+				if ((self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[self.k_size-index_k]) > -1.e-6):
 					index_kmax = self.k_size-index_k
 					break
 			integrand_low = self.integrand(0,index_z,0)*.5
@@ -312,20 +310,20 @@ class ska1_pk(Likelihood):
 				integrand_hi = self.integrand(index_k,index_z,0)*.5
 				chi2 += (integrand_hi+integrand_low)*.5*(self.k_fid[index_k]-self.k_fid[index_k-1])
 				integrand_low = integrand_hi
-			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z])-self.k_fid[index_kmax])
+			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[index_kmax])
 			for index_mu in xrange(1,self.mu_size-1):
 				integrand_low = self.integrand(0,index_z,index_mu)
 				for index_k in xrange(1,index_kmax+1):
 					integrand_hi = self.integrand(index_k,index_z,index_mu)
 					chi2 += (integrand_hi+integrand_low)*.5*(self.k_fid[index_k]-self.k_fid[index_k-1])
 					integrand_low = integrand_hi
-				chi2 += integrand_low*(self.k_cut(self.z_mean[index_z])-self.k_fid[index_kmax])
+				chi2 += integrand_low*(self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[index_kmax])
 			integrand_low = self.integrand(0,index_z,self.mu_size-1)*.5
 			for index_k in xrange(1,index_kmax+1):
 				integrand_hi = self.integrand(index_k,index_z,self.mu_size-1)*.5
 				chi2 += (integrand_hi+integrand_low)*.5*(self.k_fid[index_k]-self.k_fid[index_k-1])
 				integrand_low = integrand_hi
-			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z])-self.k_fid[index_kmax])
+			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[index_kmax])
 			#printer2 = chi2*delta_mu-printer1
 			#print("%s\t%s" % (self.z_mean[index_z], printer2))
 		chi2 *= delta_mu

@@ -29,7 +29,7 @@ class euclid_pk(Likelihood):
 		print("Using halofit")
 
 	# TS;Print warning for combining theo. error and NL cutoff
-	if (self.kmax==0 and self.theoretical_error!=0.):
+	if (self.use_zscaling and self.theoretical_error!=0.):
 		warnings.warn("You are using a theoretical error together with a nonlinear cutoff, which should be redundant!")
 
         #################
@@ -143,14 +143,13 @@ class euclid_pk(Likelihood):
 
         return galaxy_dist
 
-    def k_cut(self, z):
+    # TS; made kmax a function potentially dependent on redshift
+    def k_cut(self, z,h=0.6693,n_s=0.9619):
+	kcut = self.kmax*h
 	# compute kmax according to highest redshift linear cutoff (1509.07562v2)
-	if (self.kmax==0):
-	# n_s from Planck 2015
-		k_lc = self.k_max_factor*0.14*pow(1.+z,2./(2.+0.9667))
-		return k_lc
-	# use fixed kmax
-	return self.k_max_factor*self.kmax
+	if self.use_zscaling:
+		kcut *= pow(1.+z,2./(2.+n_s))
+	return kcut
 
     def loglkl(self, cosmo, data):
         # First thing, recover the angular distance and Hubble factor for each
@@ -361,7 +360,7 @@ class euclid_pk(Likelihood):
         #exit()		
 
         # finally compute chi2, for each z_mean	
-	if self.kmax==0:
+	if self.use_zscaling:
 		# TS; reformulated loops to include z-dependent kmax, mu -> mu_fid
         	chi2 = 0.0
 		index_kmax = 0
@@ -370,10 +369,12 @@ class euclid_pk(Likelihood):
 		integrand_hi = 0.0
 
 		for index_z in xrange(self.nbin):
+			# uncomment printers to show chi2 contribution from single bins
+			#printer1 = chi2*delta_mu
 			# TS; uncomment to display max. kmin (used to infer kmin~0.02): 
 			#kmin: #print("z=" + str(self.z_mean[index_z]) + " kmin=" + str(34.56/r[2*index_z+1]) + "\tor " + str(6.283/(r[2*index_z+2]-r[2*index_z])))
 			for index_k in xrange(1,self.k_size):
-				if ((self.k_cut(self.z_mean[index_z])-self.k_fid[self.k_size-index_k]) > -1.e-6):
+				if ((self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[self.k_size-index_k]) > -1.e-6):
 					index_kmax = self.k_size-index_k
 					break
 			integrand_low = self.integrand(0,index_z,0)*.5
@@ -381,20 +382,22 @@ class euclid_pk(Likelihood):
 				integrand_hi = self.integrand(index_k,index_z,0)*.5
 				chi2 += (integrand_hi+integrand_low)*.5*(self.k_fid[index_k]-self.k_fid[index_k-1])
 				integrand_low = integrand_hi
-			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z])-self.k_fid[index_kmax])
+			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[index_kmax])
 			for index_mu in xrange(1,self.mu_size-1):
 				integrand_low = self.integrand(0,index_z,index_mu)
 				for index_k in xrange(1,index_kmax+1):
 					integrand_hi = self.integrand(index_k,index_z,index_mu)
 					chi2 += (integrand_hi+integrand_low)*.5*(self.k_fid[index_k]-self.k_fid[index_k-1])
 					integrand_low = integrand_hi
-				chi2 += integrand_low*(self.k_cut(self.z_mean[index_z])-self.k_fid[index_kmax])
+				chi2 += integrand_low*(self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[index_kmax])
 			integrand_low = self.integrand(0,index_z,self.mu_size-1)*.5
 			for index_k in xrange(1,index_kmax+1):
 				integrand_hi = self.integrand(index_k,index_z,self.mu_size-1)*.5
 				chi2 += (integrand_hi+integrand_low)*.5*(self.k_fid[index_k]-self.k_fid[index_k-1])
 				integrand_low = integrand_hi
-			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z])-self.k_fid[index_kmax])
+			chi2 += integrand_low*(self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[index_kmax])
+			#printer2 = chi2*delta_mu-printer1
+			#print("%s\t%s" % (self.z_mean[index_z], printer2))
 		chi2 *= delta_mu
 
 	else:
@@ -423,6 +426,7 @@ class euclid_pk(Likelihood):
     def integrand(self,index_k,index_z,index_mu):
         if (self.theoretical_error == 0.):
             return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
+            #return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((1.e-3*self.tilde_P_th[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
         #return self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*self.k_fid[index_k]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
         return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + 5.97*self.theoretical_error*(self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*(self.k_fid[index_k]/self.k_sigma[2*index_z+1])**3))
     def array_integrand(self,index_z,index_mu):

@@ -32,12 +32,12 @@ euclid_pk.mu_size = 9
 # number of equally spaced bins in log(k) space
 euclid_pk.k_size = 100
 
-# integration boundaries for k (in 1/Mpc)
-# kmax=0: use nonlinear cutoff (1509.07562v2 p.5)
-# kmax will be multiplied by k_max_factor in both cases
-euclid_pk.k_max_factor = 1.
+# lower integration boundary for k (in 1/Mpc)
 euclid_pk.kmin = 0.02
-euclid_pk.kmax = 0
+# higher integration boundary for k (in h/Mpc)
+euclid_pk.kmax = 0.2
+# use z-scaling of kmax via pow(1+z,2/(2+n_s))
+euclid_pk.use_zscaling = True
 
 # use halofit method
 euclid_pk.use_halofit = True

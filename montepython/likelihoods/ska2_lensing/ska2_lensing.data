@@ -6,8 +6,14 @@ ska2_lensing.fiducial_file  = "ska2_lensing_fiducial.dat"
 
 # min, max and stepsize of l values used to compute C_l
 ska2_lensing.lmin = 5
-ska2_lensing.lmax = 2000
+ska2_lensing.lmax = 1000
 ska2_lensing.dlnl = 0.2
+
+# use linear cutoff infered from kmax_hMpc in h/Mpc at z=0
+# this can be scaled in redshift via pow(1+z,2/(2+n_s))
+ska2_lensing.use_lmax_lincut = True
+ska2_lensing.use_zscaling = True
+ska2_lensing.kmax_hMpc = 0.2
 
 # number of discrete z values in selection function file
 ska2_lensing.nzmax = 151
@@ -21,12 +27,9 @@ ska2_lensing.fsky  = 0.7272
 # precision with which bin edges are computed
 ska2_lensing.dz    = 0.01
 
-# (k_min, k_max) in h/Mpc
-# use k_max_1_by_Mpc = 0 for z-dependent kmax
-# kmax will be multiplied by k_max_factor in both cases
-ska2_lensing.k_max_factor = 1.
-ska2_lensing.k_min_1_by_Mpc = 0.001
-ska2_lensing.k_max_1_by_Mpc = 0
+# (k_min, k_max) in h/Mpc for Cl computing
+ska2_lensing.k_min_h_by_Mpc = 0.001
+ska2_lensing.k_max_h_by_Mpc = 2.
 # this k_max could be very high (e.g. 40) if you use a theoretical_error > 0
 
 # non-linear correction
@@ -35,7 +38,7 @@ ska2_lensing.use_halofit = True
 # Uncomment this line to use the theoretical error nuisance parameter of 1210.2194
 #ska2_lensing.use_nuisance = ['epsilon']
 # theoretical error parameters of 1210.2194
-ska2_lensing.theoretical_error = 0.
+ska2_lensing.theoretical_error = 0
 ska2_lensing.coefficient_f_nu = 0
 
 # noise computation

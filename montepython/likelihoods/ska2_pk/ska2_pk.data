@@ -17,7 +17,7 @@ ska2_pk.nbin  = 19
 ska2_pk.zmin = 0.1
 ska2_pk.zmax  = 2.0
 
-# sky coverage in deg^2 (Yahya et al. 2015)
+# sky coverage in deg^2 (1412.4700v2)
 ska2_pk.skycov  = 30000.
 
 # precision on the mu variable
@@ -26,14 +26,13 @@ ska2_pk.mu_size = 9
 # number of equally spaced bins in log(k) space
 ska2_pk.k_size = 100
 
-# integration boundaries for k (in 1/Mpc)
+# lower integration boundary for k (in 1/Mpc)
 # 0.02 ~ smallest of 2pi/(10deg*r_par(z)) and 2pi/(delta_r_par(z))
-# value of kmin only interesting for numerical reasons
 ska2_pk.kmin = 0.02
-# kmax=0: use nonlinear cutoff (1509.07562v2 p.5)
-# kmax will be multiplied by k_max_factor in both cases
-ska2_pk.k_max_factor = 1.
-ska2_pk.kmax = 0
+# higher integration boundary for k (in h/Mpc)
+ska2_pk.kmax = 0.2
+# use z-scaling of kmax via pow(1+z,2/(2+n_s))
+ska2_pk.use_zscaling = True
 
 # use halofit method
 ska2_pk.use_halofit = True
@@ -49,12 +48,13 @@ ska2_pk.c3 = 5.424
 ska2_pk.c4 = 0.554
 ska2_pk.c5 = 0.783
 
-# measurement errors: (found to be negligible, so rough estimates suffice)
+# measurement errors: (found to be negligible)
 
-# precision of frequency measurement in MHz
-# (10kHz slots) conservative transform to gaussian error
-# this error is neglidgible compared to (and degenerate to) sigma_NL!
-ska2_pk.sigma_nu = 0.005
+# rest frequency of line in MHz
+ska2_pk.nu0 = 1420.405752
+
+# channel bandwidth in MHz (64000 channels)
+ska2_pk.delta_nu = 0.0147
 
 # Baseline in km for ang. res. (max. baseline 3000km: SKA1 System BaselineV2 Description: Dewdney et al. 2016, center ~5km)
 ska2_pk.Baseline = 5.
