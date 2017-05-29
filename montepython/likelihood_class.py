@@ -2241,7 +2241,7 @@ class Likelihood_mpk(Likelihood):
                                 'omega_b': 0.035*0.701**2, 'non linear': ' halofit ', 'YHe': 0.24, 'k_pivot': 0.05,
                                 'n_s': 0.96, 'tau_reio': 0.084, 'z_max_pk': 0.5, 'output': ' mPk ',
                                 'omega_cdm': 0.215*0.701**2, 'T_cmb': 2.726}
-        cosmo.struct_cleanup()
+        cosmo.empty()
         cosmo.set(data.cosmo_arguments)
         cosmo.compute(['lensing'])
         h = data.cosmo_arguments['h']
@@ -2293,7 +2293,9 @@ class Likelihood_mpk(Likelihood):
         fidMID=np.interp(kh,kdata,fidpolyMID)
         fidFAR=np.interp(kh,kdata,fidpolyFAR)
 
+        cosmo.empty()
         data.cosmo_arguments = param_backup
+        cosmo.set(data.cosmo_arguments)
 
         return fidnlratio, fidNEAR, fidMID, fidFAR
 
