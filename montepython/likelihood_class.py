@@ -1545,6 +1545,13 @@ class Likelihood_mpk(Likelihood):
         if self.use_halofit:
             self.need_cosmo_arguments(data, {'non linear': 'halofit'})
 
+        # sdssDR7 adapted from A. Cuesta by T. Brinckmann
+        # Based on Reid et al. 2010 arXiv:0907.1657 - Note: arXiv version not updated
+        try:
+            self.use_sdssDR7
+        except:
+            self.use_sdssDR7 = False
+
         # read values of k (in h/Mpc)
         self.k_size = self.max_mpk_kbands_use-self.min_mpk_kbands_use+1
         self.mu_size = 1
@@ -1552,11 +1559,18 @@ class Likelihood_mpk(Likelihood):
         self.kh = np.zeros((self.k_size), 'float64')
 
         datafile = open(os.path.join(self.data_directory, self.kbands_file), 'r')
-
-        for i in range(self.num_mpk_kbands_full):
-            line = datafile.readline()
-            if i+2 > self.min_mpk_kbands_use and i-1 < self.max_mpk_kbands_use:
-                self.kh[i-self.min_mpk_kbands_use] = float(line.split()[0])
+        # matches format of sdss_lrgDR4, WiggleZ
+        if not self.use_sdssDR7:
+            for i in range(self.num_mpk_kbands_full):
+                line = datafile.readline()
+                if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
+                    self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
+        # matches format of sdss_lrgDR7
+        else:
+            for i in range(self.num_mpk_kbands_full):
+                line = datafile.readline()
+                if i+2 > self.min_mpk_kbands_use and i-1 < self.max_mpk_kbands_use:
+                    self.kh[i-self.min_mpk_kbands_use] = float(line.split()[0])
         datafile.close()
 
         khmax = self.kh[-1]
@@ -1566,13 +1580,6 @@ class Likelihood_mpk(Likelihood):
             self.use_giggleZ
         except:
             self.use_giggleZ = False
-
-        # sdssDR7 adapted from A. Cuesta by T. Brinckmann
-        # Based on Reid et al. 2010 arXiv:0907.1657 - Note: arXiv version not updated
-        try:
-            self.use_sdssDR7
-        except:
-            self.use_sdssDR7 = False
 
         # Try a new model, with an additional nuisance parameter. Note
         # that the flag use_giggleZPP0 being True requires use_giggleZ
@@ -1655,16 +1662,22 @@ class Likelihood_mpk(Likelihood):
 
         datafile = open(os.path.join(self.data_directory, self.windows_file), 'r')
         for i_region in range(self.num_regions):
+            # matches format of sdss_lrgDR4, WiggleZ
             if not self.use_sdssDR7:
                 if self.num_regions > 1:
                     line = datafile.readline()
-            for i in range(self.num_mpk_points_full+1):
-                line = datafile.readline()
-                if (i+2 > self.min_mpk_points_use and
-                        i < self.max_mpk_points_use+1):
-                    for j in range(self.k_size):
-                        self.window[i_region, i-self.min_mpk_points_use, j]=\
-                            float(line.split()[j+self.min_mpk_kbands_use])
+                for i in range(self.num_mpk_points_full):
+                    line = datafile.readline()
+                    if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
+                        for j in range(self.k_size):
+                            self.window[i_region, i-self.min_mpk_points_use+1, j] = float(line.split()[j+self.min_mpk_kbands_use-1])
+            # matches format of sdss_lrgDR7
+            else:
+                for i in range(self.num_mpk_points_full+1):
+                    line = datafile.readline()
+                    if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use+1):
+                        for j in range(self.k_size):
+                            self.window[i_region, i-self.min_mpk_points_use, j] = float(line.split()[j+self.min_mpk_kbands_use])
         datafile.close()
 
         # read measurements
@@ -1675,14 +1688,22 @@ class Likelihood_mpk(Likelihood):
         for i_region in range(self.num_regions):
             for i in range(2):
                 line = datafile.readline()
-            for i in range(self.num_mpk_points_full+1):
-                line = datafile.readline()
-                if (i+2 > self.min_mpk_points_use and
+            # matches format of sdss_lrgDR4, WiggleZ
+            if not self.use_sdssDR7:
+                for i in range(self.num_mpk_points_full):
+                    line = datafile.readline()
+                    if (i+2 > self.min_mpk_points_use and
+                        i < self.max_mpk_points_use):
+                        self.P_obs[i_region, i-self.min_mpk_points_use+1] = float(line.split()[3])
+                        self.P_err[i_region, i-self.min_mpk_points_use+1] = float(line.split()[4])
+            # matches format of sdss_lrgDR7
+            else:
+                for i in range(self.num_mpk_points_full+1):
+                    line = datafile.readline()
+                    if (i+2 > self.min_mpk_points_use and
                         i < self.max_mpk_points_use+1):
-                    self.P_obs[i_region, i-self.min_mpk_points_use] = \
-                        float(line.split()[3])
-                    self.P_err[i_region, i-self.min_mpk_points_use] = \
-                        float(line.split()[4])
+                        self.P_obs[i_region, i-self.min_mpk_points_use] = float(line.split()[3])
+                        self.P_err[i_region, i-self.min_mpk_points_use] = float(line.split()[4])
         datafile.close()
 
         # read covariance matrices
@@ -1691,6 +1712,11 @@ class Likelihood_mpk(Likelihood):
             self.use_covmat = True
         except:
             self.use_covmat = False
+
+        try:
+            self.use_invcov
+        except:
+            self.use_invcov = False
 
         self.invcov = np.zeros(
             (self.num_regions, self.n_size, self.n_size), 'float64')
@@ -1701,19 +1727,30 @@ class Likelihood_mpk(Likelihood):
 
             datafile = open(os.path.join(self.data_directory, self.covmat_file), 'r')
             for i_region in range(self.num_regions):
+                # matches format of sdss_lrgDR4, WiggleZ
                 if not self.use_sdssDR7:
                     for i in range(1):
                         line = datafile.readline()
-                for i in range(self.num_mpk_points_full+1):
-                    line = datafile.readline()
-                    if (i+2 > self.min_mpk_points_use and
+                    for i in range(self.num_mpk_points_full):
+                        line = datafile.readline()
+                        if (i+2 > self.min_mpk_points_use and
+                            i < self.max_mpk_points_use):
+                            for j in range(self.num_mpk_points_full):
+                                if (j+2 > self.min_mpk_points_use and
+                                    j < self.max_mpk_points_use):
+                                    cov[i-self.min_mpk_points_use+1,
+                                        j-self.min_mpk_points_use+1] = float(line.split()[j])
+                # matches format of sdss_lrgDR7
+                else:
+                    for i in range(self.num_mpk_points_full+1):
+                        line = datafile.readline()
+                        if (i+2 > self.min_mpk_points_use and
                             i < self.max_mpk_points_use+1):
-                        for j in range(self.num_mpk_points_full+1):
-                            if (j+2 > self.min_mpk_points_use and
+                            for j in range(self.num_mpk_points_full+1):
+                                if (j+2 > self.min_mpk_points_use and
                                     j < self.max_mpk_points_use+1):
-                                cov[i-self.min_mpk_points_use,
-                                    j-self.min_mpk_points_use] =\
-                                    float(line.split()[j])
+                                    cov[i-self.min_mpk_points_use,
+                                        j-self.min_mpk_points_use] = float(line.split()[j])
                 if self.use_invcov:
                     invcov_tmp = cov
                 else:
@@ -2005,10 +2042,10 @@ class Likelihood_mpk(Likelihood):
                 self.create_fid
             except:
                 self.create_fid = False
-            
+
             if self.create_fid == True:
-                print 'Creating fiducial file with Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
-                print 'Required for non-linear modeling'
+                print 'sdss_lrgDR7: Creating fiducial file with Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
+                print '             Required for non-linear modeling'
                 # Calculate relevant flat fiducial quantities
                 fidnlratio, fidNEAR, fidMID, fidFAR = self.get_flat_fid(cosmo,data,kh,z,sigma2bao)
                 # Save non-linear corrections from N-body sims for each redshift bin
@@ -2021,7 +2058,7 @@ class Likelihood_mpk(Likelihood):
                 arr[:,4:7]=fidnlratio
                 np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
                 self.create_fid = False
-                print 'Fiducial created'
+                print '             Fiducial created'
 
             # Load fiducial model
             fiducial = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
@@ -2117,7 +2154,7 @@ class Likelihood_mpk(Likelihood):
                     chisqnonuis = chisq[i]
                     minchisqtheoryampnonuis = minchisqtheoryamp
                     if(abs(a1val) > 0.001 or abs(a2val) > 0.001):
-                         print 'ahhhh! violation!!', a1val, a2val
+                         print 'sdss_lrgDR7: ahhhh! violation!!', a1val, a2val
 
             # numerically marginalize over a1,a2 now using values stored in chisq
             minchisq = np.min(chisqmarg)
@@ -2166,7 +2203,7 @@ class Likelihood_mpk(Likelihood):
                     imax = (i_region+1)*self.n_size-1
 
                     W_P_th = np.dot(self.window[i_region, :], P_th)
-                    print W_P_th
+                    #print W_P_th
                     for i in range(self.n_size):
                         P_data_large[imin+i] = self.P_obs[i_region, i]
                         W_P_th_large[imin+i] = W_P_th[i]
@@ -2191,9 +2228,9 @@ class Likelihood_mpk(Likelihood):
         return -chisq/2
 
     def remove_bao(self,k_in,pk_in):
-        # By M. Ballardini
+        # De-wiggling routine by Mario Ballardini
 
-        # This have to contain the BAO:
+        # This k range has to contain the BAO features:
         k_ref=[2.8e-2, 4.5e-1]
 
         # Get interpolating function for input P(k) in log-log space:

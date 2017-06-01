@@ -1,4 +1,4 @@
-# likelihood for P(k) from SDSS LRG (DR4)
+# likelihood for P(k) from SDSS LRG (DR7)
 from montepython.likelihood_class import Likelihood_mpk
 
 
