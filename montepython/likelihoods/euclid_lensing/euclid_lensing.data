@@ -22,7 +22,7 @@ euclid_lensing.nzmax = 151
 # number of bins of the survey
 euclid_lensing.nbin  = 10
 # maximum redshift covered by survey
-euclid_lensing.zmax  = 2.5
+euclid_lensing.zmax  = 3.5
 # sky coverage
 euclid_lensing.fsky  = 0.3636
 # precision with which bin edges are computed
@@ -43,7 +43,7 @@ euclid_lensing.theoretical_error = 0
 euclid_lensing.coefficient_f_nu = 0
 
 # noise computation
-euclid_lensing.rms_shear = 0.22
+euclid_lensing.rms_shear = 0.30
 # number of galaxies per square arcminutes
 euclid_lensing.gal_per_sqarcmn = 30
 

@@ -78,6 +78,18 @@ class ska2_lensing(Likelihood):
         # Fill array of discrete z values
         self.z = np.linspace(0, self.zmax, num=self.nzmax)
 
+	# check normalizations:
+        #print("n_tot = %s" % (n_tot))
+	#int_nz = self.nzmax
+	#int_z = np.linspace(0, self.zmax, num=int_nz)
+	#DDD = np.zeros(int_nz, 'float64')
+	#for nz in xrange(self.nzmax):
+	#    for nz2 in xrange(int_nz):
+	#        DDD[nz2] = self.photo_z_distribution(self.z[nz], int_z[nz2],False)
+        #    #DDD = self.photo_z_distribution(self.z[nz], int_z)
+        #    D_tot = scipy.integrate.trapz(DDD,int_z)
+	#    print("%s\t%s\t%s" % (self.z[nz], self.galaxy_distribution(self.z[nz]), D_tot ))
+
         # Fill distribution for each bin (convolving with photo_z distribution)
         self.eta_z = np.zeros((self.nzmax, self.nbin), 'float64')
         gal = self.galaxy_distribution(self.z, True)
@@ -170,7 +182,9 @@ class ska2_lensing(Likelihood):
 					-0.5*((z-zph)/self.sigma_phot/(1.+z))**2)/self.sigma_phot/(
 					1.+z)/math.sqrt(2.*math.pi)
 				if (z==zph):
-					photo_z_dist += self.f_spec
+					photo_z_dist += self.f_spec/self.zmax*(self.nzmax-1.)
+					if (z==0.):
+						photo_z_dist += self.f_spec/self.zmax*(self.nzmax-1.)
 			elif (z<=self.z_phot):
 				photo_z_dist = math.exp(
 					-0.5*((z-zph)/self.sigma_phot/(1.+z))**2)/self.sigma_phot/(
@@ -186,7 +200,9 @@ class ska2_lensing(Likelihood):
 					1.+z)/math.sqrt(2.*math.pi)
 				for index_z in xrange(len(zph)):
 					if (z==zph[index_z]):
-						photo_z_dist[index_z] += self.f_spec
+						photo_z_dist[index_z] += self.f_spec/self.zmax*(self.nzmax-1.)
+						if (z==0.):
+							photo_z_dist[index_z] += self.f_spec/self.zmax*(self.nzmax-1.)
 						break
 			elif (z<=self.z_phot):
 				photo_z_dist = np.exp(
@@ -196,7 +212,6 @@ class ska2_lensing(Likelihood):
 				photo_z_dist = np.exp(
 					-0.5*((z-zph)/self.sigma_noz/(1.+z))**2)/self.sigma_noz/(
 					1.+z)/math.sqrt(2.*math.pi)
-				
 
 		return photo_z_dist
 
