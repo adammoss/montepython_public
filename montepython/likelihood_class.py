@@ -1561,7 +1561,7 @@ class Likelihood_mpk(Likelihood):
         datafile = open(os.path.join(self.data_directory, self.kbands_file), 'r')
         for i in range(self.num_mpk_kbands_full):
             line = datafile.readline()
-            while line[0] is '#':
+            while line.find('#') != -1:
                 line = datafile.readline()
             if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
                 self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
@@ -1658,7 +1658,7 @@ class Likelihood_mpk(Likelihood):
         for i_region in range(self.num_regions):
             for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
-                while line[0] is '#':
+                while line.find('#') != -1:
                     line = datafile.readline()
                 if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
                     for j in range(self.k_size):
@@ -1673,7 +1673,7 @@ class Likelihood_mpk(Likelihood):
         for i_region in range(self.num_regions):
             for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
-                while line[0] is '#':
+                while line.find('#') != -1:
                     line = datafile.readline()
                 if (i+2 > self.min_mpk_points_use and
                     i < self.max_mpk_points_use):
@@ -1704,7 +1704,7 @@ class Likelihood_mpk(Likelihood):
             for i_region in range(self.num_regions):
                 for i in range(self.num_mpk_points_full):
                     line = datafile.readline()
-                    while line[0] is '#':
+                    while line.find('#') != -1:
                         line = datafile.readline()
                     if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
                         for j in range(self.num_mpk_points_full):
