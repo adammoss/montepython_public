@@ -25,6 +25,7 @@ sdss_lrgDR4.redshift            = 0.35
 sdss_lrgDR4.d_angular_fid       = 1032.0543
 sdss_lrgDR4.d_radial_fid        = 3665.5692
 
+# decide which k's to use, min to max
 sdss_lrgDR4.min_mpk_kbands_use = 1
 sdss_lrgDR4.max_mpk_kbands_use = 65
 

@@ -1559,18 +1559,12 @@ class Likelihood_mpk(Likelihood):
         self.kh = np.zeros((self.k_size), 'float64')
 
         datafile = open(os.path.join(self.data_directory, self.kbands_file), 'r')
-        # matches format of sdss_lrgDR4, WiggleZ
-        if not self.use_sdssDR7:
-            for i in range(self.num_mpk_kbands_full):
+        for i in range(self.num_mpk_kbands_full):
+            line = datafile.readline()
+            while line[0] is '#':
                 line = datafile.readline()
-                if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
-                    self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
-        # matches format of sdss_lrgDR7
-        else:
-            for i in range(self.num_mpk_kbands_full):
-                line = datafile.readline()
-                if i+2 > self.min_mpk_kbands_use and i-1 < self.max_mpk_kbands_use:
-                    self.kh[i-self.min_mpk_kbands_use] = float(line.split()[0])
+            if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
+                self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
         datafile.close()
 
         khmax = self.kh[-1]
@@ -1662,22 +1656,13 @@ class Likelihood_mpk(Likelihood):
 
         datafile = open(os.path.join(self.data_directory, self.windows_file), 'r')
         for i_region in range(self.num_regions):
-            # matches format of sdss_lrgDR4, WiggleZ
-            if not self.use_sdssDR7:
-                if self.num_regions > 1:
+            for i in range(self.num_mpk_points_full):
+                line = datafile.readline()
+                while line[0] is '#':
                     line = datafile.readline()
-                for i in range(self.num_mpk_points_full):
-                    line = datafile.readline()
-                    if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
-                        for j in range(self.k_size):
-                            self.window[i_region, i-self.min_mpk_points_use+1, j] = float(line.split()[j+self.min_mpk_kbands_use-1])
-            # matches format of sdss_lrgDR7
-            else:
-                for i in range(self.num_mpk_points_full+1):
-                    line = datafile.readline()
-                    if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use+1):
-                        for j in range(self.k_size):
-                            self.window[i_region, i-self.min_mpk_points_use, j] = float(line.split()[j+self.min_mpk_kbands_use])
+                if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
+                    for j in range(self.k_size):
+                        self.window[i_region, i-self.min_mpk_points_use+1, j] = float(line.split()[j+self.min_mpk_kbands_use-1])
         datafile.close()
 
         # read measurements
@@ -1686,24 +1671,14 @@ class Likelihood_mpk(Likelihood):
 
         datafile = open(os.path.join(self.data_directory, self.measurements_file), 'r')
         for i_region in range(self.num_regions):
-            for i in range(2):
+            for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
-            # matches format of sdss_lrgDR4, WiggleZ
-            if not self.use_sdssDR7:
-                for i in range(self.num_mpk_points_full):
+                while line[0] is '#':
                     line = datafile.readline()
-                    if (i+2 > self.min_mpk_points_use and
-                        i < self.max_mpk_points_use):
-                        self.P_obs[i_region, i-self.min_mpk_points_use+1] = float(line.split()[3])
-                        self.P_err[i_region, i-self.min_mpk_points_use+1] = float(line.split()[4])
-            # matches format of sdss_lrgDR7
-            else:
-                for i in range(self.num_mpk_points_full+1):
-                    line = datafile.readline()
-                    if (i+2 > self.min_mpk_points_use and
-                        i < self.max_mpk_points_use+1):
-                        self.P_obs[i_region, i-self.min_mpk_points_use] = float(line.split()[3])
-                        self.P_err[i_region, i-self.min_mpk_points_use] = float(line.split()[4])
+                if (i+2 > self.min_mpk_points_use and
+                    i < self.max_mpk_points_use):
+                    self.P_obs[i_region, i-self.min_mpk_points_use+1] = float(line.split()[3])
+                    self.P_err[i_region, i-self.min_mpk_points_use+1] = float(line.split()[4])
         datafile.close()
 
         # read covariance matrices
@@ -1727,30 +1702,15 @@ class Likelihood_mpk(Likelihood):
 
             datafile = open(os.path.join(self.data_directory, self.covmat_file), 'r')
             for i_region in range(self.num_regions):
-                # matches format of sdss_lrgDR4, WiggleZ
-                if not self.use_sdssDR7:
-                    for i in range(1):
+                for i in range(self.num_mpk_points_full):
+                    line = datafile.readline()
+                    while line[0] is '#':
                         line = datafile.readline()
-                    for i in range(self.num_mpk_points_full):
-                        line = datafile.readline()
-                        if (i+2 > self.min_mpk_points_use and
-                            i < self.max_mpk_points_use):
-                            for j in range(self.num_mpk_points_full):
-                                if (j+2 > self.min_mpk_points_use and
-                                    j < self.max_mpk_points_use):
-                                    cov[i-self.min_mpk_points_use+1,
-                                        j-self.min_mpk_points_use+1] = float(line.split()[j])
-                # matches format of sdss_lrgDR7
-                else:
-                    for i in range(self.num_mpk_points_full+1):
-                        line = datafile.readline()
-                        if (i+2 > self.min_mpk_points_use and
-                            i < self.max_mpk_points_use+1):
-                            for j in range(self.num_mpk_points_full+1):
-                                if (j+2 > self.min_mpk_points_use and
-                                    j < self.max_mpk_points_use+1):
-                                    cov[i-self.min_mpk_points_use,
-                                        j-self.min_mpk_points_use] = float(line.split()[j])
+                    if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
+                        for j in range(self.num_mpk_points_full):
+                            if (j+2 > self.min_mpk_points_use and j < self.max_mpk_points_use):
+                                cov[i-self.min_mpk_points_use+1,j-self.min_mpk_points_use+1] = float(line.split()[j])
+
                 if self.use_invcov:
                     invcov_tmp = cov
                 else:

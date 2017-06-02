@@ -10,10 +10,12 @@ sdss_lrgDR7.num_mpk_points_full = 45
 sdss_lrgDR7.num_mpk_kbands_full = 250
 
 # decide which bandpowers to use, min to max
-sdss_lrgDR7.min_mpk_points_use = 0
-sdss_lrgDR7.max_mpk_points_use = 44
-sdss_lrgDR7.min_mpk_kbands_use = 0
-sdss_lrgDR7.max_mpk_kbands_use = 249
+sdss_lrgDR7.min_mpk_points_use = 1
+sdss_lrgDR7.max_mpk_points_use = 45
+
+# decide which k's to use, min to max
+sdss_lrgDR7.min_mpk_kbands_use = 1
+sdss_lrgDR7.max_mpk_kbands_use = 250
 
 # parameter for the rescaling with respect to a fiducial model
 sdss_lrgDR7.use_scaling = True
