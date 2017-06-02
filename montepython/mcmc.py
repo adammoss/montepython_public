@@ -466,7 +466,7 @@ def chain(cosmo, data, command_line):
                         R_minus_one = analyze(info_command_line)
                     except:
                         if not command_line.silent:
-                            print 'Step ',k,' chain ', rank,': Failed to calculate covariant matrix'
+                            print 'Step ',k,' chain ', rank,': Failed to calculate covariance matrix'
                         pass
 
                 if command_line.superupdate:
