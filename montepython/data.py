@@ -799,10 +799,11 @@ class Data(object):
                     raise ValueError(
                         "N_ncdm is not equal to 3."
                         " This value should be exactly 3.")
-                # From Gonzalez-Garcia et al. 2014. Updated 2016: https://arxiv.org/abs/1409.5439v2
-                delta_m_squared_atm=2.484e-3 #2.45e-3
-                delta_m_squared_sol=7.49e-5 #7.50e-5
-                m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
+                # From Esteban et al. 2016: https://arxiv.org/abs/1611.01514
+                delta_m_squared_atm=2.524e-3 #2.45e-3
+                delta_m_squared_sol=7.50e-5 #7.50e-5
+                #m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
+                m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot - m1 - (d_m_sq_sol + m1**2.)**0.5 - (d_m_sq_atm + m1**2.)**0.5
                 m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments['M_tot_NH']/3.,(self.cosmo_arguments['M_tot_NH'],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
                 if not success == 1:
                     raise ValueError(
@@ -810,7 +811,8 @@ class Data(object):
                         " Exiting run.")
                 m1 = m1[0]
                 m2 = (delta_m_squared_sol + m1**2.)**0.5
-                m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
+                #m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
+                m3 = (delta_m_squared_atm + m1**2.)**0.5
                 if m1+m2+m3 > self.cosmo_arguments['M_tot_NH']+0.001*self.cosmo_arguments['M_tot_NH']:
                     raise ValueError(
                         "Failed to estimate m1 resulting in sum(m_i) > M_tot."
@@ -825,22 +827,28 @@ class Data(object):
                     raise ValueError(
                         "N_ncdm is not equal to 3."
                         " This value should be exactly 3.")
-                # From Gonzalez-Garcia et al. 2014. Updated 2016: https://arxiv.org/abs/1409.5439v2
-                delta_m_squared_atm=-2.467e-3 #-2.45e-3
-                delta_m_squared_sol=7.49e-5 #7.50e-5
-                m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
-                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments['M_tot_IH']/3.,(self.cosmo_arguments['M_tot_IH'],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
+                # From Esteban et al. 2016: https://arxiv.org/abs/1611.01514
+                delta_m_squared_atm=-2.514e-3 #-2.45e-3
+                delta_m_squared_sol=7.50e-5 #7.50e-5
+                #m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
+                m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot - m1 - (d_m_sq_sol + m1**2.)**0.5 - (abs(d_m_sq_atm + d_m_sq_sol + m1**2.))**0.5
+                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments['M_tot_IH']/2.,(self.cosmo_arguments['M_tot_IH'],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
                 if not success == 1:
                     raise ValueError(
                         "Failed to estimate m1. Reason: "+output_message+
                         " Exiting run.")
                 m1 = m1[0]
                 m2 = (delta_m_squared_sol + m1**2.)**0.5
-                m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
+                #m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
+                m3 = (delta_m_squared_atm + m2**2.)**0.5
                 if m1+m2+m3 > self.cosmo_arguments['M_tot_IH']+0.001*self.cosmo_arguments['M_tot_IH']:
                     raise ValueError(
                         "Failed to estimate m1 resulting in sum(m_i) > M_tot."
                         "Exiting run.")
+                if delta_m_squared_atm + delta_m_squared_sol + m1**2. < 0.:
+                    raise ValueError(
+                        "Failed to correctly estimate m1. Found m1^2 = %f < %f,"
+                        "but m1^2 should always be greater than this value." % (m1**2.,- delta_m_squared_sol - delta_m_squared_atm))
                 self.cosmo_arguments['m_ncdm'] = r'%g, %g, %g' % (m1,m2,m3)
                 del self.cosmo_arguments[elem]
             elif elem == 'M_tot':
