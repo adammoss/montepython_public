@@ -270,7 +270,7 @@ class euclid_pk(Likelihood):
         # affected, set the scale to one, and make sure that the nuisance parameter
         # epsilon is set to zero
 	# TS; added self to use it in integrand function
-        k_sigma = np.zeros(2*self.nbin+1, 'float64')
+        self.k_sigma = np.zeros(2*self.nbin+1, 'float64')
         if (cosmo.nonlinear_method == 0):
             self.k_sigma[:]=1.e6
         else :
