@@ -13,6 +13,11 @@ class bao_fs_boss_dr12(Likelihood):
 
         Likelihood.__init__(self, path, data, command_line)
 
+        # needed arguments in order to get sigma_8(z) up to z=1 with correct precision
+        self.need_cosmo_arguments(data, {'output': 'mPk'})
+        self.need_cosmo_arguments(data, {'P_k_max_h/Mpc': '1.'})
+        self.need_cosmo_arguments(data, {'z_max_pk': '1.'})
+
         # are there conflicting experiments?
         if 'bao_boss_aniso' in data.experiments:
             raise io_mp.LikelihoodError(
@@ -68,13 +73,15 @@ class bao_fs_boss_dr12(Likelihood):
             DM_at_z = cosmo.angular_distance(self.z[i]) * (1. + self.z[i])
             H_at_z = cosmo.Hubble(self.z[i]) * conts.c / 1000.0
             rd = cosmo.rs_drag() * self.rs_rescale
-            #theo_fsig8 = cosmo.fsig8()
-            theo_fsig8 = self.fsig8[i] #### PLACEHOLDER
+            theo_fsig8 = cosmo.scale_independent_growth_factor_f(self.z[i])*cosmo.sigma(8./cosmo.h(),self.z[i])
+            #print 'f(',self.z[i],') =',cosmo.scale_independent_growth_factor_f(self.z[i])
+            #print 'sigma8(',self.z[i],') =',cosmo.sigma(8./cosmo.h(),self.z[i])
+            #print 'f*sig8 =',theo_fsig8
 
             theo_DM_rdfid_by_rd_in_Mpc = DM_at_z / rd * self.rd_fid_in_Mpc
             theo_H_rd_by_rdfid = H_at_z * rd / self.rd_fid_in_Mpc
 
-            # calculate difference between the sampled point and observations  
+            # calculate difference between the sampled point and observations
             DM_diff = theo_DM_rdfid_by_rd_in_Mpc - self.DM_rdfid_by_rd_in_Mpc[i]
             H_diff = theo_H_rd_by_rdfid - self.H_rd_by_rdfid_in_km_per_s_per_Mpc[i]
             fsig8_diff = theo_fsig8 - self.fsig8[i]
