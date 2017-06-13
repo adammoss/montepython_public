@@ -1,0 +1,17 @@
+# Gaussian likelihood for sigma8 *(Omega_m/Omega_m_ref)^Omega_m_index,
+# coming from the KiDS-450 survey: arxiv:1706.02982
+# Implemented by Thejs Brinckmann (June 2017) 
+
+# S_8 = sigma_8 (Omega_m/Omega_m_ref)^Omega_m_index
+KiDS450_lensing.Omega_m_ref    = 0.3
+KiDS450_lensing.Omega_m_index  = 0.5
+
+# Bestfit value for S_8 = sigma_8 * sqrt(Omega_m/0.3)
+# for the the cases with two and three bins
+KiDS450_lensing.bestfit_3bin   = 0.651
+KiDS450_lensing.sigma_3bin     = 0.058
+KiDS450_lensing.bestfit_2bin   = 0.624
+KiDS450_lensing.sigma_2bin     = 0.065
+
+# Specify whether to use two or three bins
+KiDS450_lensing.Nbins	       = 3
