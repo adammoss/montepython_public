@@ -258,6 +258,7 @@ def chain(cosmo, data, command_line):
 	    jump_file.close()
 	    rank = 0
 	    print 'rank = ',rank
+            starting_jumping_factor = data.jumping_factor
 
     # Recover the covariance matrix according to the input, if the varying set
     # of parameters is non-zero
@@ -477,7 +478,9 @@ def chain(cosmo, data, command_line):
                     # Start adapting the jumping factor after command_line.superupdate steps
                     if (k > updated_steps + command_line.superupdate) and not stop_c:
                         c = data.jumping_factor**2/len(parameter_names)
-                        if (c + (np.mean(ar) - 0.25)/(k - updated_steps)) > 0:
+                        # To avoid getting trapped in local minima, the jumping factor should
+                        # not go below 0.1 (arbitrary) times the starting jumping factor.
+                        if (c + (np.mean(ar) - 0.25)/(k - updated_steps)) > (0.1*starting_jumping_factor)**2./len(parameter_names):
                             c += (np.mean(ar) - 0.25)/(k - updated_steps)
                             data.jumping_factor = np.sqrt(len(parameter_names) * c)
 
