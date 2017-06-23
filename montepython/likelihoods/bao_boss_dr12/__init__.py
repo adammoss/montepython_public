@@ -14,9 +14,13 @@ class bao_boss_dr12(Likelihood):
         Likelihood.__init__(self, path, data, command_line)
 
         # are there conflicting experiments?
-        if 'bao_boss_aniso' in data.experiments:
-            raise io_mp.LikelihoodError(
-                'conflicting bao_boss_aniso measurments')
+        conflicting_experiments = [
+            'bao', 'bao_boss', 'bao_known_rs'
+            'bao_boss_aniso', 'bao_boss_aniso_gauss_approx']
+        for experiment in conflicting_experiments:
+            if experiment in data.experiments:
+                raise io_mp.LikelihoodError(
+                    'conflicting BAO measurments')
 
         # define arrays for values of z and data points
         self.z = np.array([], 'float64')
