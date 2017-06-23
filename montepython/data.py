@@ -870,6 +870,9 @@ class Data(object):
                 m_s_eff = self.cosmo_arguments[elem]/self.cosmo_arguments['deg_ncdm__2']
                 self.cosmo_arguments['m_ncdm'] = r'%g, %g' % (float(self.cosmo_arguments['m_ncdm']), m_s_eff)
                 del self.cosmo_arguments[elem]
+            elif elem == 'log10N_dg':
+                self.cosmo_arguments['N_dg'] = 10**(self.cosmo_arguments[elem])
+                del self.cosmo_arguments[elem]
 
             # Finally, deal with all the parameters ending with __i, where i is
             # an integer. Replace them all with their name without the trailing
