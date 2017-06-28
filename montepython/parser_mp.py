@@ -413,7 +413,7 @@ def create_parser():
             Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
             Adapting jumping factor stops when above criteria is not fulfilled, plus
             the acceptance rate of (25 +/- 2) percent is achieved, and the jumping factor
-            changed by less than 1 percent compared to the mean of the last 100 steps.<++>
+            changed by less than 1 percent compared to the mean of the last 100 steps.
 
             Note: the covmat saved to the folder is the last updated one.
             Use this covmat for restarting chains (*OPT*).<++>
@@ -449,13 +449,14 @@ def create_parser():
             Using :code:`-f 0 -N 1` is a convenient way to get the likelihood
             exactly at the starting point passed in input.<++>
         <**>-T<**> : float
-            <++>Sample from the probability distribution P^(1/T) instead of P.  (*OPT*)<++><++>
+            <++>Sample from the probability distribution P^(1/T) instead of P.<++>
+            (*OPT*)<++>
         <**>--conf<**> : str
             <++>configuration file<++> (default to `default.conf`) (*OPT*).
             This file contains the path to your cosmological module
             directory.<++>
         <**>--chain-number<**> : str
-            arbitrary <++>number of the output chain<++>, to overcome the
+            <++>user-assigned number for the output chain<++>, to overcome the
             automatic one (*OPT*).
 
             By default, the chains are named :code:`yyyy-mm-dd_N__i.txt` with
@@ -482,6 +483,7 @@ def create_parser():
             as proposal distribution<++>
         <**>--fisher-it<**> : int
             <++>Number of iterations for fisher matrix computation (Default: 1)<++>
+            <++>
         <**>--start-from-fisher<**> : None
             <++>Calculates the inverse of the fisher matrix<++> to use as
             proposal distribution<++>
@@ -531,7 +533,7 @@ def create_parser():
             number for smoother plots at the expense of masking details.<++>
         <**>-T<**> : float
             <++>Raise posteriors to the power T.<++>
-            Interpret the chains as samples from the probability distribution 
+            Interpret the chains as samples from the probability distribution
             P^(1/T) instead of P. (*OPT*)<++>
         <**>--no-mean<**> : None
             <++>remove the mean likelihood from the plot<++>. By default, when
@@ -548,7 +550,7 @@ def create_parser():
             name, and value set to the new variable name), `info.to_plot` (list
             of variables with new names to plot), and `info.new_scales` (dict
             with keys set to the new variable names, and values set to the
-            number by which it should be multiplied in the graph).<++> For
+            number by which it should be multiplied in the graph). For
             instance,
 
             .. code::
@@ -556,7 +558,7 @@ def create_parser():
                 info.to_change={'oldname1':'newname1','oldname2':'newname2',...}
                 info.to_plot=['name1','name2','newname3',...]
                 info.new_scales={'name1':number1,'name2':number2,...}
-
+            <++>
         <**>--noplot<**> : bool
             <++>do not produce any plot, simply compute the posterior<++>
             (*OPT*) (flag)<++>
