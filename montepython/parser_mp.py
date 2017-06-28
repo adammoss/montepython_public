@@ -482,7 +482,8 @@ def create_parser():
             <++>Calculates the fisher matrix and its inverse<++>, which can be used
             as proposal distribution<++>
         <**>--fisher-it<**> : int
-            <++>Number of iterations for fisher matrix computation (Default: 1)<++>
+            <++>Number of iterations for fisher matrix computation<++>
+            (Default: 1)
             <++>
         <**>--start-from-fisher<**> : None
             <++>Calculates the inverse of the fisher matrix<++> to use as
@@ -676,10 +677,10 @@ def create_parser():
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
     # -- iterative fisher argument (EXPERIMENTAL)
-    runparser.add_argument('--fisher-it', help=helpdict['fisher'], type=int,
+    runparser.add_argument('--fisher-it', help=helpdict['fisher-it'], type=int,
                            dest='fisher_it', default=1)
     # -- fisher as MCMC input (EXPERIMENTAL)
-    runparser.add_argument('--start-from-fisher', help=helpdict['fisher'],
+    runparser.add_argument('--start-from-fisher', help=helpdict['start-from-fisher'],
                            dest='start_from_fisher', action='store_true')
     # -- configuration file (OPTIONAL)
     runparser.add_argument('--conf', help=helpdict['conf'],
