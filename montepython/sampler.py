@@ -382,8 +382,8 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
             cov_matrix = np.linalg.inv(fisher_matrix)
         except np.linalg.LinAlgError:
             raise io_mp.ConfigurationError(
-                "Could not find Fisher matrix, please adjust bestfit and/or input"
-                "sigma values (or covmat) or remove the option --fisher and run"
+                "Could not find Fisher matrix, please adjust bestfit and/or input "
+                "sigma values (or covmat) or remove the option --fisher and run "
                 "with Metropolis-Hastings or another sampling method.")
             fisher_invert_success = False
             done = True
@@ -401,12 +401,23 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
                     filetest = open(command_line.folder + '/fisher'+str(file_index)+'.mat','r')
                     filetest.close()
                     if command_line.cov == None:
-                        warnings.warn("Running in folder with existing fisher matrix,"
-                                      "but no input covmat was provided. Existing fisher"
-                                      "matrix was not used and has been overwritten."
-                                      "If you wanted to continue iterating on an existing"
-                                      "fisher matrix, provide covmat from fisher matrix"
+                        warnings.warn("Running in folder with existing fisher matrix, "
+                                      "but no input covmat was provided. Existing fisher "
+                                      "matrix was not used and has been overwritten. "
+                                      "If you wanted to continue iterating on an existing "
+                                      "fisher matrix, provide covmat from fisher matrix "
                                       "as input and increase iteration number (--fisher-it).")
+                        io_mp.write_covariance_matrix(
+                            fisher_matrix, parameter_names,
+                            os.path.join(command_line.folder, 'fisher'+str(file_index)+'.mat'))
+                        print 'Fisher iteration step %d done' % file_index
+                        break
+                    elif file_index == command_line.fisher_it:
+                        warnings.warn("Running in folder with existing fisher matrix. The existing "
+                                      "fisher matrix \"fisher%d.mat\" has been overwritten. "
+                                      "If you wanted to continue iterating on an existing "
+                                      "fisher matrix, provide covmat from fisher matrix "
+                                      "as input and increase iteration number (--fisher-it)." % file_index)
                         io_mp.write_covariance_matrix(
                             fisher_matrix, parameter_names,
                             os.path.join(command_line.folder, 'fisher'+str(file_index)+'.mat'))
@@ -437,7 +448,7 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
 
     # Check if desired number of fisher iterations has been reached.
     # If True, either exit or start MCMC.
-    if file_index == command_line.fisher_it:
+    if file_index >= command_line.fisher_it:
         if command_line.start_from_fisher == True:
             print 'Fisher matrix successfully computed after %d iterations,' % command_line.fisher_it
             print 'starting MCMC run with covmat from fisher matrix as input.'
