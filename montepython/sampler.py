@@ -359,6 +359,7 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
             center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
 
     # Load stepsize from input covmat or covmat generated from param file
+    # JL TODO: check this, and try another scheme to be sure that index and elem refer to the same params in the same order
     stepsize = np.zeros(len(parameter_names))
     for index in range(len(parameter_names)):
         stepsize[index] = (matrix[index][index])**0.5
@@ -625,14 +626,18 @@ def compute_fisher(data, cosmo, center, step_size):
     # Initialise the gradient field
     gradient = np.zeros(len(parameter_names), 'float64')
 
+    # Compute loglike at the point supposed to be a good estimate of the best-fit
+    data.update_cosmo_arguments()
+    loglike_min = compute_lkl(cosmo, data)
+
+    # loop over one parameter
     for k, elem_k in enumerate(parameter_names):
-        kdiff = center[elem_k]*step_size[k]
-        if kdiff == 0.0:
-            kdiff = step_size[k]
+        kdiff = step_size[k]
+
+        # loop over second parameter
         for h, elem_h in enumerate(parameter_names):
-            hdiff = center[elem_h]*step_size[h]
-            if hdiff == 0.0:
-                hdiff = step_size[h]
+            hdiff = step_size[h]
+
             # Since the matrix is symmetric, we only compute the
             # elements of one half of it plus the diagonal.
             if k > h:
@@ -640,42 +645,48 @@ def compute_fisher(data, cosmo, center, step_size):
             print 'Computing fisher element (%d,%d)' % (k,h)
             if k != h:
                 fisher_matrix[k][h] = compute_fisher_element(
-                    data, cosmo, center,
+                    data, cosmo, center, loglike_min,
                     (elem_k, kdiff),
                     (elem_h, hdiff))
                 fisher_matrix[h][k] = fisher_matrix[k][h]
             else:
                 fisher_matrix[k][k], gradient[k] = compute_fisher_element(
-                    data, cosmo, center,
+                    data, cosmo, center, loglike_min,
                     (elem_k, kdiff))
 
     return fisher_matrix, gradient
 
 
-def compute_fisher_element(data, cosmo, center, one, two=None):
+def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
+    # JL TODO: add tests: if a point goes beyond the boundary, use single-sided values
     # Unwrap
     name_1, diff_1 = one
     if two:
         name_2, diff_2 = two
-        data.mcmc_parameters[name_1]['current'] = (
-            center[name_1]+diff_1)
-        data.mcmc_parameters[name_2]['current'] = (
-            center[name_2]+diff_2)
+
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1)
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2)
         data.update_cosmo_arguments()
         loglike_1 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_2]['current'] -= 2*diff_2
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1)
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2)
         data.update_cosmo_arguments()
         loglike_2 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] -= 2*diff_1
-        data.mcmc_parameters[name_2]['current'] += 2*diff_2
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1)
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2)
         data.update_cosmo_arguments()
         loglike_3 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_2]['current'] -= 2*diff_2
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1)
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2)
         data.update_cosmo_arguments()
         loglike_4 = compute_lkl(cosmo, data)
+
+        data.mcmc_parameters[name_1]['current'] = (center[name_1])
+        data.mcmc_parameters[name_2]['current'] = (center[name_2])
+        data.update_cosmo_arguments()
 
         fisher_off_diagonal = -(
             loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
@@ -683,20 +694,20 @@ def compute_fisher_element(data, cosmo, center, one, two=None):
         return fisher_off_diagonal
     # It is otherwise a diagonal component
     else:
+
+        data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1
+        data.update_cosmo_arguments()
+        loglike_right = compute_lkl(cosmo, data)
+
+        data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1
+        data.update_cosmo_arguments()
+        loglike_left = compute_lkl(cosmo, data)
+
         data.mcmc_parameters[name_1]['current'] = center[name_1]
         data.update_cosmo_arguments()
-        loglike_1 = compute_lkl(cosmo, data)
-
-        data.mcmc_parameters[name_1]['current'] += diff_1
-        data.update_cosmo_arguments()
-        loglike_2 = compute_lkl(cosmo, data)
-
-        data.mcmc_parameters[name_1]['current'] -= 2*diff_1
-        data.update_cosmo_arguments()
-        loglike_3 = compute_lkl(cosmo, data)
 
         fisher_diagonal = -(
-            loglike_2-2.*loglike_1+loglike_3)/(diff_1**2)
-        gradient = -(loglike_2-loglike_3)/(2.*diff_1)
+            loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
+        gradient = -(loglike_right-loglike_left)/(2.*diff_1)
 
         return fisher_diagonal, gradient
