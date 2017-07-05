@@ -1,5 +1,5 @@
 """
-.. module:: nested_sampling
+.. module:: MultiNest
     :synopsis: Interface the MultiNest program with Monte Python
 
 This implementation relies heavily on the existing Python wrapper for
@@ -8,13 +8,13 @@ this address <https://github.com/JohannesBuchner/PyMultiNest>`_ .
 
 The main routine, :func:`run`, truly interfaces the two codes. It takes for
 input the cosmological module, data and command line. It then defines
-internally two functions, :func:`prior() <nested_sampling.prior>` and
+internally two functions, :func:`prior() <MultiNest.prior>` and
 :func:`loglike` that will serve as input for the run function of PyMultiNest.
 
 .. moduleauthor:: Jesus Torrado <torradocacho@lorentz.leidenuniv.nl>
 .. moduleauthor:: Benjamin Audren <benjamin.audren@epfl.ch>
 """
-from pymultinest import run as nested_run
+from pymultinest import run as multinest_run
 import numpy as np
 import os
 from copy import copy
@@ -25,29 +25,29 @@ import sampler
 # Data on file names and MultiNest options, that may be called by other modules
 
 # MultiNest subfolder and name separator
-NS_subfolder    = 'NS'
-NS_separator    = '-'
+MN_subfolder    = 'MN'
+MN_separator    = '-'
 # MultiNest file names ending, i.e. after the defined 'base_name'
-name_rejected   = NS_separator + 'ev.dat'                 # rejected points
-name_post       = NS_separator + '.txt'                   # accepted points
-name_post_sep   = NS_separator + 'post_separate.dat'      # accepted points separated by '\n\n'
-name_post_equal = NS_separator + 'post_equal_weights.dat' # some acc. points, same sample prob.
-name_stats      = NS_separator + 'stats.dat'              # summarized information, explained
-name_summary    = NS_separator + 'summary.txt'            # summarized information
+name_rejected   = MN_separator + 'ev.dat'                 # rejected points
+name_post       = MN_separator + '.txt'                   # accepted points
+name_post_sep   = MN_separator + 'post_separate.dat'      # accepted points separated by '\n\n'
+name_post_equal = MN_separator + 'post_equal_weights.dat' # some acc. points, same sample prob.
+name_stats      = MN_separator + 'stats.dat'              # summarized information, explained
+name_summary    = MN_separator + 'summary.txt'            # summarized information
 # New files
-name_paramnames = '.paramnames'            # in the NS/ subfolder
-name_arguments  = '.arguments'             # in the NS/ subfolder
-name_chain_acc  = 'chain_NS__accepted.txt' # in the chain root folder
-name_chain_rej  = 'chain_NS__rejected.txt' # in the chain root folder
+name_paramnames = '.paramnames'            # in the MN/ subfolder
+name_arguments  = '.arguments'             # in the MN/ subfolder
+name_chain_acc  = 'chain_MN__accepted.txt' # in the chain root folder
+name_chain_rej  = 'chain_MN__rejected.txt' # in the chain root folder
 # Log.param name (ideally, we should import this one from somewhere else)
 name_logparam = 'log.param'
 
 # Multinest option prefix
-NS_prefix       = 'NS_'
+MN_prefix       = 'MN_'
 # User-defined arguments of PyMultiNest, and 'argparse' keywords
 # First: basic string -> bool type conversion:
 str2bool = lambda s: True if s.lower() == 'true' else False
-NS_user_arguments = {
+MN_user_arguments = {
     # General sampling options
     'n_live_points':
         {'help': 'Number of live samples',
@@ -93,7 +93,7 @@ NS_user_arguments = {
          'nargs': '+'}
     }
 # Automatically-defined arguments of PyMultiNest, type specified
-NS_auto_arguments = {
+MN_auto_arguments = {
     'n_dims':   {'type': int},
     'n_params': {'type': int},
     'verbose':  {'type': str2bool},
@@ -116,82 +116,82 @@ def initialise(cosmo, data, command_line):
         data.mcmc_parameters, varying_param_names)
     if not is_flat:
         raise io_mp.ConfigurationError(
-            'Nested Sampling with MultiNest is only possible with flat ' +
-            'priors. Sorry!')
+            'Nested Sampling with MultiNest and PolyChord is only possible ' +
+            'with flat priors. Sorry!')
     if not is_bound:
         raise io_mp.ConfigurationError(
-            'Nested Sampling with MultiNest is only possible for bound ' +
-            'parameters. Set reasonable bounds for them in the ".param"' +
-            'file.')
+            'Nested Sampling with MultiNest and PolyChord is only possible ' +
+            'for bound parameters. Set reasonable bounds for them in the ' +
+            '".param" file.')
 
-    # If absent, create the sub-folder NS
-    NS_folder = os.path.join(command_line.folder, NS_subfolder)
-    if not os.path.exists(NS_folder):
-        os.makedirs(NS_folder)
+    # If absent, create the sub-folder MN
+    MN_folder = os.path.join(command_line.folder, MN_subfolder)
+    if not os.path.exists(MN_folder):
+        os.makedirs(MN_folder)
 
     # Use chain name as a base name for MultiNest files
     chain_name = [a for a in command_line.folder.split(os.path.sep) if a][-1]
-    base_name = os.path.join(NS_folder, chain_name)
+    base_name = os.path.join(MN_folder, chain_name)
 
     # Prepare arguments for PyMultiNest
     # -- Automatic arguments
-    data.NS_arguments['n_dims'] = len(varying_param_names)
-    data.NS_arguments['n_params'] = (len(varying_param_names) +
+    data.MN_arguments['n_dims'] = len(varying_param_names)
+    data.MN_arguments['n_params'] = (len(varying_param_names) +
                                      len(derived_param_names))
-    data.NS_arguments['verbose'] = True
-    data.NS_arguments['outputfiles_basename'] = base_name + NS_separator
+    data.MN_arguments['verbose'] = True
+    data.MN_arguments['outputfiles_basename'] = base_name + MN_separator
     # -- User-defined arguments
-    for arg in NS_user_arguments:
-        value = getattr(command_line, NS_prefix+arg)
+    for arg in MN_user_arguments:
+        value = getattr(command_line, MN_prefix+arg)
         # Special case: clustering parameters
         if arg == 'clustering_params':
             clustering_param_names = value if value != -1 else []
             continue
         # Rest of the cases
         if value != -1:
-            data.NS_arguments[arg] = value
+            data.MN_arguments[arg] = value
         # else: don't define them -> use PyMultiNest default value
 
     # Clustering parameters -- reordering to put them first
-    NS_param_names = []
+    MN_param_names = []
     if clustering_param_names:
-        data.NS_arguments['n_clustering_params'] = len(clustering_param_names)
+        data.MN_arguments['n_clustering_params'] = len(clustering_param_names)
         for param in clustering_param_names:
             if not param in varying_param_names:
                 raise io_mp.ConfigurationError(
                     'The requested clustering parameter "%s"' % param +
                     ' was not found in your ".param" file. Pick a valid one.')
-            NS_param_names.append(param)
+            MN_param_names.append(param)
     for param in varying_param_names:
-        if not param in NS_param_names:
-            NS_param_names.append(param)
-    data.NS_param_names = NS_param_names
+        if not param in MN_param_names:
+            MN_param_names.append(param)
+    data.MN_param_names = MN_param_names
             
-    # Caveat: multi-modal sampling OFF by default; if requested, INS disabled
+    # Caveat: multi-modal sampling OFF by default; if requested, IMN disabled
     try:
-        if data.NS_arguments['multimodal']:
-            data.NS_arguments['importance_nested_sampling'] = False
+        if data.MN_arguments['multimodal']:
+            data.MN_arguments['importance_nested_sampling'] = False
             warnings.warn('Multi-modal sampling has been requested, ' +
                           'so Importance Nested Sampling has been disabled')
     except KeyError:
-        data.NS_arguments['multimodal'] = False
+        data.MN_arguments['multimodal'] = False
 
     # MPI: don't initialise it inside MultiNest.
     # Rather, it is either initialised by Monte Python (if MPI used) or ignored
-    data.NS_arguments['init_MPI']=False
+    data.MN_arguments['init_MPI']=False
 
     # Write the MultiNest arguments and parameter ordering
     with open(base_name+name_arguments, 'w') as afile:
-        for arg in data.NS_arguments:
+        for arg in data.MN_arguments:
             if arg != 'n_clustering_params':
                 afile.write(' = '.join(
-                    [str(arg), str(data.NS_arguments[arg])]))
+                    [str(arg), str(data.MN_arguments[arg])]))
             else:
                 afile.write('clustering_params = ' +
                             ' '.join(clustering_param_names))
             afile.write('\n')
     with open(base_name+name_paramnames, 'w') as pfile:
-        pfile.write('\n'.join(NS_param_names+derived_param_names))
+        pfile.write('\n'.join(MN_param_names+derived_param_names))
 
 
 def run(cosmo, data, command_line):
@@ -243,7 +243,7 @@ def run(cosmo, data, command_line):
     """
     # Convenience variables
     derived_param_names = data.get_mcmc_parameters(['derived'])
-    NS_param_names      = data.NS_param_names
+    MN_param_names      = data.MN_param_names
 
     # Function giving the prior probability
     def prior(cube, ndim, *args):
@@ -251,7 +251,7 @@ def run(cosmo, data, command_line):
         Please see the encompassing function docstring
 
         """
-        for i, name in zip(range(ndim), NS_param_names):
+        for i, name in zip(range(ndim), MN_param_names):
             cube[i] = data.mcmc_parameters[name]['prior']\
                 .map_from_unit_interval(cube[i])
 
@@ -262,7 +262,7 @@ def run(cosmo, data, command_line):
 
         """
         # Updates values: cube --> data
-        for i, name in zip(range(ndim), NS_param_names):
+        for i, name in zip(range(ndim), MN_param_names):
             data.mcmc_parameters[name]['current'] = cube[i]
         # Propagate the information towards the cosmo arguments
         data.update_cosmo_arguments()
@@ -272,19 +272,19 @@ def run(cosmo, data, command_line):
         return lkl
 
     # Launch MultiNest, and recover the output code
-    output = nested_run(loglike, prior, **data.NS_arguments)
+    output = multinest_run(loglike, prior, **data.MN_arguments)
 
     # Assuming this worked, i.e. if output is `None`,
     # state it and suggest the user to analyse the output.
     if output is None:
         warnings.warn('The sampling with MultiNest is done.\n' +
                       'You can now analyse the output calling Monte Python ' +
-                      ' with the -info flag in the chain_name/NS subfolder,' +
+                      ' with the -info flag in the chain_name/MN subfolder,' +
                       'or, if you used multimodal sampling, in the ' +
                       'chain_name/mode_# subfolders.')
 
 
-def from_NS_output_to_chains(folder):
+def from_MN_output_to_chains(folder):
     """
     Translate the output of MultiNest into readable output for Monte Python
 
@@ -303,27 +303,27 @@ def from_NS_output_to_chains(folder):
     chain_name = [a for a in folder.split(os.path.sep) if a][-2]
     base_name = os.path.join(folder, chain_name)
 
-    # Read the arguments of the NS run
+    # Read the arguments of the MN run
     # This file is intended to be machine generated: no "#" ignored or tests
     # done
-    NS_arguments = {}
+    MN_arguments = {}
     with open(base_name+name_arguments, 'r') as afile:
         for line in afile:
             arg   = line.split('=')[0].strip()
             value = line.split('=')[1].strip()
-            arg_type = (NS_user_arguments[arg]['type']
-                        if arg in NS_user_arguments else
-                        NS_auto_arguments[arg]['type'])
+            arg_type = (MN_user_arguments[arg]['type']
+                        if arg in MN_user_arguments else
+                        MN_auto_arguments[arg]['type'])
             value = arg_type(value)
             if arg == 'clustering_params':
                 value = [a.strip() for a in value.split()]
-            NS_arguments[arg] = value
-    multimodal = NS_arguments.get('multimodal')
+            MN_arguments[arg] = value
+    multimodal = MN_arguments.get('multimodal')
     # Read parameters order
-    NS_param_names = np.loadtxt(base_name+name_paramnames, dtype='str').tolist()
+    MN_param_names = np.loadtxt(base_name+name_paramnames, dtype='str').tolist()
     # In multimodal case, if there were no clustering params specified, ALL are
-    if multimodal and not NS_arguments.get('clustering_params'):
-        NS_arguments['clustering_params'] = NS_param_names
+    if multimodal and not MN_arguments.get('clustering_params'):
+        MN_arguments['clustering_params'] = MN_param_names
 
     # Extract the necessary information from the log.param file
     # Including line numbers of the parameters
@@ -346,8 +346,8 @@ def from_NS_output_to_chains(folder):
                                       line.split('=')[1].strip('[]').split(',')]
             param_lines[param_name] = i
 
-    # Create the mapping from NS ordering to log.param ordering
-    columns_reorder = [NS_param_names.index(param) for param in param_names]
+    # Create the mapping from MN ordering to log.param ordering
+    columns_reorder = [MN_param_names.index(param) for param in param_names]
 
     # Open the 'stats.dat' file to see what happened and retrieve some info
     stats_file = open(base_name+name_stats, 'r')
@@ -358,7 +358,7 @@ def from_NS_output_to_chains(folder):
     n_modes = 0
     stats_mode_lines = {0: []}
     for line in lines:
-        if 'Nested Sampling Global Log-Evidence' in line:
+        if 'MultiNest Global Log-Evidence' in line:
             global_logZ, global_logZ_err = [float(a.strip()) for a in
                                             line.split(':')[1].split('+/-')]
         if 'Total Modes Found' in line:
@@ -398,7 +398,7 @@ def from_NS_output_to_chains(folder):
 
         # Add ACCEPTED points
         mode_data = np.array(mode_lines[i].split(), dtype='float64')
-        columns = 2+NS_arguments['n_params']
+        columns = 2+MN_arguments['n_params']
         mode_data = mode_data.reshape([mode_data.shape[0]/columns, columns])
         # Rearrange: sample-prob | -2*loglik | params (clustering first)
         #       ---> sample-prob |   -loglik | params (log.param order)
@@ -422,7 +422,7 @@ def from_NS_output_to_chains(folder):
                 line_MAP = j+2
         MAPs   = {}
         sigmas = {}
-        for j, param in enumerate(NS_param_names):
+        for j, param in enumerate(MN_param_names):
             n, MAP = stats_mode_lines[i][line_MAP+j].split()
             assert int(n) == j+1,  'Something is wrong... (strange error n.3)'
             MAPs[param] = MAP
@@ -432,15 +432,15 @@ def from_NS_output_to_chains(folder):
         #  -- minimum rectangle containing the mode (only clustering params)
         mins = {}
         maxs = {}
-        for param in NS_arguments['clustering_params']:
+        for param in MN_arguments['clustering_params']:
             # Notice that in the next line we use param_names and not
-            # NS_param_names: the chain lines have already been reordered
+            # MN_param_names: the chain lines have already been reordered
             values = mode_data[:, 2+param_names.index(param)]
             mins[param] = min(values)
             maxs[param] = max(values)
         # Create the log.param file
         for param in param_names:
-            if param in NS_arguments['clustering_params']:
+            if param in MN_arguments['clustering_params']:
                 mini, maxi = '%.6e'%mins[param], '%.6e'%maxs[param]
             else:
                 mini, maxi = param_data[param][1], param_data[param][2]

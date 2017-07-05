@@ -377,7 +377,7 @@ def create_parser():
             in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
         <**>-m<**> : str
             <++>sampling method<++>, by default 'MH' for Metropolis-Hastings,
-            can be set to 'NS' for Nested Sampling (using Multinest wrapper
+            can be set to 'MN' for MultiNest (using Multinest wrapper
             PyMultiNest), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
             to emcee algorithm), and finally 'IS' for importance sampling.
 
@@ -455,8 +455,8 @@ def create_parser():
             <++>When using update mode, stop run after updating the covariant matrix.<++>
             Useful if you want to change settings after the first guess (*OPT*) (flag)<++>
 
-        For Nested Sampling and Cosmo Hammer arguments, see
-        :mod:`nested_sampling` and :mod:`cosmo_hammer`.
+        For MultiNest and Cosmo Hammer arguments, see
+        :mod:`MultiNest` and :mod:`cosmo_hammer`.
 
     **info**
 
@@ -595,7 +595,7 @@ def create_parser():
     # -- sampling method (OPTIONAL)
     runparser.add_argument('-m', '--method', help=helpdict['m'],
                            dest='method', default='MH',
-                           choices=['MH', 'NS', 'CH', 'IS', 'Der'])
+                           choices=['MH', 'MN', 'CH', 'IS', 'Der'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
                            default=0)
@@ -642,18 +642,18 @@ def create_parser():
         help=helpdict['IS-starting-folder'], type=str, default='', nargs='+')
 
     ###############
-    # MultiNest arguments (all OPTIONAL and ignored if not "-m=NS")
+    # MultiNest arguments (all OPTIONAL and ignored if not "-m=MN")
     # The default values of -1 mean to take the PyMultiNest default values
     try:
-        from nested_sampling import NS_prefix, NS_user_arguments
-        NSparser = runparser.add_argument_group(
+        from MultiNest import MN_prefix, MN_user_arguments
+        MNparser = runparser.add_argument_group(
             title="MultiNest",
             description="Run the MCMC chains using MultiNest"
             )
-        for arg in NS_user_arguments:
-            NSparser.add_argument('--'+NS_prefix+arg,
+        for arg in MN_user_arguments:
+            MNparser.add_argument('--'+MN_prefix+arg,
                                   default=-1,
-                                  **NS_user_arguments[arg])
+                                  **MN_user_arguments[arg])
     except ImportError:
         # Not defined if not installed
         pass

@@ -82,10 +82,10 @@ def initialise(custom_command=''):
         # MH: Creating the file that will contain the chain
         if command_line.method == 'MH':
             io_mp.create_output_files(command_line, data)
-        # NS: Creating the NS subfolder and the MultiNest arguments
-        elif command_line.method == 'NS':
-            from nested_sampling import initialise as initialise_ns
-            initialise_ns(cosmo, data, command_line)
+        # MN: Creating the MN subfolder and the MultiNest arguments
+        elif command_line.method == 'MN':
+            from MultiNest import initialise as initialise_mn
+            initialise_mn(cosmo, data, command_line)
 
         return cosmo, data, command_line, True
 

@@ -473,16 +473,16 @@ class Test07CosmoHammerBehaviour(TestMontePython):
                 self.data.lkl[experiment], 'computeLikelihood'))
 
 
-class Test08NestedSamplingBehaviour(TestMontePython):
+class Test08MultiNestBehaviour(TestMontePython):
     """
-    Check if Nested Sampling works
+    Check if MultiNest works
     """
     def setUp(self):
         self.date = str(datetime.date.today())
         self.folder = os.path.join('tests', 'test_%s' % self.date)
         self.custom_command = (
             'run -N 1 -p test_gaussian.param -o %s' % self.folder +
-            ' -m NS --NS_n_live_points 30 --NS_max_iter 10')
+            ' -m MN --MN_n_live_points 30 --MN_max_iter 10')
         self.cosmo, self.data, self.command_line, _ = initialise(
             self.custom_command)
 
@@ -493,9 +493,9 @@ class Test08NestedSamplingBehaviour(TestMontePython):
         del self.cosmo, self.data, self.command_line
 
     def test_behaviour(self):
-        """Check Nested Sampling global behaviour"""
+        """Check MultiNest global behaviour"""
         self.assertTrue(os.path.exists(
-            os.path.join(self.folder, 'NS')))
+            os.path.join(self.folder, 'MN')))
         sampler.run(self.cosmo, self.data, self.command_line)
 
 

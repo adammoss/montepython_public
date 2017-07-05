@@ -19,7 +19,7 @@ Contents:
    likelihood_class
    sampler
    mcmc
-   nested_sampling
+   multinest
    cosmo_hammer
    analyze
    io_mp
