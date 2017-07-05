@@ -38,6 +38,7 @@ Contents:
    getting_started
    example
    multi
+   poly 
    hammer
    likelihoods
    documentation

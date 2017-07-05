@@ -20,6 +20,7 @@ Contents:
    sampler
    mcmc
    multinest
+   polychord
    cosmo_hammer
    analyze
    io_mp

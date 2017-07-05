@@ -14,9 +14,11 @@ test_CH:
 	nosetests tests.test_montepython:Test07CosmoHammerBehaviour
 test_MN:
 	nosetests tests.test_montepython:Test08MultiNestBehaviour
+test_PC:
+	nosetests tests.test_montepython:Test09PolyChordBehaviour
 
 short_tests: test_command_line test_setup test_conf test_CH
-long_tests: test_wrapper test_data test_MH_IS test_MN
+long_tests: test_wrapper test_data test_MH_IS test_MN test_PC
 
 doctests:
 	python montepython/data.py

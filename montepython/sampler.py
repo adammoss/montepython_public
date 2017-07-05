@@ -5,7 +5,7 @@
 .. moduleauthor:: Surhudm More <>
 
 This module defines one key function, :func:`run`, that distributes the work to
-the desired actual sampler (Metropolis Hastings, MultiNest so far).
+the desired actual sampler (Metropolis Hastings, MultiNest, or PolyChord so far).
 
 It also defines a serie of helper functions, that aim to be generically used by
 all different sampler methods:
@@ -45,6 +45,9 @@ def run(cosmo, data, command_line):
     elif command_line.method == 'MN':
         import MultiNest as mn
         mn.run(cosmo, data, command_line)
+    elif command_line.method == 'PC':
+        import PolyChord as pc
+        pc.run(cosmo, data, command_line)
     elif command_line.method == 'CH':
         import cosmo_hammer as hammer
         hammer.run(cosmo, data, command_line)
@@ -421,7 +424,7 @@ def check_flat_bound_priors(parameters, names):
     """
     Ensure that all varying parameters are bound and flat
 
-    It is a necessary condition to use the code with MultiNest or the
+    It is a necessary condition to use the code with MultiNest, PolyChord or the
     Cosmo Hammer.
     """
     is_flat = all(parameters[name]['prior'].prior_type == 'flat'

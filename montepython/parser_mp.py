@@ -378,7 +378,8 @@ def create_parser():
         <**>-m<**> : str
             <++>sampling method<++>, by default 'MH' for Metropolis-Hastings,
             can be set to 'MN' for MultiNest (using Multinest wrapper
-            PyMultiNest), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
+            PyMultiNest), 'PC' for PolyChord (using PolyChord wrapper
+            PyPolyChord), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
             to emcee algorithm), and finally 'IS' for importance sampling.
 
             Note that when running with Importance sampling, you need to
@@ -455,8 +456,8 @@ def create_parser():
             <++>When using update mode, stop run after updating the covariant matrix.<++>
             Useful if you want to change settings after the first guess (*OPT*) (flag)<++>
 
-        For MultiNest and Cosmo Hammer arguments, see
-        :mod:`MultiNest` and :mod:`cosmo_hammer`.
+        For MultiNest, PolyChord and Cosmo Hammer arguments, see
+        :mod:`MultiNest`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
 
     **info**
 
@@ -595,7 +596,7 @@ def create_parser():
     # -- sampling method (OPTIONAL)
     runparser.add_argument('-m', '--method', help=helpdict['m'],
                            dest='method', default='MH',
-                           choices=['MH', 'MN', 'CH', 'IS', 'Der'])
+                           choices=['MH', 'MN', 'PC', 'CH', 'IS', 'Der'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
                            default=0)
@@ -654,6 +655,23 @@ def create_parser():
             MNparser.add_argument('--'+MN_prefix+arg,
                                   default=-1,
                                   **MN_user_arguments[arg])
+    except ImportError:
+        # Not defined if not installed
+        pass
+
+    ###############
+    # PolyChord arguments (all OPTIONAL and ignored if not "-m=PC")
+    # The default values of -1 mean to take the PyPolyChord default values
+    try:
+        from PolyChord import PC_prefix, PC_user_arguments
+        PCparser = runparser.add_argument_group(
+            title="PolyChord",
+            description="Run the MCMC chains using PolyChord"
+            )
+        for arg in PC_user_arguments:
+            PCparser.add_argument('--'+PC_prefix+arg,
+                                  default=-1,
+                                  **PC_user_arguments[arg])
     except ImportError:
         # Not defined if not installed
         pass

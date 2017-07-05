@@ -170,12 +170,12 @@ def prepare(files, info):
         Used to store the result
 
     """
-    # First test if the folder is a MultiNest or CosmoHammer folder. If
-    # so, call the module's own routine through the clean conversion function,
-    # which will translate the output of this other sampling into MCMC chains
-    # that can then be analyzed.
-    modules = ['MultiNest', 'cosmo_hammer']
-    tags = ['MN', 'CH']
+    # First test if the folder is a MultiNest, PolyChord or CosmoHammer folder.
+    # If so, call the module's own routine through the clean conversion
+    # function, which will translate the output of this other sampling into
+    # MCMC chains that can then be analyzed.
+    modules = ['MultiNest', 'PolyChord', 'cosmo_hammer']
+    tags = ['MN', 'PC', 'CH']
     for module_name, tag in zip(modules, tags):
         action_done = clean_conversion(module_name, tag, files[0])
         if action_done:
