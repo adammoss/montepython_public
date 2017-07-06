@@ -12,7 +12,7 @@ internally two functions, :func:`prior() <PolyChord.prior>` and
 
 .. moduleauthor:: Will Handley <wh260@cam.ac.uk>
 """
-from PyPolyChord.PyPolyChord import run_polychord as polychord_run
+from PyPolyChord import run_polychord as polychord_run
 from PyPolyChord.settings import PolyChordSettings as PC_Settings
 import numpy as np
 import os
