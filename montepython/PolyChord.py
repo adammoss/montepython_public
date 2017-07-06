@@ -179,23 +179,7 @@ PC_user_arguments = {
         '(Default: nlive)\n'
         'How often to update the files in <base_dir>.'
         )
-        },
-
-    'grade_frac' :
-        {'type': list,
-                'help':(
-        '(Default: 1)\n'
-        'The amount of time to spend in each speed.'
-)
-        },
-
-    'grade_dims' :
-        {'type': list,
-                'help':(
-        '(Default: 1)\n'
-        'The number of parameters within each speed.'
-        )
-        },
+        }
     }
 
 
@@ -203,6 +187,8 @@ PC_user_arguments = {
 PC_auto_arguments = {
     'file_root': {'type': str},
     'base_dir': {'type': str},
+    'grade_dims': {'type': list},
+    'grade_frac': {'type': list}
     }
 
 
@@ -214,6 +200,8 @@ def initialise(cosmo, data, command_line):
     # Convenience variables
     varying_param_names = data.get_mcmc_parameters(['varying'])
     derived_param_names = data.get_mcmc_parameters(['derived'])
+    nslow = len(data.get_mcmc_parameters(['varying', 'cosmo']))
+    nfast = len(data.get_mcmc_parameters(['varying', 'nuisance']))
 
     # Check that all the priors are flat and that all the parameters are bound
     is_flat, is_bound = sampler.check_flat_bound_priors(
@@ -244,8 +232,12 @@ def initialise(cosmo, data, command_line):
 
     # Prepare arguments for PyPolyChord
     # -- Automatic arguments
-    data.PC_arguments['file_root'] = base_name
-    data.PC_arguments['base_dir'] = '.'
+    data.PC_arguments['file_root'] = chain_name
+    data.PC_arguments['base_dir'] = PC_folder
+    data.PC_arguments['grade_dims'] = [nslow, nfast]
+    data.PC_arguments['grade_frac'] = [0.75,0.25]
+    data.PC_arguments['num_repeats'] = nslow * 5
+
     # -- User-defined arguments
     for arg in PC_user_arguments:
         value = getattr(command_line, PC_prefix+arg)
@@ -315,8 +307,7 @@ def run(cosmo, data, command_line):
     """
     # Convenience variables
     derived_param_names = data.get_mcmc_parameters(['derived'])
-    PC_param_names      = data.PC_param_names
-    nDims = len(PC_param_names)
+    nDims = len(data.PC_param_names)
     nDerived = len(derived_param_names)
 
     # Function giving the prior probability
@@ -326,7 +317,7 @@ def run(cosmo, data, command_line):
 
         """
         theta = [0.0] * nDims
-        for i, name in enumerate(PC_param_names):
+        for i, name in enumerate(data.PC_param_names):
             theta[i] = data.mcmc_parameters[name]['prior']\
                 .map_from_unit_interval(hypercube[i])
         return theta
@@ -338,7 +329,12 @@ def run(cosmo, data, command_line):
 
         """
         # Updates values: theta --> data
-        for i, name in enumerate(PC_param_names):
+        try:
+            data.check_for_slow_step(theta)
+        except KeyError:
+            pass
+
+        for i, name in enumerate(data.PC_param_names):
             data.mcmc_parameters[name]['current'] = theta[i]
         data.update_cosmo_arguments()
 
@@ -362,61 +358,3 @@ def run(cosmo, data, command_line):
     warnings.warn('The sampling with PolyChord is done.\n' +
                   'You can now analyse the output calling Monte Python ' +
                   ' with the -info flag in the chain_name/PC subfolder,')
-
-
-#def from_PC_output_to_chains(folder):
-#    """
-#    """
-#    chain_name = [a for a in folder.split(os.path.sep) if a][-2]
-#    base_name = os.path.join(folder, chain_name)
-#
-#    # Read the arguments of the PC run
-#    # This file is intended to be machine generated: no "#" ignored or tests
-#    # done
-#    PC_arguments = {}
-#    with open(base_name+name_arguments, 'r') as afile:
-#        for line in afile:
-#            arg   = line.split('=')[0].strip()
-#            value = line.split('=')[1].strip()
-#            arg_type = (PC_user_arguments[arg]['type']
-#                        if arg in PC_user_arguments else
-#                        PC_auto_arguments[arg]['type'])
-#            value = arg_type(value)
-#            PC_arguments[arg] = value
-#
-#    # Read parameters order
-#    PC_param_names = np.loadtxt(base_name+name_paramnames, dtype='str').tolist()
-#
-#    # Extract the necessary information from the log.param file
-#    # Including line numbers of the parameters
-#    with open(os.path.join(folder, '..', name_logparam), 'r') as log_file:
-#        log_lines = log_file.readlines()
-#    # Number of the lines to be changed
-#    param_names = []
-#    param_lines = {}
-#    param_data  = {}
-#    pre, pos = 'data.parameters[', ']'
-#    for i, line in enumerate(log_lines):
-#        if pre in line:
-#            if line.strip()[0] == '#':
-#                continue
-#            param_name = line.split('=')[0][line.find(pre)+len(pre):
-#                                            line.find(pos)]
-#            param_name = param_name.replace('"','').replace("'",'').strip()
-#            param_names.append(param_name)
-#            param_data[param_name] = [a.strip() for a in
-#                                      line.split('=')[1].strip('[]').split(',')]
-#            param_lines[param_name] = i
-#
-#    # Create the mapping from PC ordering to log.param ordering
-#    columns_reorder = [PC_param_names.index(param) for param in param_names]
-#
-#    # Open the 'stats.dat' file to see what happened and retrieve some info
-#    stats_file = open(base_name+name_stats, 'r')
-#    lines = stats_file.readlines()
-#    stats_file.close()
-#    for line in lines:
-#        if 'log(Z)       =' in line:
-#            strings = line.split()
-#            global_logZ = float(strings[2])
-#            global_logZ_err = float(strings[4])
