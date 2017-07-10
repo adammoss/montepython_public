@@ -319,10 +319,10 @@ def get_covariance_matrix(cosmo, data, command_line):
     #inverse, and diagonalization
     eigv, eigV = np.linalg.eig(np.linalg.inv(matrix))
 
-    if command_line.start_from_fisher:
-        command_line.fisher = True
-    if command_line.fisher:
-        eigv, eigV, matrix = get_fisher_matrix(cosmo, data, command_line, matrix)
+    #if command_line.start_from_fisher:
+    #    command_line.fisher = True
+    #if command_line.fisher:
+    #    eigv, eigV, matrix = get_fisher_matrix(cosmo, data, command_line, matrix)
 
     return eigv, eigV, matrix
 
@@ -360,108 +360,51 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
 
     # Load stepsize from input covmat or covmat generated from param file
     # JL TODO: check this, and try another scheme to be sure that index and elem refer to the same params in the same order
+    # here the stepsizes are for the scaled parameter (e.g. 100*omega_b)
     stepsize = np.zeros(len(parameter_names))
     for index in range(len(parameter_names)):
         stepsize[index] = (matrix[index][index])**0.5
 
-    # Have a security index that prevents looping indefinitely
-    security = 0
-    while not done and security < 10:
-        security += 1
+    fisher_iteration = 0
+    while fisher_iteration < command_line.fisher_it:
+        fisher_iteration += 1
         # Compute the Fisher matrix and the gradient array at the center
         # point.
+        print ("Compute Fisher [iteration %d/%d] with following stepsizes:" % (fisher_iteration,command_line.fisher_it))
+        for index in range(len(parameter_names)):
+            print "%s : %e" % (parameter_names[index],stepsize[index])
         fisher_matrix, gradient = compute_fisher(
             temp_data, cosmo, center, stepsize)
+        if not command_line.silent:
+            print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,command_line.fisher_it))
+        io_mp.write_covariance_matrix(
+            fisher_matrix, parameter_names,
+            os.path.join(command_line.folder, 'fisher'+str(fisher_iteration)+'.mat'))
 
         # Compute inverse of the fisher matrix, catch LinAlgError exception
-        fisher_invert_success = True
         try:
-            if not command_line.silent:
-                print("Fisher matrix computed:")
-                print(fisher_matrix)
-            cov_matrix = np.linalg.inv(fisher_matrix)
+            inv_fisher_matrix = np.linalg.inv(fisher_matrix)
+            io_mp.write_covariance_matrix(
+                inv_fisher_matrix, parameter_names,
+                os.path.join(command_line.folder, 'inv_fisher'+str(fisher_iteration)+'.mat'))
         except np.linalg.LinAlgError:
             raise io_mp.ConfigurationError(
-                "Could not find Fisher matrix, please adjust bestfit and/or input "
+                "Could not find Fisher matrix inverse, please adjust bestfit and/or input "
                 "sigma values (or covmat) or remove the option --fisher and run "
                 "with Metropolis-Hastings or another sampling method.")
-            fisher_invert_success = False
-            done = True
 
-        # Write covmat from fisher matrix to file
-        if fisher_invert_success:
-            io_mp.write_covariance_matrix(
-                cov_matrix, parameter_names,
-                os.path.join(command_line.folder, 'covariance_fisher.covmat'))
+        for index in range(len(parameter_names)):
+            stepsize[index] = (inv_fisher_matrix[index,index])**0.5
 
-            # Check fisher iteration step and write fisher matrix to file
-            file_index = 1
-            while file_index <= command_line.fisher_it:
-                try:
-                    filetest = open(command_line.folder + '/fisher'+str(file_index)+'.mat','r')
-                    filetest.close()
-                    if command_line.cov == None:
-                        warnings.warn("Running in folder with existing fisher matrix, "
-                                      "but no input covmat was provided. Existing fisher "
-                                      "matrix was not used and has been overwritten. "
-                                      "If you wanted to continue iterating on an existing "
-                                      "fisher matrix, provide covmat from fisher matrix "
-                                      "as input and increase iteration number (--fisher-it).")
-                        io_mp.write_covariance_matrix(
-                            fisher_matrix, parameter_names,
-                            os.path.join(command_line.folder, 'fisher'+str(file_index)+'.mat'))
-                        print 'Fisher iteration step %d done' % file_index
-                        break
-                    elif file_index == command_line.fisher_it:
-                        warnings.warn("Running in folder with existing fisher matrix. The existing "
-                                      "fisher matrix \"fisher%d.mat\" has been overwritten. "
-                                      "If you wanted to continue iterating on an existing "
-                                      "fisher matrix, provide covmat from fisher matrix "
-                                      "as input and increase iteration number (--fisher-it)." % file_index)
-                        io_mp.write_covariance_matrix(
-                            fisher_matrix, parameter_names,
-                            os.path.join(command_line.folder, 'fisher'+str(file_index)+'.mat'))
-                        print 'Fisher iteration step %d done' % file_index
-                        break
-                except:
-                    io_mp.write_covariance_matrix(
-                        fisher_matrix, parameter_names,
-                        os.path.join(command_line.folder, 'fisher'+str(file_index)+'.mat'))
-                    print 'Fisher iteration step %d done' % file_index
-                    break
-                file_index += 1
-
-            command_line.cov = os.path.join(
-                command_line.folder, 'covariance_fisher.covmat')
-
-            done = True
-            # Check if the diagonal elements are non-negative
-            for h, elem in enumerate(parameter_names):
-                if cov_matrix[h][h] < 0:
-                    warnings.warn(
-                        "Covariance matrix has negative values on diagonal")
-                    done = False
-                    break
-
-            if not done:
-                raise ValueError("Negative values on diagonal, please use a better bestfit and/or covmat - aborting run")
-
-    # Check if desired number of fisher iterations has been reached.
-    # If True, either exit or start MCMC.
-    if file_index >= command_line.fisher_it:
-        if command_line.start_from_fisher == True:
-            print 'Fisher matrix successfully computed after %d iterations,' % command_line.fisher_it
-            print 'starting MCMC run with covmat from fisher matrix as input.'
-            command_line.fisher = False
-            command_line.start_from_fisher = False
-        else:
-            print 'Fisher matrix successfully computed after %d iterations, exiting.' % command_line.fisher_it
-            exit()
+    # Write the last inverse Fisher matrix as the new covariance matrix
+    io_mp.write_covariance_matrix(
+        inv_fisher_matrix, parameter_names,
+        os.path.join(command_line.folder, 'covariance_fisher.covmat'))
 
     # Load the covmat from computed fisher matrix as the new starting covariance matrix
-    eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)
+    # eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)
 
-    return eigv, eigV, matrix
+    return matrix
 
 
 def accept_step(data):
@@ -670,6 +613,7 @@ def compute_fisher(data, cosmo, center, step_size):
 
 def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
     # JL TODO: add tests: if a point goes beyond the boundary, use single-sided values
+    # note that here everything stands for unscaled parameters (e.g. 100*omega_b)
     # Unwrap
     name_1, diff_1 = one
     if two:
@@ -706,13 +650,47 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
     # It is otherwise a diagonal component
     else:
 
-        data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1
-        data.update_cosmo_arguments()
-        loglike_right = compute_lkl(cosmo, data)
+        #print center[name_1], diff_1
+
+        #data.mcmc_parameters[name_1]['current'] = center[name_1] - 2.*diff_1
+        #data.update_cosmo_arguments()
+        #loglike_left = compute_lkl(cosmo, data)
+
+        #print center[name_1] - 2.*diff_1,-loglike_left
 
         data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1
         data.update_cosmo_arguments()
         loglike_left = compute_lkl(cosmo, data)
+
+        #print center[name_1] - diff_1,-loglike_left
+
+        #data.mcmc_parameters[name_1]['current'] = center[name_1] - 0.5*diff_1
+        #data.update_cosmo_arguments()
+        #loglike_left = compute_lkl(cosmo, data)
+
+        #print center[name_1] - 0.5*diff_1,-loglike_left
+
+        #print center[name_1],-loglike_min
+
+        #data.mcmc_parameters[name_1]['current'] = center[name_1] + 0.5*diff_1
+        #data.update_cosmo_arguments()
+        #loglike_right = compute_lkl(cosmo, data)
+
+        #print center[name_1] + 0.5*diff_1,-loglike_right
+
+        data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1
+        data.update_cosmo_arguments()
+        loglike_right = compute_lkl(cosmo, data)
+
+        #print center[name_1]+diff_1,-loglike_right
+
+        #data.mcmc_parameters[name_1]['current'] = center[name_1] + 2.*diff_1
+        #data.update_cosmo_arguments()
+        #loglike_right = compute_lkl(cosmo, data)
+
+        #print center[name_1] + 2.*diff_1,-loglike_right
+
+        #exit()
 
         data.mcmc_parameters[name_1]['current'] = center[name_1]
         data.update_cosmo_arguments()

@@ -402,6 +402,43 @@ def compute_posterior(information_instances):
     file_name = "_".join(
         [info.basename for info in information_instances])
 
+
+    # JL: READ HERE INVERSE FISHER
+    if info.plot_fisher:
+        try:
+            # read inv_fisher file
+            file_name = os.path.join(info.folder, 'inv_fisher1.mat')
+            n=0
+            with open(file_name, 'r') as f:
+                inv_fisher = np.zeros((len(info.ref_names), len(info.ref_names)), 'float64')
+                for line in f:
+                    if line.find('#') != -1:
+                        fisher_num_param = len(line.split())-1
+                        fisher_indices = np.zeros(fisher_num_param, 'int')
+                        for i in range(fisher_num_param):
+                            fisher_name = line.split()[i+1].replace(',', '')
+                            try:
+                                fisher_indices[i] = info.ref_names.index(fisher_name)
+                                print 'Read fisher matrix entry for parameter ',fisher_name
+                            except:
+                                print 'Input fisher matrix contained unknown parameter ',fisher_name
+                                fisher_indices[i] = -1
+                    else:
+                        if fisher_indices[n] >= 0:
+                            for m in range(fisher_num_param):
+                                if fisher_indices[m] >= 0:
+                                    inv_fisher[fisher_indices[n],fisher_indices[m]]=line.split()[m]
+                        n += 1
+            #print 'Read Fisher matrix:'
+            #print 'param  center  scale  (Fii)^1/2  (Fii)^-1/2'
+            #for i in range(len(info.ref_names)):
+            #    if fisher[i,i] != 0.:
+            #        print info.ref_names[i],info.centers[i],info.scales[i,i],math.sqrt(fisher[i,i]),1./math.sqrt(fisher[i,i])
+            #    else:
+            #        print info.ref_names[i],info.centers[i],' ---'
+        except Warning:
+            warnings.warn("Did not find inv_fisher file %s" % file_name)
+
     # Loop over all the plotted parameters
     # There will be two indices at all time, the one running over the plotted
     # parameters, `index`, and the one corresponding to the actual column in
@@ -478,11 +515,13 @@ def compute_posterior(information_instances):
                 interpolation_factor = float(len(info.interp_grid))/float(len(info.bincenters))
                 # factor for gaussian smoothing
                 sigma = interpolation_factor*info.gaussian_smoothing
+                smoothed_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
+                smoothed_hist = smoothed_hist/smoothed_hist.max()
 
                 if conf.plot_2d:
                     plot = ax2d.plot(
                         info.interp_grid,
-                        scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma),
+                        smoothed_hist,
                         linewidth=info.line_width, ls='-')
                     legends[info.id] = plot[0]
                     ax2d.set_xticks(info.ticks[info.native_index])
@@ -686,6 +725,37 @@ def compute_posterior(information_instances):
                                 "'%s-%s' 2d-plot" % (
                                     info.plotted_parameters[info.native_index],
                                     info.plotted_parameters[info.native_second_index]))
+
+                        # ADDING FISHER CONTOURS
+                        if info.plot_fisher:
+                            sub_inv_fisher = np.zeros((2,2), 'float64')
+                            sub_inv_fisher[0,0] = inv_fisher[info.native_index,info.native_index]
+                            sub_inv_fisher[1,1] = inv_fisher[info.native_second_index,info.native_second_index]
+                            sub_inv_fisher[0,1] = inv_fisher[info.native_index,info.native_second_index]
+                            sub_inv_fisher[1,0] = sub_inv_fisher[0,1]
+                            inv_sub_inv_fisher = np.linalg.inv(sub_inv_fisher)
+
+                            x = scipy.ndimage.zoom(info.x_centers,info.interpolation_smoothing, mode='reflect')
+                            y = scipy.ndimage.zoom(info.y_centers,info.interpolation_smoothing, mode='reflect')
+
+                            z = np.zeros((len(x),len(y)), 'float64')
+
+                            #print info.ref_names[info.native_index]
+                            #print info.scales[info.native_index]
+                            #print info.boundaries[info.native_index]
+                            #print info.centers[info.native_index]
+
+                            for ix in range(len(x)):
+                                dx = (x[ix] - info.centers[info.native_index])
+                                for iy in range(len(y)):
+                                    dy = (y[iy] - info.centers[info.native_second_index])
+                                    z[ix,iy] = dx*inv_sub_inv_fisher[0,0]*dx + dy*inv_sub_inv_fisher[1,1]*dy + 2.*dx*inv_sub_inv_fisher[0,1]*dy
+
+                            ax2dsub.contour(y,x,z,
+                                            extent=info.extent,
+                                            levels=[2.3,6.18],
+                                            #levels=[9.30,15.79],
+                                            zorder=4, colors='k')
 
                         ax2dsub.set_xticks(info.ticks[info.native_second_index])
                         if index == len(plotted_parameters)-1:
@@ -1222,6 +1292,7 @@ def extract_parameter_names(info):
     ref_names = []
     tex_names = []
     scales = []
+    centers = []
     with open(info.param_path, 'r') as param:
         for line in param:
             if line.find('#') == -1:
@@ -1266,6 +1337,10 @@ def extract_parameter_names(info):
                         number = 1./scale
                         tex_names.append(
                             io_mp.get_tex_name(name, number=number))
+
+                        # Read starting values (useful for plotting Fisher)
+                        centers.append(array[0])
+
     scales = np.diag(scales)
 
     info.ref_names = ref_names
@@ -1278,6 +1353,8 @@ def extract_parameter_names(info):
     # plotting purpose only.
     info.number_parameters = len(ref_names)
     info.plotted_parameters = plotted_parameters
+
+    info.centers = centers
 
 
 def find_maximum_of_likelihood(info):
@@ -1618,10 +1695,10 @@ class Information(object):
     # be harcoded
     # Note that, as with the other customisation options, you can specify new
     # values for this in the extra plot_file.
-    cm = ['k','purple','r','g','darkorange','b']
+    cm = ['purple','r','g','darkorange','b','k']
 
     # Define colormaps for the contour plots
-    cmaps = [plt.cm.gray_r, plt.cm.Purples, plt.cm.Reds_r, plt.cm.Greens, plt.cm.Oranges, plt.cm.Blues]
+    cmaps = [plt.cm.Purples, plt.cm.Reds_r, plt.cm.Greens, plt.cm.Oranges, plt.cm.Blues, plt.cm.gray_r]
     alphas = [1.0, 0.8, 0.6, 0.4,0.3,0.2]
 
     def __init__(self, command_line, other=None):

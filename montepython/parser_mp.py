@@ -604,6 +604,10 @@ def create_parser():
         <**>--interpolation-smoothing<**> : float
             <++>interpolation factor for plotting posteriors<++>,
             1 means no interpolation, increase for smoother curves<++>
+        <**>--plot-fisher<**> : None
+            <++>tries to plot Fisher ellipses<++>,
+            if the previous run has produced a Fisher matrix and stored it<++>
+
 
     Returns
     -------
@@ -830,12 +834,15 @@ def create_parser():
     # -- width of gaussian smoothing for plotting posteriors,
     # in units of bin size, increase for smoother data.
     infoparser.add_argument('--gaussian-smoothing', help=helpdict['gaussian-smoothing'],
-                            type=float, default=1.)
+                            type=float, default=0.5)
     # interpolation factor for plotting posteriors, 1 means no interpolation,
     # increase for smoother curves (it means that extra bins are created
     # and interpolated between computed bins)
     infoparser.add_argument('--interpolation-smoothing', help=helpdict['interpolation-smoothing'],
                             type=int, default=4)
+    # -- plot Fisher ellipses
+    infoparser.add_argument('--plot-fisher', help=helpdict['plot-fisher'],
+                           dest='plot_fisher',action='store_true')
 
     return parser
 
