@@ -244,7 +244,7 @@ def convergence(info):
     info.bounds = np.zeros((len(info.ref_names), len(info.levels), 2))
 
     # Circle through all files to find the global maximum of likelihood
-    print '--> Finding global maximum of likelihood'
+    #print '--> Finding global maximum of likelihood'
     find_maximum_of_likelihood(info)
 
     # Restarting the circling through files, this time removing the burnin,
@@ -253,7 +253,7 @@ def convergence(info):
     # explored once the chain moved within min_minus_lkl - LOG_LKL_CUTOFF.
     # If the user asks for a keep_fraction <1, this is also the place where
     # a fraction (1-keep_fraction) is removed at the beginning of each chain.
-    print '--> Removing burn-in'
+    #print '--> Removing burn-in'
     spam = remove_bad_points(info)
 
     info.remap_parameters(spam)
@@ -872,8 +872,8 @@ def minimum_credible_intervals(info):
     bounds = np.zeros((len(levels), 2))
     j = 0
     delta = bincenters[1]-bincenters[0]
-    left_edge = np.max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0)
-    right_edge = np.max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0)
+    left_edge = max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0.)
+    right_edge = max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0.)
     failed = False
     for level in levels:
         norm = float(
