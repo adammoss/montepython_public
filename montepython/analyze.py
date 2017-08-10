@@ -244,7 +244,7 @@ def convergence(info):
     info.bounds = np.zeros((len(info.ref_names), len(info.levels), 2))
 
     # Circle through all files to find the global maximum of likelihood
-    print '--> Finding global maximum of likelihood'
+    #print '--> Finding global maximum of likelihood'
     find_maximum_of_likelihood(info)
 
     # Restarting the circling through files, this time removing the burnin,
@@ -253,7 +253,7 @@ def convergence(info):
     # explored once the chain moved within min_minus_lkl - LOG_LKL_CUTOFF.
     # If the user asks for a keep_fraction <1, this is also the place where
     # a fraction (1-keep_fraction) is removed at the beginning of each chain.
-    print '--> Removing burn-in'
+    #print '--> Removing burn-in'
     spam = remove_bad_points(info)
 
     info.remap_parameters(spam)
@@ -498,10 +498,11 @@ def compute_posterior(information_instances):
                 # Correct for temperature
                 info.hist = info.hist**conf.temperature
 
+                info.hist = info.hist/info.hist.max()
+
                 # interpolated histogram (if available)
                 info.interp_hist, info.interp_grid = cubic_interpolation(
                     info, info.hist, info.bincenters)
-                info.interp_hist /= np.max(info.interp_hist)
 
                 # minimum credible interval (method by Jan Haman). Fails for
                 # multimodal histograms #FIXME
@@ -588,11 +589,13 @@ def compute_posterior(information_instances):
                                info.x_range[info.native_index][1],
                                0, 1.05])
 
+                    smoothed_interp_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
+                    smoothed_interp_hist = smoothed_interp_hist/smoothed_interp_hist.max()
 
                     ax1d.plot(
                         info.interp_grid,
                         # gaussian filtered 1d posterior:
-                        scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma),
+                        smoothed_interp_hist,
                         # raw 1d posterior:
                         #info.interp_hist,
                         lw=info.line_width, ls='-')
@@ -613,6 +616,7 @@ def compute_posterior(information_instances):
                             normed=False,
                             weights=np.exp(
                                 conf.min_minus_lkl-info.chain[:, 1])*info.chain[:, 0])
+
 
                         lkl_mean /= lkl_mean.max()
                         interp_lkl_mean, interp_grid = cubic_interpolation(
@@ -872,8 +876,8 @@ def minimum_credible_intervals(info):
     bounds = np.zeros((len(levels), 2))
     j = 0
     delta = bincenters[1]-bincenters[0]
-    left_edge = np.max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0)
-    right_edge = np.max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0)
+    left_edge = max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0.)
+    right_edge = max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0.)
     failed = False
     for level in levels:
         norm = float(
@@ -1012,6 +1016,7 @@ def cubic_interpolation(info, hist, bincenters):
 
             # prepare the interpolation (before gaussian smoothing that will be done later):
             f = UnivariateSpline(bincenters, hist,
+                                 s=0,
                                  bbox=[interp_grid[0],interp_grid[-1]])
 
         # if it does not work, simple interpolation between bin centers
