@@ -377,7 +377,10 @@ def compute_posterior(information_instances):
             " wrong parameters names in the '--extra' file.")
     # Find the appropriate number of columns and lines for the 1d posterior
     # plot
-    num_columns = int(round(math.sqrt(len(plotted_parameters))))
+    if  conf.num_columns_1d == None:
+        num_columns = int(round(math.sqrt(len(plotted_parameters))))
+    else:
+        num_columns = conf.num_columns_1d
     num_lines = int(math.ceil(len(plotted_parameters)*1.0/num_columns))
 
     # For special needs, you can impose here a different number of columns and lines in the 1d plot
@@ -467,11 +470,9 @@ def compute_posterior(information_instances):
                 len(plotted_parameters),
                 index*(len(plotted_parameters)+1)+1,
                 yticks=[])
-            ax2d.set_color_cycle(conf.cm)
         if conf.plot:
             ax1d = fig1d.add_subplot(
                 num_lines, num_columns, index+1, yticks=[])
-            ax1d.set_color_cycle(conf.cm)
 
         # check for each instance if the name is part of the list of plotted
         # parameters, and if yes, store the native_index. If not, store a flag
@@ -545,7 +546,12 @@ def compute_posterior(information_instances):
                     plot = ax2d.plot(
                         info.interp_grid,
                         smoothed_interp_hist,
-                        linewidth=info.line_width, ls='-')
+                        linewidth=info.line_width, ls='-',
+                        color = info.cmaps[info.id](0.66),
+                        # the 0.66 adjusts the color of the lines to those of the 68% contours.
+                        # you could use 0.33 to get the color of the 95% contours,
+                        # or 0.5 to get something in between.
+                        alpha = info.alphas[info.id])
 
                     legends[info.id] = plot[0]
                     ax2d.set_xticks(info.ticks[info.native_index])
@@ -570,6 +576,7 @@ def compute_posterior(information_instances):
                                 ['%.{0}g'.format(info.decimal) % s
                                  for s in info.ticks[info.native_index]],
                                 fontsize=info.ticksize)
+                            ax2d.tick_params('x',direction='inout')
                             ax2d.set_xlabel(
                                 info.tex_names[info.native_index],
                                 fontsize=info.fontsize)
@@ -580,18 +587,24 @@ def compute_posterior(information_instances):
                                0, 1.05])
 
                 if conf.plot:
-                    # Note the use of double curly brackets {{ }} to produce
-                    # the desired LaTeX output. This is necessary because the
-                    # format function would otherwise understand single
-                    # brackets as fields.
-                    ax1d.set_title(
-                        '%s=$%.{0}g^{{+%.{0}g}}_{{%.{0}g}}$'.format(
-                            info.decimal) % (
-                            info.tex_names[info.native_index],
-                            info.mean[info.native_index],
-                            info.bounds[info.native_index, 0, -1],
-                            info.bounds[info.native_index, 0, 0]),
-                        fontsize=info.fontsize)
+                    if conf.short_title_1d:
+                        ax1d.set_title(
+                            '%s'.format(info.decimal) % (
+                                    info.tex_names[info.native_index]),
+                            fontsize=info.fontsize)
+                    else:
+                        # Note the use of double curly brackets {{ }} to produce
+                        # the desired LaTeX output. This is necessary because the
+                        # format function would otherwise understand single
+                        # brackets as fields.
+                        ax1d.set_title(
+                            '%s=$%.{0}g^{{+%.{0}g}}_{{%.{0}g}}$'.format(
+                                info.decimal) % (
+                                    info.tex_names[info.native_index],
+                                    info.mean[info.native_index],
+                                    info.bounds[info.native_index, 0, -1],
+                                    info.bounds[info.native_index, 0, 0]),
+                            fontsize=info.fontsize)
 
                     # JL: example of customisation commands
                     # (in this example: change label and plot vertical lines)
@@ -621,14 +634,16 @@ def compute_posterior(information_instances):
                         smoothed_interp_hist,
                         # raw 1d posterior:
                         #info.interp_hist,
-                        lw=info.line_width, ls='-')
+                        lw=info.line_width, ls='-',
+                        color = info.cmaps[info.id](0.5),
+                        alpha = info.alphas[info.id])
+                    # uncopmment if you want to see the raw point sfrom the histogram
+                    # (to check whether the inteprolation and smoothing generated artefacts)
+                    #ax1d.plot(
+                    #    info.bincenters,
+                    #    info.hist,
+                    #    'ro')
 
-        # mean likelihood (optional, if comparison, it will not be printed)
-        # The color cycle has to be reset, before
-        if conf.plot_2d:
-            ax2d.set_color_cycle(conf.cm)
-        if conf.plot:
-            ax1d.set_color_cycle(conf.cm)
         if conf.mean_likelihood:
             for info in information_instances:
                 if not info.ignore_param:
@@ -670,14 +685,18 @@ def compute_posterior(information_instances):
                         ########################################################
                         if conf.plot_2d:
                             ax2d.plot(interp_grid, smoothed_interp_lkl_mean,
-                                      ls='--', lw=conf.line_width)
+                                      ls='--', lw=conf.line_width,
+                                      color = info.cmaps[info.id](0.5),
+                                      alpha = info.alphas[info.id])
 
                         ########################################################
                         # plot 1D mean likelihood in 1D plot                   #
                         ########################################################
                         if conf.plot:
                             ax1d.plot(interp_grid, smoothed_interp_lkl_mean,
-                                      ls='--', lw=conf.line_width)
+                                      ls='--', lw=conf.line_width,
+                                      color = info.cmaps[info.id](0.5),
+                                      alpha = info.alphas[info.id])
 
                     except:
                         print 'could not find likelihood contour for ',
@@ -782,7 +801,9 @@ def compute_posterior(information_instances):
                                     extent=info.extent, levels=ctr_level(
                                         interp_smoothed_likelihood,
                                         info.levels[:2]),
-                                    zorder=4, colors=info.cm[info.id],
+                                    zorder=4,
+                                    colors = info.cmaps[info.id](0.5),
+                                    alpha = info.alphas[info.id],
                                     linewidths=info.line_width)
 
                             ###########################
@@ -793,10 +814,12 @@ def compute_posterior(information_instances):
                                     interp_y_centers,
                                     interp_x_centers,
                                     interp_smoothed_likelihood,
-                                    extent=info.extent, levels=ctr_level(
+                                    extent=info.extent,
+                                    levels=ctr_level(
                                         interp_smoothed_likelihood,
                                         info.levels[:2]),
-                                    zorder=4, cmap=info.cmaps[info.id],
+                                    zorder=4,
+                                    cmap=info.cmaps[info.id],
                                     alpha=info.alphas[info.id])
 
                         except Warning:
@@ -838,6 +861,8 @@ def compute_posterior(information_instances):
                                             zorder=4, colors='k')
 
                         ax2dsub.set_xticks(info.ticks[info.native_second_index])
+                        ax2dsub.set_yticks(info.ticks[info.native_index])
+                        ax2dsub.tick_params('both',direction='inout',top=True,bottom=True,left=True,right=True)
                         if index == len(plotted_parameters)-1:
                             ax2dsub.set_xticklabels(
                                 ['%.{0}g'.format(info.decimal) % s for s in
@@ -901,27 +926,54 @@ def compute_posterior(information_instances):
         print '--> Saving figures to .{0} files'.format(info.extension)
         plot_name = '-vs-'.join([os.path.split(elem.folder)[-1]
                                 for elem in information_instances])
+
         if conf.plot_2d:
-            if len(legends) > 1:
+            # Legend of triangle plot
+            if ((conf.plot_legend_2d == None) and (len(legends) > 1)) or (conf.plot_legend_2d == True):
+                # Create a virtual subplot in the top right corner,
+                # just to be able to anchor the legend nicely
+                ax2d = fig2d.add_subplot(
+                    len(plotted_parameters),
+                    len(plotted_parameters),
+                    len(plotted_parameters),
+                    )
+                ax2d.axis('off')
                 try:
-                    fig2d.legend(legends, legend_names, 'upper right',
+                    ax2d.legend(legends, legend_names,
+                                 loc='upper right',
+                                 borderaxespad=0.,
                                  fontsize=info.legendsize)
                 except TypeError:
-                    fig2d.legend(legends, legend_names, 'upper right',
+                    ax2d.legend(legends, legend_names,
+                                 loc='upper right',
+                                 borderaxespad=0.,
                                  prop={'fontsize': info.legendsize})
-            fig2d.tight_layout()
+            fig2d.subplots_adjust(wspace=0, hspace=0)
             fig2d.savefig(
                 os.path.join(
                     conf.folder, 'plots', '{0}_triangle.{1}'.format(
                         plot_name, info.extension)),
-                bbox_inches=0, )
+                bbox_inches='tight')
+        # Legend of 1D plot
         if conf.plot:
+            if ((conf.plot_legend_1d == None) and (len(legends) > 1)) or (conf.plot_legend_1d == True):
+                # no space left: add legend to thr right
+                if len(plotted_parameters)<num_columns*num_lines:
+                    fig1d.legend(legends, legend_names,
+                                 loc= ((num_columns-0.9)/num_columns,0.1/num_columns),
+                                 fontsize=info.legendsize)
+                # space left in lower right part: add legend there
+                else:
+                    fig1d.legend(legends, legend_names,
+                                 loc= 'center right',
+                                 bbox_to_anchor = (1.2,0.5),
+                                 fontsize=info.legendsize)
             fig1d.tight_layout()
             fig1d.savefig(
                 os.path.join(
                     conf.folder, 'plots', '{0}_1d.{1}'.format(
                         plot_name, info.extension)),
-                bbox_inches=0)
+                bbox_inches='tight')
 
 
 def ctr_level(histogram2d, lvl, infinite=False):
@@ -1775,16 +1827,16 @@ class Information(object):
     # Flag checking the absence or presence of the interp1d function
     has_interpolate_module = False
 
-    # Global colormap for the 1d plots. Colours will get chosen from this.
+    # Obsolete: Global colormap for the 1d plots. Colours will get chosen from this.
     # Some old versions of matplotlib do not have CMRmap, so the colours will
     # be harcoded
     # Note that, as with the other customisation options, you can specify new
     # values for this in the extra plot_file.
-    cm = ['purple','r','g','darkorange','b','k']
+    #cm = ['k','purple','r','g','darkorange','b']
 
-    # Define colormaps for the contour plots
-    cmaps = [plt.cm.Purples, plt.cm.Reds_r, plt.cm.Greens, plt.cm.Oranges, plt.cm.Blues, plt.cm.gray_r]
-    alphas = [1.0, 0.8, 0.6, 0.4,0.3,0.2]
+    # Define default colormaps and transparencies for the contour plots
+    cmaps = [plt.cm.Reds, plt.cm.Blues, plt.cm.Greens, plt.cm.Greys, plt.cm.Purples, plt.cm.Oranges]
+    alphas = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5]
 
     def __init__(self, command_line, other=None):
         """
@@ -1818,6 +1870,7 @@ class Information(object):
         name, and the value its scale.
 
         """
+
         # Assign a unique id to this instance
         self.id = self._ids.next()
 
@@ -1835,17 +1888,23 @@ class Information(object):
             if elem.find('__') == -1:
                 setattr(self, elem, getattr(command_line, elem))
 
+        # initialise the legend flags
+        self.plot_legend_1d = None
+        self.plot_legend_2d = None
+
         # initialize the legend size to be the same as fontsize, but can be
         # altered in the extra file
         self.legendsize = self.fontsize
         self.legendnames = []
+
+        cmaps = [plt.cm.Reds, plt.cm.Blues, plt.cm.Greens, plt.cm.Purples, plt.cm.Oranges, plt.cm.Greys]
 
         # Read a potential file describing changes to be done for the parameter
         # names, and number of paramaters plotted (can be let empty, all will
         # then be plotted), but also the style of the plot. Note that this
         # overrides the command line options
         if command_line.optional_plot_file:
-            plot_file_vars = {'info': self}
+            plot_file_vars = {'info': self,'plt': plt}
             execfile(command_line.optional_plot_file, plot_file_vars)
 
         # check and store keep_fraction
