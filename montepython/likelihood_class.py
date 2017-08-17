@@ -2010,7 +2010,7 @@ class Likelihood_mpk(Likelihood):
                     existing_fid = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
                     print 'Fiducial deviations, near, mid far:', np.sum(existing_fid[:,1] - fidNEAR),np.sum(existing_fid[:,2] - fidMID), np.sum(existing_fid[:,3] - fidFAR)
                     if np.sum(existing_fid[:,1] - fidNEAR) < 10**-5:
-                        self.create_fid == False
+                        self.create_fid = False
                 except:
                     pass
                 if self.create_fid == True:
