@@ -547,10 +547,9 @@ def compute_posterior(information_instances):
                         info.interp_grid,
                         smoothed_interp_hist,
                         linewidth=info.line_width, ls='-',
-                        color = info.cmaps[info.id](0.66),
-                        # the 0.66 adjusts the color of the lines to those of the 68% contours.
-                        # you could use 0.33 to get the color of the 95% contours,
-                        # or 0.5 to get something in between.
+                        color = info.MP_color_cycle[info.id][1],
+                        # the [1] picks up the color of the 68% contours
+                        # with [0] you would get that of the 95% contours
                         alpha = info.alphas[info.id])
 
                     legends[info.id] = plot[0]
@@ -606,16 +605,6 @@ def compute_posterior(information_instances):
                                     info.bounds[info.native_index, 0, 0]),
                             fontsize=info.fontsize)
 
-                    # JL: example of customisation commands
-                    # (in this example: change label and plot vertical lines)
-                    # At some point these types of commands will be made available from
-                    # the customisation input files in plot_file/
-                    #ax1d.set_title(r'$M_{\nu}  (eV)$',fontsize=info.fontsize)
-                    #ax1d.axvline(x=0.058536,linestyle='-',color='k')
-                    #ax1d.axvline(x=0.098993,linestyle='-',color='k')
-                    #ax1d.axvline(x=0.06,linestyle='--',color='k')
-                    #ax1d.axvline(x=0.10,linestyle='--',color='k')
-
                     ax1d.set_xticks(info.ticks[info.native_index])
                     ax1d.set_xticklabels(
                         ['%.{0}g'.format(info.decimal) % s
@@ -624,6 +613,11 @@ def compute_posterior(information_instances):
                     ax1d.axis([info.x_range[info.native_index][0],
                                info.x_range[info.native_index][1],
                                0, 1.05])
+
+                    # Execute some customisation scripts for the 1d plots
+                    if (info.custom1d != []):
+                        for elem in info.custom1d:
+                            execfile('plot_files/'+elem)
 
                     ##################################################
                     # plot 1D posterior in 1D plot                   #
@@ -635,7 +629,9 @@ def compute_posterior(information_instances):
                         # raw 1d posterior:
                         #info.interp_hist,
                         lw=info.line_width, ls='-',
-                        color = info.cmaps[info.id](0.5),
+                        color = info.MP_color_cycle[info.id][1],
+                        # the [1] picks up the color of the 68% contours
+                        # with [0] you would get that of the 95% contours
                         alpha = info.alphas[info.id])
                     # uncopmment if you want to see the raw point sfrom the histogram
                     # (to check whether the inteprolation and smoothing generated artefacts)
@@ -680,13 +676,18 @@ def compute_posterior(information_instances):
                         # re-normalised
                         smoothed_interp_lkl_mean = smoothed_interp_lkl_mean/smoothed_interp_lkl_mean.max()
 
+                        # Execute some customisation scripts for the 1d plots
+                        if (info.custom1d != []):
+                            for elem in info.custom1d:
+                                execfile('plot_files/'+elem)
+
                         ########################################################
                         # plot 1D mean likelihood in diagonal of triangle plot #
                         ########################################################
                         if conf.plot_2d:
                             ax2d.plot(interp_grid, smoothed_interp_lkl_mean,
                                       ls='--', lw=conf.line_width,
-                                      color = info.cmaps[info.id](0.5),
+                                      color = info.MP_color_cycle[info.id][1],
                                       alpha = info.alphas[info.id])
 
                         ########################################################
@@ -695,7 +696,7 @@ def compute_posterior(information_instances):
                         if conf.plot:
                             ax1d.plot(interp_grid, smoothed_interp_lkl_mean,
                                       ls='--', lw=conf.line_width,
-                                      color = info.cmaps[info.id](0.5),
+                                      color = info.MP_color_cycle[info.id][1],
                                       alpha = info.alphas[info.id])
 
                     except:
@@ -741,10 +742,18 @@ def compute_posterior(information_instances):
                             info.has_second_param = False
                     else:
                         info.has_second_param = False
+
                 ax2dsub = fig2d.add_subplot(
                     len(plotted_parameters),
                     len(plotted_parameters),
                     (index)*len(plotted_parameters)+second_index+1)
+
+                if info.has_second_param:
+                    ax2dsub.axis([info.x_range[info.native_second_index][0],
+                                  info.x_range[info.native_second_index][1],
+                                  info.x_range[info.native_index][0],
+                                  info.x_range[info.native_index][1]])
+
                 for info in information_instances:
                     if info.has_second_param:
 
@@ -785,10 +794,46 @@ def compute_posterior(information_instances):
                         sigma = info.interpolation_smoothing*info.gaussian_smoothing
                         interp_smoothed_likelihood = scipy.ndimage.filters.gaussian_filter(interp_likelihood,[sigma,sigma], mode='reflect')
 
+                        # Execute some customisation scripts for the 2d contour plots
+                        if (info.custom2d != []):
+                           for elem in info.custom2d:
+                               execfile('plot_files/'+elem)
+
                         # plotting contours, using the ctr_level method (from Karim
                         # Benabed). Note that only the 1 and 2 sigma contours are
                         # displayed (due to the line with info.levels[:2])
                         try:
+
+                            ###########################
+                            # plot 2D filled contours #
+                            ###########################
+                            if not info.contours_only:
+                                contours = ax2dsub.contourf(
+                                    interp_y_centers,
+                                    interp_x_centers,
+                                    interp_smoothed_likelihood,
+                                    extent=info.extent,
+                                    levels=ctr_level(
+                                        interp_smoothed_likelihood,
+                                        info.levels[:2]),
+                                    zorder=4,
+                                    colors = info.MP_color_cycle[info.id],
+                                    alpha=info.alphas[info.id])
+
+                                # now add a thin darker line
+                                # around the 95% contour
+                                ax2dsub.contour(
+                                    interp_y_centers,
+                                    interp_x_centers,
+                                    interp_smoothed_likelihood,
+                                    extent=info.extent,
+                                    levels=ctr_level(
+                                        interp_smoothed_likelihood,
+                                        info.levels[1:2]),
+                                    zorder=4,
+                                    colors = info.MP_color_cycle[info.id][1],
+                                    alpha = info.alphas[info.id],
+                                    linewidths=1)
 
                             ###########################
                             # plot 2D contours        #
@@ -802,25 +847,9 @@ def compute_posterior(information_instances):
                                         interp_smoothed_likelihood,
                                         info.levels[:2]),
                                     zorder=4,
-                                    colors = info.cmaps[info.id](0.5),
+                                    colors = info.MP_color_cycle[info.id],
                                     alpha = info.alphas[info.id],
                                     linewidths=info.line_width)
-
-                            ###########################
-                            # plot 2D filled contours #
-                            ###########################
-                            else:
-                                contours = ax2dsub.contourf(
-                                    interp_y_centers,
-                                    interp_x_centers,
-                                    interp_smoothed_likelihood,
-                                    extent=info.extent,
-                                    levels=ctr_level(
-                                        interp_smoothed_likelihood,
-                                        info.levels[:2]),
-                                    zorder=4,
-                                    cmap=info.cmaps[info.id],
-                                    alpha=info.alphas[info.id])
 
                         except Warning:
                             warnings.warn(
@@ -1827,16 +1856,30 @@ class Information(object):
     # Flag checking the absence or presence of the interp1d function
     has_interpolate_module = False
 
-    # Obsolete: Global colormap for the 1d plots. Colours will get chosen from this.
-    # Some old versions of matplotlib do not have CMRmap, so the colours will
-    # be harcoded
+    # Actual pairs of colors used by MP.
+    # For each pair, the first color is for the 95% contour,
+    # and the second for the 68% contour + the 1d probability.
     # Note that, as with the other customisation options, you can specify new
     # values for this in the extra plot_file.
-    #cm = ['k','purple','r','g','darkorange','b']
-
-    # Define default colormaps and transparencies for the contour plots
-    cmaps = [plt.cm.Reds, plt.cm.Blues, plt.cm.Greens, plt.cm.Greys, plt.cm.Purples, plt.cm.Oranges]
-    alphas = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5]
+    MP_color = {
+        'Red':['#E37C80','#CE121F'],
+        'Blue':['#7A98F6','#1157EF'],
+        'Green':['#88B27A','#297C09'],
+        'Orange':['#F3BE82','#ED920F'],
+        'Grey':['#ABABAB','#737373'],
+        'Purple':['#B87294','#88004C']
+    }
+    # order used when several directories are analysed
+    MP_color_cycle = [
+        MP_color['Red'],
+        MP_color['Blue'],
+        MP_color['Green'],
+        MP_color['Orange'],
+        MP_color['Grey'],
+        MP_color['Purple']
+    ]
+    # in the same order, list of transparency levels
+    alphas = [0.9, 0.9, 0.9, 0.9, 0.9, 0.9]
 
     def __init__(self, command_line, other=None):
         """
@@ -1897,7 +1940,9 @@ class Information(object):
         self.legendsize = self.fontsize
         self.legendnames = []
 
-        cmaps = [plt.cm.Reds, plt.cm.Blues, plt.cm.Greens, plt.cm.Purples, plt.cm.Oranges, plt.cm.Greys]
+        # initialize the customisation script flags
+        self.custom1d = []
+        self.custom2d = []
 
         # Read a potential file describing changes to be done for the parameter
         # names, and number of paramaters plotted (can be let empty, all will
