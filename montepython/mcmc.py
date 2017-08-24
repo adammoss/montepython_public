@@ -492,8 +492,8 @@ def chain(cosmo, data, command_line):
                     # By B. Schroer and T. Brinckmann
 
                     c_array[(k-1)%100] = data.jumping_factor
-                    # Start adapting the jumping factor after command_line.superupdate steps
-                    if (k > updated_steps + command_line.superupdate) and not stop_c:
+                    # Start adapting the jumping factor after command_line.superupdate steps if R-1 < 10
+                    if (k > updated_steps + command_line.superupdate) and (max(R_minus_one) < 10) and not stop_c:
                         c = data.jumping_factor**2/len(parameter_names)
                         # To avoid getting trapped in local minima, the jumping factor should
                         # not go below 0.1 (arbitrary) times the starting jumping factor.
@@ -534,7 +534,6 @@ def chain(cosmo, data, command_line):
                         # Test here whether the covariance matrix has really changed
                         # We should in principle test all terms, but testing the first one should suffice
                         if not C[0,0] == previous[2][0,0]:
-                            previous = (sigma_eig, U, C, Cholesky)
                             if k == 1:
                                 if not command_line.silent:
                                     if not input_covmat == None:
@@ -553,6 +552,14 @@ def chain(cosmo, data, command_line):
                                     # Save the step number after it updated for superupdate and start adaption of c again
 				    updated_steps = k
 				    stop_c = False
+                                    cov_det = np.linalg.det(C)
+                                    prev_cov_det = np.linalg.det(previous[2])
+                                    # Rescale jumping factor
+                                    new_jumping_factor = data.jumping_factor * (prev_cov_det/cov_det)**(1./(2 * len(parameter_names)))
+                                    data.out.write('# After %d accepted steps: rescaled jumping factor from %f to %f, due to updated covariance matrix \n' % (int(acc), data.jumping_factor, new_jumping_factor))
+                                    if not command_line.silent:
+                                        print 'After %d accepted steps: rescaled jumping factor from %f to %f, due to updated covariance matrix \n' % (int(acc), data.jumping_factor, new_jumping_factor)
+                                    data.jumping_factor = new_jumping_factor
 
                                 # Write to chains file when the covmat was updated
                                 data.out.write('# After %d accepted steps: update proposal with max(R-1) = %f and jumping factor = %f \n' % (int(acc), max(R_minus_one), data.jumping_factor))
@@ -565,6 +572,7 @@ def chain(cosmo, data, command_line):
                                 except:
                                     pass
 
+                            previous = (sigma_eig, U, C, Cholesky)
                     except:
                         pass
 
