@@ -2301,6 +2301,7 @@ class Likelihood_mpk(Likelihood):
         cosmo.empty()
         data.cosmo_arguments = param_backup
         cosmo.set(data.cosmo_arguments)
+        cosmo.compute(['lensing'])
 
         return fidnlratio, fidNEAR, fidMID, fidFAR
 
