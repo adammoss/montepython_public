@@ -1678,7 +1678,7 @@ def remove_bad_points(info):
 
             # Remove fixed fraction as requested by user (usually not useful if non-markovian is also removed)
             if info.keep_fraction < 1:
-                start = start + (1-info.keep_fraction)*(line_count - start)
+                start = start + int((1.-info.keep_fraction)*(line_count - start))
 
             print ": Removed",
             if info.markovian:
