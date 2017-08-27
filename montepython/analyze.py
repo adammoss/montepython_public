@@ -486,9 +486,22 @@ def compute_posterior(information_instances):
             except ValueError:
                 info.ignore_param = True
 
-        adjust_ticks(name, information_instances)
+        # The limits might have been enforced by the user
+        if name in conf.force_limits.iterkeys():
+            x_span = conf.force_limits[name][1]-conf.force_limits[name][0]
+            tick_min = conf.force_limits[name][0] +0.1*x_span
+            tick_max = conf.force_limits[name][1] -0.1*x_span
+            ticks = np.linspace(tick_min,
+                                tick_max,
+                                info.ticknumber)
+            for info in information_instances:
+                if not info.ignore_param:
+                    info.x_range[info.native_index] = conf.force_limits[name]
+                    info.ticks[info.native_index] = ticks
+        # otherwise, find them automatically
+        else:
+            adjust_ticks(name, information_instances)
 
-        # normalized histogram
         print ' -> Computing histograms for ', name
         for info in information_instances:
             if not info.ignore_param:
@@ -748,18 +761,13 @@ def compute_posterior(information_instances):
                     len(plotted_parameters),
                     (index)*len(plotted_parameters)+second_index+1)
 
-                if info.has_second_param:
-                    ax2dsub.axis([info.x_range[info.native_second_index][0],
-                                  info.x_range[info.native_second_index][1],
-                                  info.x_range[info.native_index][0],
-                                  info.x_range[info.native_index][1]])
-                else:
-                    # when the second parameter is absent, empty square with no ticks:
-                    ax2dsub.set_xticks([])
-                    ax2dsub.set_yticks([])
-
                 for info in information_instances:
                     if info.has_second_param:
+
+                        ax2dsub.axis([info.x_range[info.native_second_index][0],
+                                      info.x_range[info.native_second_index][1],
+                                      info.x_range[info.native_index][0],
+                                      info.x_range[info.native_index][1]])
 
                         # 2D likelihood (first step)
                         #
@@ -1499,9 +1507,11 @@ def extract_parameter_names(info):
                         ref_names.append(name)
                         # Take care of the scales
                         scale = array[4]
+                        rescale = 1.
                         if name in info.new_scales.iterkeys():
                             scale = info.new_scales[name]
-                        scales.append(scale)
+                            rescale = info.new_scales[name]/array[4]
+                        scales.append(rescale)
 
                         # Given the scale, decide for the pretty tex name
                         number = 1./scale
@@ -1678,7 +1688,7 @@ def remove_bad_points(info):
 
             # Remove fixed fraction as requested by user (usually not useful if non-markovian is also removed)
             if info.keep_fraction < 1:
-                start = start + (1-info.keep_fraction)*(line_count - start)
+                start = start + int((1.-info.keep_fraction)*(line_count - start))
 
             print ": Removed",
             if info.markovian:
@@ -1796,6 +1806,7 @@ def adjust_ticks(param, information_instances):
     # The new x_range and tick should min/max all the existing ones
     new_x_range = np.array(
         [min([e[0] for e in x_ranges]), max([e[1] for e in x_ranges])])
+
     temp_ticks = np.array(
         [min([e[0] for e in ticks]), max([e[-1] for e in ticks])])
 
@@ -1947,6 +1958,9 @@ class Information(object):
         # initialize the customisation script flags
         self.custom1d = []
         self.custom2d = []
+
+        # initialise the dictionary enmforcing limit
+        self.force_limits = {}
 
         # Read a potential file describing changes to be done for the parameter
         # names, and number of paramaters plotted (can be let empty, all will
