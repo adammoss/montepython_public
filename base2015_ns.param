@@ -33,31 +33,31 @@ data.over_sampling=[1, 4]
 
 # Cosmological parameters list
 
-data.parameters['omega_b']      = [2.249,  1.8, 3, 0.016, 0.01, 'cosmo'] 
-data.parameters['omega_cdm']    = [0.1120, 0.1,   0.2, 0.0016,1,'cosmo'] 
-data.parameters['100*theta_s']  = [0.963,  0.9,1.1, 0.004, 1,   'cosmo'] 
-data.parameters['ln10^{10}A_s'] = [2.42,   1.8,3, 0.038, 1e-9,  'cosmo'] 
-data.parameters['n_s']          = [0.703,  0.6,0.8, 0.0065,1,   'cosmo'] 
-data.parameters['tau_reio']     = [0.085,  0.04,0.12, 0.0044,1, 'cosmo'] 
+data.parameters['omega_b']      = [ 2.249,    2.1,   2.3,  0.016,  0.01, 'cosmo']
+data.parameters['omega_cdm']    = [0.1120,   0.11,  0.12, 0.0016,     1, 'cosmo']
+data.parameters['100*theta_s']  = [  1.04,   1.03,  1.05,  0.004,     1, 'cosmo']
+data.parameters['ln10^{10}A_s'] = [ 3.089,   2.98,   3.2,  0.038,  1e-9, 'cosmo']
+data.parameters['n_s']          = [0.9655,   0.94,  0.98, 0.0065,     1, 'cosmo']
+data.parameters['tau_reio']     = [  0.07,  0.004, 0.135, 0.0044,     1, 'cosmo']
 
 # Nuisance parameter list, same call, except the name does not have to be a class name
 
-data.parameters['A_cib_217']         = [     61,    0,  200,     7,     1,'nuisance']   
-data.parameters['cib_index']         = [   -1.3, -1.3, -1.3,     0,     1,'nuisance']   
-data.parameters['xi_sz_cib']         = [   0.13,    0,    1,   0.3,     1,'nuisance']	 
-data.parameters['A_sz']              = [   6.86,    0,   10,   1.9,     1,'nuisance'] 			      
-data.parameters['ps_A_100_100']      = [  222.9,    0,  400,    30,     1,'nuisance'] 			      
-data.parameters['ps_A_143_143']      = [     38,    0,  400,     8,     1,'nuisance'] 			      
-data.parameters['ps_A_143_217']      = [   35.2,    0,  400,    10,     1,'nuisance'] 			      
-data.parameters['ps_A_217_217']      = [  102.6,    0,  400,    11,     1,'nuisance'] 			      
-data.parameters['ksz_norm']          = [      0,    0,   10,   4.2,     1,'nuisance'] 			      
-data.parameters['gal545_A_100']      = [   6.75,    0,   50,   1.8,     1,'nuisance']   
-data.parameters['gal545_A_143']      = [   9.41,    0,   50,   1.8,     1,'nuisance']   
-data.parameters['gal545_A_143_217']  = [  19.28,    0,  100,   4.2,     1,'nuisance']   
-data.parameters['gal545_A_217']      = [   81.7,    0,  400,   7.9,     1,'nuisance']   
-data.parameters['calib_100T']        = [ 998.59,    0, 3000,  0.73, 0.001,'nuisance']  
-data.parameters['calib_217T']        = [ 995.89,    0, 3000,   1.4, 0.001,'nuisance']  
-data.parameters['A_planck']          = [100.028,   90,  110,  0.25,  0.01,'nuisance']  
+data.parameters['A_cib_217']         = [     61,    0,  200,     7,     1,'nuisance']
+data.parameters['cib_index']         = [   -1.3, -1.3, -1.3,     0,     1,'nuisance']
+data.parameters['xi_sz_cib']         = [   0.13,    0,    1,   0.3,     1,'nuisance']
+data.parameters['A_sz']              = [   6.86,    0,   10,   1.9,     1,'nuisance']
+data.parameters['ps_A_100_100']      = [  222.9,    0,  400,    30,     1,'nuisance']
+data.parameters['ps_A_143_143']      = [     38,    0,  400,     8,     1,'nuisance']
+data.parameters['ps_A_143_217']      = [   35.2,    0,  400,    10,     1,'nuisance']
+data.parameters['ps_A_217_217']      = [  102.6,    0,  400,    11,     1,'nuisance']
+data.parameters['ksz_norm']          = [      0,    0,   10,   4.2,     1,'nuisance']
+data.parameters['gal545_A_100']      = [   6.75,    0,   50,   1.8,     1,'nuisance']
+data.parameters['gal545_A_143']      = [   9.41,    0,   50,   1.8,     1,'nuisance']
+data.parameters['gal545_A_143_217']  = [  19.28,    0,  100,   4.2,     1,'nuisance']
+data.parameters['gal545_A_217']      = [   81.7,    0,  400,   7.9,     1,'nuisance']
+data.parameters['calib_100T']        = [ 998.59,    0, 3000,  0.73, 0.001,'nuisance']
+data.parameters['calib_217T']        = [ 995.89,    0, 3000,   1.4, 0.001,'nuisance']
+data.parameters['A_planck']          = [100.028,   90,  110,  0.25,  0.01,'nuisance']
 
 # Derived parameters
 
@@ -82,7 +82,7 @@ data.cosmo_arguments['N_ncdm'] = 1
 data.cosmo_arguments['m_ncdm'] = 0.06
 data.cosmo_arguments['T_ncdm'] = 0.71611
 
-# These two are required to get sigma8 as a derived parameter 
+# These two are required to get sigma8 as a derived parameter
 # (class must compute the P(k) until sufficient k)
 data.cosmo_arguments['output'] = 'mPk'
 data.cosmo_arguments['P_k_max_h/Mpc'] = 1.
