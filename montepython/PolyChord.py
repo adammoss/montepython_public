@@ -236,7 +236,7 @@ def initialise(cosmo, data, command_line):
     data.PC_arguments['base_dir'] = PC_folder
     data.PC_arguments['grade_dims'] = [nslow, nfast]
     data.PC_arguments['grade_frac'] = [0.75,0.25]
-    data.PC_arguments['num_repeats'] = nslow * 5
+    data.PC_arguments['num_repeats'] = nslow * 2
 
     # -- User-defined arguments
     for arg in PC_user_arguments:
@@ -344,7 +344,8 @@ def run(cosmo, data, command_line):
         # Compute derived parameters and pass them back
         phi = [0.0] * nDerived
         for i, name in enumerate(derived_param_names):
-            phi[i] = data.mcmc_parameters[name]['current']
+            phi[i] = float(data.mcmc_parameters[name]['current'])
+
         return logl, phi
 
     # Pass over the settings
