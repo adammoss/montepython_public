@@ -308,19 +308,29 @@ def chain(cosmo, data, command_line):
         Cholesky = la.cholesky(C).T
         Rotation = np.identity(len(sigma_eig))
 
+    # Fast Parameter Multiplier (fpm) for adjusting update and superupdate numbers.
+    # This is equal to N_slow + f_fast N_fast, where N_slow is the number of slow
+    # parameters, f_fast is the over sampling number for each fast block and f_fast
+    # is the number of parameters in each fast block.
+    fpm = np.dot(np.array(data.over_sampling), np.array(data.block_parameters))
+
     # If the update mode was selected, the previous (or original) matrix should be stored
     if command_line.update:
-        if not rank:
-            print 'Update routine is enabled with value %d (recommended: 300)' % command_line.update
+        if not rank and not command_line.silent:
+            print 'Update routine is enabled with value %d (recommended: 50)' % command_line.update
+            print 'This number is rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
+        # Rescale update number by cycle length N_slow + f_fast * N_fast to account for fast parameters
+        command_line.update *= fpm
         previous = (sigma_eig, U, C, Cholesky)
 
-    # Local acceptance rate of last 100 steps
-    ar = np.zeros(100)
+    # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
+    ar = np.zeros(20*fpm)
     # Initialise adaptive
     if command_line.adaptive:
-        print 'Adaptive routine is enabled with value %d (recommended: 10*dimension)' % command_line.adaptive
-        print 'and adaptive_ts = %d (recommended: 100*dimension)' % command_line.adaptive_ts
-        print 'Please note: current implementation not suitable for MPI'
+        if not command_line.silent:
+            print 'Adaptive routine is enabled with value %d (recommended: 10*dimension)' % command_line.adaptive
+            print 'and adaptive_ts = %d (recommended: 100*dimension)' % command_line.adaptive_ts
+            print 'Please note: current implementation not suitable for MPI'
         # Define needed parameters
         parameter_names = data.get_mcmc_parameters(['varying'])
         mean = np.zeros(len(parameter_names))
@@ -343,19 +353,23 @@ def chain(cosmo, data, command_line):
 
     # Initialize superupdate
     if command_line.superupdate:
-        if not rank:
-            print 'Superupdate routine is enabled with value %d (recommended: 100)' % command_line.superupdate
+        if not rank and not command_line.silent:
+            print 'Superupdate routine is enabled with value %d (recommended: 20)' % command_line.superupdate
+            print 'This number is rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
+        # Rescale superupdate number by cycle length N_slow + f_fast * N_fast to account for fast parameters
+        command_line.superupdate *= fpm
         # Define needed parameters
 	parameter_names = data.get_mcmc_parameters(['varying'])
         updated_steps = 0
         stop_c = False
-        c_array = np.zeros(100)
-        R_minus_one = np.array([100.,100.])
+        c_array = np.zeros(20*fpm) # Allows computation of mean of jumping factor
+        R_minus_one = np.array([100.,100.]) # 100 to make sure max(R-1) value is high if computation failed
         # Make sure update is enabled
         if command_line.update == 0:
-            if not rank:
-                print 'Update routine required by superupdate. Setting --update 300'
-            command_line.update = 300
+            if not rank and not command_line.silent:
+                print 'Update routine required by superupdate. Setting --update 50'
+                print 'This number is then rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
+            command_line.update = 50 * fpm
 
     # If restart wanted, pick initial value for arguments
     if command_line.restart is not None:
@@ -491,7 +505,7 @@ def chain(cosmo, data, command_line):
                     # Start of superupdate routine
                     # By B. Schroer and T. Brinckmann
 
-                    c_array[(k-1)%100] = data.jumping_factor
+                    c_array[(k-1)%(20*fpm)] = data.jumping_factor
                     # Start adapting the jumping factor after command_line.superupdate steps if R-1 < 10
                     if (k > updated_steps + command_line.superupdate) and (max(R_minus_one) < 10) and not stop_c:
                         c = data.jumping_factor**2/len(parameter_names)
@@ -503,7 +517,7 @@ def chain(cosmo, data, command_line):
 
                         if not (k-1) % 5:
                             # Check if the jumping factor adaption should stop
-                            if (max(R_minus_one) < 0.4) and (abs(np.mean(ar) - 0.25) < 0.02) and (abs(np.mean(c_array)/c_array[(k-1) % 100] - 1) < 0.01):
+                            if (max(R_minus_one) < 0.4) and (abs(np.mean(ar) - 0.25) < 0.02) and (abs(np.mean(c_array)/c_array[(k-1) % (20*fpm)] - 1) < 0.01):
                                 stop_c = True
                                 data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
                                 if not command_line.silent:
@@ -517,9 +531,9 @@ def chain(cosmo, data, command_line):
                                 jump_file.close()
 
                     # Write the evolution of the jumping factor to a file
-                    if not k % 100:
+                    if not k % (20*fpm):
                         jump_file = open(command_line.folder + '/jumping_factors.txt','a')
-                        for i in xrange(100):
+                        for i in xrange(20*fpm):
                             jump_file.write(str(c_array[i])+'\n')
                         jump_file.close()
                     # End of main part of superupdate routine
@@ -664,7 +678,7 @@ def chain(cosmo, data, command_line):
             newloglike = sampler.compute_lkl(cosmo, data)
         else:  # reject step
             rej += 1
-	    ar[k%100] = 0 # Local acceptance rate of last 100 steps
+	    ar[k%(20*fpm)] = 0 # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
             N += 1
             k += 1
             continue
@@ -694,11 +708,11 @@ def chain(cosmo, data, command_line):
                 max_loglike = loglike
             acc += 1.0
             N = 1  # Reset the multiplicity
-	    ar[k%100]=1 # Local acceptance rate of last 100 steps
+	    ar[k%(20*fpm)]=1 # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
         else:  # reject step
             rej += 1.0
             N += 1  # Increase multiplicity of last accepted point
-	    ar[k%100]=0 # Local acceptance rate of last 100 steps
+	    ar[k%(20*fpm)]=0 # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
 
         # Regularly (option to set in parameter file), close and reopen the
         # buffer to force to write on file.
