@@ -387,8 +387,11 @@ def create_parser():
             <++>Enabled by default. Method for periodic update of the covariance
             matrix. Input: covmat update frequency for Metropolis Hastings.<++>
             If greater than zero, number of steps after which the proposal
-            covariance matrix is updated automatically (recommended: 300).
-            Leaving this option enabled should help speed up convergence.
+            covariance matrix is updated automatically (recommended: 50). This
+            number is then multiplied by the cycle length (N_slow + f_fast * N_fast),
+            where N_slow is the number of slow parameters, f_fast is the over sampling
+            for each fast block and N_fast is the number of parameters for each fast
+            block. Leaving this option enabled should help speed up convergence.
             Can set to zero to disable, i.e. if starting from a good covmat.
 
             The Markovian properties of the MCMC are maintained by the MontePython
@@ -404,7 +407,10 @@ def create_parser():
             matrix for Metropolis Hastings. Input: Number of steps to wait after updating
             the covmat before adapting the jumping factor. Enable to speed up convergence.<++>
             For optimizing the acceptance rate. If enabled, should be set to at
-            least 100 (recommended: 100).
+            least 20 (recommended: 20). This number is then multiplied by the cycle length
+            (N_slow + f_fast * N_fast), where N_slow is the number of slow parameters, f_fast
+            is the over sampling for each fast block and N_fast is the number of
+            parameters for each fast block.
 
             The Markovian properties of the MCMC are maintained by the MontePython
             analyze module, which will only analyze steps after the last covariance
@@ -413,7 +419,8 @@ def create_parser():
             Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
             Adapting jumping factor stops when above criteria is not fulfilled, plus
             the acceptance rate of (25 +/- 2) percent is achieved, and the jumping factor
-            changed by less than 1 percent compared to the mean of the last 100 steps.
+            changed by less than 1 percent compared to the mean of the last superupdate
+            times cycle length (N_slow + f_fast * N_fast) steps.
 
             Note: the covmat saved to the folder is the last updated one.
             Use this covmat for restarting chains (*OPT*).<++>
@@ -671,7 +678,7 @@ def create_parser():
                            choices=['MH', 'NS', 'CH', 'IS', 'Der'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
-                           dest='update', default=300)
+                           dest='update', default=50)
     # -- update Metropolis Hastings with an adaptive jumping factor (OPTIONAL)
     runparser.add_argument('--superupdate', help=helpdict['superupdate'], type=int,
                            dest='superupdate', default=0)
