@@ -361,9 +361,11 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
             center[elem] = data.mcmc_parameters[elem]['last_accepted']
 
     scales = np.zeros((len(parameter_names)))
+    invscales = np.zeros((len(parameter_names)))
     for index, elem in enumerate(parameter_names):
         data.mcmc_parameters[elem]['current'] = center[elem]
         scales[index] = data.mcmc_parameters[elem]['scale']
+        invscales[index] = 1./data.mcmc_parameters[elem]['scale']
 
     # Load stepsize from input covmat or covmat generated from param file
     # JL TODO: check this, and try another scheme to be sure that index and elem refer to the same params in the same order
@@ -377,36 +379,40 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
         fisher_iteration += 1
         # Compute the Fisher matrix and the gradient array at the center
         # point.
-        print ("Compute Fisher [iteration %d/%d] with following stepsizes:" % (fisher_iteration,command_line.fisher_it))
+        print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,command_line.fisher_it))
         for index in range(len(parameter_names)):
             print "%s : %e" % (parameter_names[index],stepsize[index])
-        #fisher_matrix, gradient = compute_fisher(
-        #    temp_data, cosmo, center, stepsize)
-        fisher_matrix, gradient = compute_fisher(
-            data, cosmo, center, stepsize)
+
+        fisher_matrix, gradient = compute_fisher(data, cosmo, center, stepsize)
         if not command_line.silent:
             print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,command_line.fisher_it))
-        io_mp.write_covariance_matrix(
-            fisher_matrix, parameter_names,
-            os.path.join(command_line.folder, 'fisher'+str(fisher_iteration)+'.mat'))
 
         # Compute inverse of the fisher matrix, catch LinAlgError exception
         try:
             inv_fisher_matrix = np.linalg.inv(fisher_matrix)
-            io_mp.write_covariance_matrix(
-                inv_fisher_matrix, parameter_names,
-                os.path.join(command_line.folder, 'inv_fisher'+str(fisher_iteration)+'.mat'))
         except np.linalg.LinAlgError:
             raise io_mp.ConfigurationError(
                 "Could not find Fisher matrix inverse, please adjust bestfit and/or input "
                 "sigma values (or covmat) or remove the option --fisher and run "
                 "with Metropolis-Hastings or another sampling method.")
 
+        # stepsize for the next iteration
         for index in range(len(parameter_names)):
             stepsize[index] = (inv_fisher_matrix[index,index])**0.5
 
+        # take scalings into account and write the matrices in files
+        fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
+        io_mp.write_covariance_matrix(
+            fisher_matrix, parameter_names,
+            os.path.join(command_line.folder, 'fisher'+str(fisher_iteration)+'.mat'))
+
+        inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
+        io_mp.write_covariance_matrix(
+            inv_fisher_matrix, parameter_names,
+            os.path.join(command_line.folder, 'inv_fisher'+str(fisher_iteration)+'.mat'))
+
     # Removing scale factors in order to store true parameter covariance
-    inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
+    #inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
 
     # Write the last inverse Fisher matrix as the new covariance matrix
     io_mp.write_covariance_matrix(
@@ -711,8 +717,7 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
         data.mcmc_parameters[name_1]['current'] = center[name_1]
         data.update_cosmo_arguments()
 
-        fisher_diagonal = -(
-            loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
+        fisher_diagonal = -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
         gradient = -(loglike_right-loglike_left)/(2.*diff_1)
 
         return fisher_diagonal, gradient

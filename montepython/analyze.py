@@ -873,33 +873,34 @@ def compute_posterior(information_instances):
                         # ADDING FISHER CONTOURS
                         if info.plot_fisher:
                             sub_inv_fisher = np.zeros((2,2), 'float64')
-                            sub_inv_fisher[0,0] = inv_fisher[info.native_index,info.native_index]
-                            sub_inv_fisher[1,1] = inv_fisher[info.native_second_index,info.native_second_index]
-                            sub_inv_fisher[0,1] = inv_fisher[info.native_index,info.native_second_index]
+                            sub_inv_fisher[0,0] = inv_fisher[info.native_index,info.native_index]/info.scales[info.native_index,info.native_index]/info.scales[info.native_index,info.native_index]
+                            sub_inv_fisher[1,1] = inv_fisher[info.native_second_index,info.native_second_index]/info.scales[info.native_second_index,info.native_second_index]/info.scales[info.native_second_index,info.native_second_index]
+                            sub_inv_fisher[0,1] = inv_fisher[info.native_index,info.native_second_index]/info.scales[info.native_index,info.native_index]/info.scales[info.native_second_index,info.native_second_index]
                             sub_inv_fisher[1,0] = sub_inv_fisher[0,1]
-                            inv_sub_inv_fisher = np.linalg.inv(sub_inv_fisher)
+                            if sub_inv_fisher[0,0]*sub_inv_fisher[1,1] != 0.:
+                                inv_sub_inv_fisher = np.linalg.inv(sub_inv_fisher)
 
-                            x = scipy.ndimage.zoom(info.x_centers,info.interpolation_smoothing, mode='reflect')
-                            y = scipy.ndimage.zoom(info.y_centers,info.interpolation_smoothing, mode='reflect')
+                                x = scipy.ndimage.zoom(info.x_centers,info.interpolation_smoothing, mode='reflect')
+                                y = scipy.ndimage.zoom(info.y_centers,info.interpolation_smoothing, mode='reflect')
 
-                            z = np.zeros((len(x),len(y)), 'float64')
+                                z = np.zeros((len(x),len(y)), 'float64')
 
-                            #print info.ref_names[info.native_index]
-                            #print info.scales[info.native_index]
-                            #print info.boundaries[info.native_index]
-                            #print info.centers[info.native_index]
+                                #print info.ref_names[info.native_index]
+                                #print info.scales
+                                #print info.boundaries[info.native_index]
+                                #print info.centers[info.native_index]
 
-                            for ix in range(len(x)):
-                                dx = (x[ix] - info.centers[info.native_index])
-                                for iy in range(len(y)):
-                                    dy = (y[iy] - info.centers[info.native_second_index])
-                                    z[ix,iy] = dx*inv_sub_inv_fisher[0,0]*dx + dy*inv_sub_inv_fisher[1,1]*dy + 2.*dx*inv_sub_inv_fisher[0,1]*dy
+                                for ix in range(len(x)):
+                                    dx = (x[ix] - info.centers[info.native_index])
+                                    for iy in range(len(y)):
+                                        dy = (y[iy] - info.centers[info.native_second_index])
+                                        z[ix,iy] = dx*inv_sub_inv_fisher[0,0]*dx + dy*inv_sub_inv_fisher[1,1]*dy + 2.*dx*inv_sub_inv_fisher[0,1]*dy
 
-                            ax2dsub.contour(y,x,z,
-                                            extent=info.extent,
-                                            levels=[2.3,6.18],
-                                            #levels=[9.30,15.79],
-                                            zorder=4, colors='k')
+                                ax2dsub.contour(y,x,z,
+                                    extent=info.extent,
+                                    levels=[2.3,6.18],
+                                    #levels=[9.30,15.79],
+                                    zorder=4, colors='k')
 
                         ax2dsub.set_xticks(info.ticks[info.native_second_index])
                         ax2dsub.set_yticks(info.ticks[info.native_index])
@@ -1470,6 +1471,7 @@ def extract_parameter_names(info):
     ref_names = []
     tex_names = []
     scales = []
+    rescales = []
     centers = []
     with open(info.param_path, 'r') as param:
         for line in param:
@@ -1509,9 +1511,9 @@ def extract_parameter_names(info):
                         scale = array[4]
                         rescale = 1.
                         if name in info.new_scales.iterkeys():
-                            scale = info.new_scales[name]
                             rescale = info.new_scales[name]/array[4]
-                        scales.append(rescale)
+                        scales.append(scale)
+                        rescales.append(rescale)
 
                         # Given the scale, decide for the pretty tex name
                         number = 1./scale
@@ -1522,12 +1524,14 @@ def extract_parameter_names(info):
                         centers.append(array[0])
 
     scales = np.diag(scales)
+    rescales = np.diag(rescales)
 
     info.ref_names = ref_names
     info.tex_names = tex_names
     info.boundaries = boundaries
     info.backup_names = backup_names
     info.scales = scales
+    info.rescales = rescales
     # Beware, the following two numbers are different. The first is the total
     # number of parameters stored in the chain, whereas the second is for
     # plotting purpose only.
@@ -1734,7 +1738,7 @@ def remove_bad_points(info):
         try:
             index = info.ref_names.index(name)
             for i in xrange(len(spam)):
-                spam[i][:, index+2] *= 1./info.scales[index, index]
+                spam[i][:, index+2] *= 1./info.rescales[index, index]
         except ValueError:
             # there is nothing to do if the name is not contained in ref_names
             pass
