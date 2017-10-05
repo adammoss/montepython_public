@@ -244,7 +244,7 @@ def convergence(info):
     info.bounds = np.zeros((len(info.ref_names), len(info.levels), 2))
 
     # Circle through all files to find the global maximum of likelihood
-    print '--> Finding global maximum of likelihood'
+    #print '--> Finding global maximum of likelihood'
     find_maximum_of_likelihood(info)
 
     # Restarting the circling through files, this time removing the burnin,
@@ -253,7 +253,7 @@ def convergence(info):
     # explored once the chain moved within min_minus_lkl - LOG_LKL_CUTOFF.
     # If the user asks for a keep_fraction <1, this is also the place where
     # a fraction (1-keep_fraction) is removed at the beginning of each chain.
-    print '--> Removing burn-in'
+    #print '--> Removing burn-in'
     spam = remove_bad_points(info)
 
     info.remap_parameters(spam)
@@ -377,7 +377,10 @@ def compute_posterior(information_instances):
             " wrong parameters names in the '--extra' file.")
     # Find the appropriate number of columns and lines for the 1d posterior
     # plot
-    num_columns = int(round(math.sqrt(len(plotted_parameters))))
+    if  conf.num_columns_1d == None:
+        num_columns = int(round(math.sqrt(len(plotted_parameters))))
+    else:
+        num_columns = conf.num_columns_1d
     num_lines = int(math.ceil(len(plotted_parameters)*1.0/num_columns))
 
     # For special needs, you can impose here a different number of columns and lines in the 1d plot
@@ -467,11 +470,9 @@ def compute_posterior(information_instances):
                 len(plotted_parameters),
                 index*(len(plotted_parameters)+1)+1,
                 yticks=[])
-            ax2d.set_color_cycle(conf.cm)
         if conf.plot:
             ax1d = fig1d.add_subplot(
                 num_lines, num_columns, index+1, yticks=[])
-            ax1d.set_color_cycle(conf.cm)
 
         # check for each instance if the name is part of the list of plotted
         # parameters, and if yes, store the native_index. If not, store a flag
@@ -485,44 +486,85 @@ def compute_posterior(information_instances):
             except ValueError:
                 info.ignore_param = True
 
-        adjust_ticks(name, information_instances)
+        # The limits might have been enforced by the user
+        if name in conf.force_limits.iterkeys():
+            x_span = conf.force_limits[name][1]-conf.force_limits[name][0]
+            tick_min = conf.force_limits[name][0] +0.1*x_span
+            tick_max = conf.force_limits[name][1] -0.1*x_span
+            ticks = np.linspace(tick_min,
+                                tick_max,
+                                info.ticknumber)
+            for info in information_instances:
+                if not info.ignore_param:
+                    info.x_range[info.native_index] = conf.force_limits[name]
+                    info.ticks[info.native_index] = ticks
+        # otherwise, find them automatically
+        else:
+            adjust_ticks(name, information_instances)
 
-        # normalized histogram
         print ' -> Computing histograms for ', name
         for info in information_instances:
             if not info.ignore_param:
+
+                # 1D posterior normalised to P_max=1 (first step)
+                #
+                # simply the histogram from the chains, with few bins
+                #
                 info.hist, info.bin_edges = np.histogram(
                     info.chain[:, info.native_index+2], bins=info.bins,
                     weights=info.chain[:, 0], normed=False, density=False)
-                info.bincenters = 0.5*(info.bin_edges[1:]+info.bin_edges[:-1])
+                info.hist = info.hist/info.hist.max()
                 # Correct for temperature
                 info.hist = info.hist**conf.temperature
 
-                # interpolated histogram (if available)
+                info.bincenters = 0.5*(info.bin_edges[1:]+info.bin_edges[:-1])
+
+                # 1D posterior normalised to P_max=1 (second step)
+                #
+                # returns a histogram still normalised to one, but with a ten times finer sampling;
+                # >> first, tries a method with spline interpolation between bin centers and extrapolation at the edges
+                # >> if it fails, a simpler and more robust method of linear interpolation between bin centers is used
+                # >> if the interpolation module is not installed, this step keeps the same posterior
+                #
                 info.interp_hist, info.interp_grid = cubic_interpolation(
                     info, info.hist, info.bincenters)
-                info.interp_hist /= np.max(info.interp_hist)
 
                 # minimum credible interval (method by Jan Haman). Fails for
-                # multimodal histograms #FIXME
+                # multimodal histograms
                 bounds = minimum_credible_intervals(info)
                 info.bounds[info.native_index] = bounds
 
         # plotting
         for info in information_instances:
             if not info.ignore_param:
+
+                # 1D posterior normalised to P_max=1 (third step, used only for plotting)
+                #
+                # apply gaussian smoothing
+                #
                 # factor by which the grid has been made thinner (10 means 10 times more bins)
                 interpolation_factor = float(len(info.interp_grid))/float(len(info.bincenters))
                 # factor for gaussian smoothing
                 sigma = interpolation_factor*info.gaussian_smoothing
-                smoothed_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
-                smoothed_hist = smoothed_hist/smoothed_hist.max()
+                # smooth
+                smoothed_interp_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
+                # re-normalised
+                smoothed_interp_hist = smoothed_interp_hist/smoothed_interp_hist.max()
 
                 if conf.plot_2d:
+
+                    ##################################################
+                    # plot 1D posterior in diagonal of triangle plot #
+                    ##################################################
                     plot = ax2d.plot(
                         info.interp_grid,
-                        smoothed_hist,
-                        linewidth=info.line_width, ls='-')
+                        smoothed_interp_hist,
+                        linewidth=info.line_width, ls='-',
+                        color = info.MP_color_cycle[info.id][1],
+                        # the [1] picks up the color of the 68% contours
+                        # with [0] you would get that of the 95% contours
+                        alpha = info.alphas[info.id])
+
                     legends[info.id] = plot[0]
                     ax2d.set_xticks(info.ticks[info.native_index])
                     if conf.legend_style == 'top':
@@ -546,6 +588,7 @@ def compute_posterior(information_instances):
                                 ['%.{0}g'.format(info.decimal) % s
                                  for s in info.ticks[info.native_index]],
                                 fontsize=info.ticksize)
+                            ax2d.tick_params('x',direction='inout')
                             ax2d.set_xlabel(
                                 info.tex_names[info.native_index],
                                 fontsize=info.fontsize)
@@ -556,28 +599,24 @@ def compute_posterior(information_instances):
                                0, 1.05])
 
                 if conf.plot:
-                    # Note the use of double curly brackets {{ }} to produce
-                    # the desired LaTeX output. This is necessary because the
-                    # format function would otherwise understand single
-                    # brackets as fields.
-                    ax1d.set_title(
-                        '%s=$%.{0}g^{{+%.{0}g}}_{{%.{0}g}}$'.format(
-                            info.decimal) % (
-                            info.tex_names[info.native_index],
-                            info.mean[info.native_index],
-                            info.bounds[info.native_index, 0, -1],
-                            info.bounds[info.native_index, 0, 0]),
-                        fontsize=info.fontsize)
-
-                    # JL: example of customisation commands
-                    # (in this example: change label and plot vertical lines)
-                    # At some point these types of commands will be made available from
-                    # the customisation input files in plot_file/
-                    #ax1d.set_title(r'$M_{\nu}  (eV)$',fontsize=info.fontsize)
-                    #ax1d.axvline(x=0.058536,linestyle='-',color='k')
-                    #ax1d.axvline(x=0.098993,linestyle='-',color='k')
-                    #ax1d.axvline(x=0.06,linestyle='--',color='k')
-                    #ax1d.axvline(x=0.10,linestyle='--',color='k')
+                    if conf.short_title_1d:
+                        ax1d.set_title(
+                            '%s'.format(info.decimal) % (
+                                    info.tex_names[info.native_index]),
+                            fontsize=info.fontsize)
+                    else:
+                        # Note the use of double curly brackets {{ }} to produce
+                        # the desired LaTeX output. This is necessary because the
+                        # format function would otherwise understand single
+                        # brackets as fields.
+                        ax1d.set_title(
+                            '%s=$%.{0}g^{{+%.{0}g}}_{{%.{0}g}}$'.format(
+                                info.decimal) % (
+                                    info.tex_names[info.native_index],
+                                    info.mean[info.native_index],
+                                    info.bounds[info.native_index, 0, -1],
+                                    info.bounds[info.native_index, 0, 0]),
+                            fontsize=info.fontsize)
 
                     ax1d.set_xticks(info.ticks[info.native_index])
                     ax1d.set_xticklabels(
@@ -588,41 +627,91 @@ def compute_posterior(information_instances):
                                info.x_range[info.native_index][1],
                                0, 1.05])
 
+                    # Execute some customisation scripts for the 1d plots
+                    if (info.custom1d != []):
+                        for elem in info.custom1d:
+                            execfile('plot_files/'+elem)
 
+                    ##################################################
+                    # plot 1D posterior in 1D plot                   #
+                    ##################################################
                     ax1d.plot(
                         info.interp_grid,
                         # gaussian filtered 1d posterior:
-                        scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma),
+                        smoothed_interp_hist,
                         # raw 1d posterior:
                         #info.interp_hist,
-                        lw=info.line_width, ls='-')
+                        lw=info.line_width, ls='-',
+                        color = info.MP_color_cycle[info.id][1],
+                        # the [1] picks up the color of the 68% contours
+                        # with [0] you would get that of the 95% contours
+                        alpha = info.alphas[info.id])
+                    # uncopmment if you want to see the raw point sfrom the histogram
+                    # (to check whether the inteprolation and smoothing generated artefacts)
+                    #ax1d.plot(
+                    #    info.bincenters,
+                    #    info.hist,
+                    #    'ro')
 
-        # mean likelihood (optional, if comparison, it will not be printed)
-        # The color cycle has to be reset, before
-        if conf.plot_2d:
-            ax2d.set_color_cycle(conf.cm)
-        if conf.plot:
-            ax1d.set_color_cycle(conf.cm)
         if conf.mean_likelihood:
             for info in information_instances:
                 if not info.ignore_param:
                     try:
+
+                        # 1D mean likelihood normalised to P_max=1 (first step)
+                        #
+                        # simply the histogram from the chains, weighted by mutiplicity*likelihood
+                        #
                         lkl_mean, _ = np.histogram(
                             info.chain[:, info.native_index+2],
                             bins=info.bin_edges,
                             normed=False,
                             weights=np.exp(
                                 conf.min_minus_lkl-info.chain[:, 1])*info.chain[:, 0])
-
                         lkl_mean /= lkl_mean.max()
+
+                        # 1D mean likelihood normalised to P_max=1 (second step)
+                        #
+                        # returns a histogram still normalised to one, but with a ten times finer sampling;
+                        # >> first, tries a method with spline interpolation between bin centers and extrapolation at the edges
+                        # >> if it fails, a simpler and more robust method of linear interpolation between bin centers is used
+                        # >> if the interpolation module is not installed, this step keeps the same posterior
+                        #
                         interp_lkl_mean, interp_grid = cubic_interpolation(
                             info, lkl_mean, info.bincenters)
+
+                        # 1D mean likelihood normalised to P_max=1 (third step, used only for plotting)
+                        #
+                        # apply gaussian smoothing
+                        #
+                        # smooth
+                        smoothed_interp_lkl_mean = scipy.ndimage.filters.gaussian_filter(interp_lkl_mean,sigma)
+                        # re-normalised
+                        smoothed_interp_lkl_mean = smoothed_interp_lkl_mean/smoothed_interp_lkl_mean.max()
+
+                        # Execute some customisation scripts for the 1d plots
+                        if (info.custom1d != []):
+                            for elem in info.custom1d:
+                                execfile('plot_files/'+elem)
+
+                        ########################################################
+                        # plot 1D mean likelihood in diagonal of triangle plot #
+                        ########################################################
                         if conf.plot_2d:
-                            ax2d.plot(interp_grid, interp_lkl_mean,
-                                      ls='--', lw=conf.line_width)
+                            ax2d.plot(interp_grid, smoothed_interp_lkl_mean,
+                                      ls='--', lw=conf.line_width,
+                                      color = info.MP_color_cycle[info.id][1],
+                                      alpha = info.alphas[info.id])
+
+                        ########################################################
+                        # plot 1D mean likelihood in 1D plot                   #
+                        ########################################################
                         if conf.plot:
-                            ax1d.plot(interp_grid, interp_lkl_mean,
-                                      ls='--', lw=conf.line_width)
+                            ax1d.plot(interp_grid, smoothed_interp_lkl_mean,
+                                      ls='--', lw=conf.line_width,
+                                      color = info.MP_color_cycle[info.id][1],
+                                      alpha = info.alphas[info.id])
+
                     except:
                         print 'could not find likelihood contour for ',
                         print info.ref_parameters[info.native_index]
@@ -666,12 +755,24 @@ def compute_posterior(information_instances):
                             info.has_second_param = False
                     else:
                         info.has_second_param = False
+
                 ax2dsub = fig2d.add_subplot(
                     len(plotted_parameters),
                     len(plotted_parameters),
                     (index)*len(plotted_parameters)+second_index+1)
+
                 for info in information_instances:
                     if info.has_second_param:
+
+                        ax2dsub.axis([info.x_range[info.native_second_index][0],
+                                      info.x_range[info.native_second_index][1],
+                                      info.x_range[info.native_index][0],
+                                      info.x_range[info.native_index][1]])
+
+                        # 2D likelihood (first step)
+                        #
+                        # simply the histogram from the chains, with few bins only
+                        #
                         info.n, info.xedges, info.yedges = np.histogram2d(
                             info.chain[:, info.native_index+2],
                             info.chain[:, info.native_second_index+2],
@@ -689,36 +790,79 @@ def compute_posterior(information_instances):
                         info.x_centers = 0.5*(info.xedges[1:]+info.xedges[:-1])
                         info.y_centers = 0.5*(info.yedges[1:]+info.yedges[:-1])
 
+                        # 2D likelihood (second step)
+                        #
+                        # like for 1D, interpolate to get a finer grid
+                        # TODO: we should not only interpolate between bin centers, but also extrapolate between side bin centers and bin edges
+                        #
+                        interp_y_centers = scipy.ndimage.zoom(info.y_centers,info.interpolation_smoothing, mode='reflect')
+                        interp_x_centers = scipy.ndimage.zoom(info.x_centers,info.interpolation_smoothing, mode='reflect')
+                        interp_likelihood = scipy.ndimage.zoom(info.n,info.interpolation_smoothing, mode='reflect')
+
+                        # 2D likelihood (third step)
+                        #
+                        # gaussian smoothing
+                        #
+                        sigma = info.interpolation_smoothing*info.gaussian_smoothing
+                        interp_smoothed_likelihood = scipy.ndimage.filters.gaussian_filter(interp_likelihood,[sigma,sigma], mode='reflect')
+
+                        # Execute some customisation scripts for the 2d contour plots
+                        if (info.custom2d != []):
+                           for elem in info.custom2d:
+                               execfile('plot_files/'+elem)
+
                         # plotting contours, using the ctr_level method (from Karim
                         # Benabed). Note that only the 1 and 2 sigma contours are
                         # displayed (due to the line with info.levels[:2])
                         try:
-                            #width of gaussian smoothing:
-                            sigma = info.interpolation_smoothing*info.gaussian_smoothing
-                            if info.contours_only:
-                                # TODO: we should not only interpolate between bin centers, but also extrapolate between side bine centers and bin edges
-                                contours = ax2dsub.contour(
-                                    scipy.ndimage.zoom(info.y_centers,info.interpolation_smoothing, mode='reflect'),
-                                    scipy.ndimage.zoom(info.x_centers,info.interpolation_smoothing, mode='reflect'),
-                                    scipy.ndimage.filters.gaussian_filter(
-                                        scipy.ndimage.zoom(info.n,info.interpolation_smoothing),
-                                        [sigma,sigma]),
-                                    extent=info.extent, levels=ctr_level(
-                                        info.n, info.levels[:2]),
-                                    zorder=4, colors=info.cm[info.id],
-                                    linewidths=info.line_width)
-                            else:
-                                # TODO: we should not only interpolate between bin centers, but also extrapolate between side bine centers and bin edges
+
+                            ###########################
+                            # plot 2D filled contours #
+                            ###########################
+                            if not info.contours_only:
                                 contours = ax2dsub.contourf(
-                                    scipy.ndimage.zoom(info.y_centers,info.interpolation_smoothing, mode='reflect'),
-                                    scipy.ndimage.zoom(info.x_centers,info.interpolation_smoothing, mode='reflect'),
-                                    scipy.ndimage.filters.gaussian_filter(
-                                        scipy.ndimage.zoom(info.n,info.interpolation_smoothing),
-                                        [sigma,sigma], mode='reflect'),
-                                    extent=info.extent, levels=ctr_level(
-                                        info.n, info.levels[:2]),
-                                    zorder=4, cmap=info.cmaps[info.id],
+                                    interp_y_centers,
+                                    interp_x_centers,
+                                    interp_smoothed_likelihood,
+                                    extent=info.extent,
+                                    levels=ctr_level(
+                                        interp_smoothed_likelihood,
+                                        info.levels[:2]),
+                                    zorder=4,
+                                    colors = info.MP_color_cycle[info.id],
                                     alpha=info.alphas[info.id])
+
+                                # now add a thin darker line
+                                # around the 95% contour
+                                ax2dsub.contour(
+                                    interp_y_centers,
+                                    interp_x_centers,
+                                    interp_smoothed_likelihood,
+                                    extent=info.extent,
+                                    levels=ctr_level(
+                                        interp_smoothed_likelihood,
+                                        info.levels[1:2]),
+                                    zorder=4,
+                                    colors = info.MP_color_cycle[info.id][1],
+                                    alpha = info.alphas[info.id],
+                                    linewidths=1)
+
+                            ###########################
+                            # plot 2D contours        #
+                            ###########################
+                            if info.contours_only:
+                                contours = ax2dsub.contour(
+                                    interp_y_centers,
+                                    interp_x_centers,
+                                    interp_smoothed_likelihood,
+                                    extent=info.extent, levels=ctr_level(
+                                        interp_smoothed_likelihood,
+                                        info.levels[:2]),
+                                    zorder=4,
+                                    colors = info.MP_color_cycle[info.id],
+                                    alpha = info.alphas[info.id],
+                                    linewidths=info.line_width)
+
                         except Warning:
                             warnings.warn(
                                 "The routine could not find the contour of the " +
@@ -758,6 +902,8 @@ def compute_posterior(information_instances):
                                             zorder=4, colors='k')
 
                         ax2dsub.set_xticks(info.ticks[info.native_second_index])
+                        ax2dsub.set_yticks(info.ticks[info.native_index])
+                        ax2dsub.tick_params('both',direction='inout',top=True,bottom=True,left=True,right=True)
                         if index == len(plotted_parameters)-1:
                             ax2dsub.set_xticklabels(
                                 ['%.{0}g'.format(info.decimal) % s for s in
@@ -821,27 +967,54 @@ def compute_posterior(information_instances):
         print '--> Saving figures to .{0} files'.format(info.extension)
         plot_name = '-vs-'.join([os.path.split(elem.folder)[-1]
                                 for elem in information_instances])
+
         if conf.plot_2d:
-            if len(legends) > 1:
+            # Legend of triangle plot
+            if ((conf.plot_legend_2d == None) and (len(legends) > 1)) or (conf.plot_legend_2d == True):
+                # Create a virtual subplot in the top right corner,
+                # just to be able to anchor the legend nicely
+                ax2d = fig2d.add_subplot(
+                    len(plotted_parameters),
+                    len(plotted_parameters),
+                    len(plotted_parameters),
+                    )
+                ax2d.axis('off')
                 try:
-                    fig2d.legend(legends, legend_names, 'upper right',
+                    ax2d.legend(legends, legend_names,
+                                 loc='upper right',
+                                 borderaxespad=0.,
                                  fontsize=info.legendsize)
                 except TypeError:
-                    fig2d.legend(legends, legend_names, 'upper right',
+                    ax2d.legend(legends, legend_names,
+                                 loc='upper right',
+                                 borderaxespad=0.,
                                  prop={'fontsize': info.legendsize})
-            fig2d.tight_layout()
+            fig2d.subplots_adjust(wspace=0, hspace=0)
             fig2d.savefig(
                 os.path.join(
                     conf.folder, 'plots', '{0}_triangle.{1}'.format(
                         plot_name, info.extension)),
-                bbox_inches=0, )
+                bbox_inches='tight')
+        # Legend of 1D plot
         if conf.plot:
+            if ((conf.plot_legend_1d == None) and (len(legends) > 1)) or (conf.plot_legend_1d == True):
+                # no space left: add legend to thr right
+                if len(plotted_parameters)<num_columns*num_lines:
+                    fig1d.legend(legends, legend_names,
+                                 loc= ((num_columns-0.9)/num_columns,0.1/num_columns),
+                                 fontsize=info.legendsize)
+                # space left in lower right part: add legend there
+                else:
+                    fig1d.legend(legends, legend_names,
+                                 loc= 'center right',
+                                 bbox_to_anchor = (1.2,0.5),
+                                 fontsize=info.legendsize)
             fig1d.tight_layout()
             fig1d.savefig(
                 os.path.join(
                     conf.folder, 'plots', '{0}_1d.{1}'.format(
                         plot_name, info.extension)),
-                bbox_inches=0)
+                bbox_inches='tight')
 
 
 def ctr_level(histogram2d, lvl, infinite=False):
@@ -872,8 +1045,8 @@ def minimum_credible_intervals(info):
     bounds = np.zeros((len(levels), 2))
     j = 0
     delta = bincenters[1]-bincenters[0]
-    left_edge = np.max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0)
-    right_edge = np.max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0)
+    left_edge = max(histogram[0] - 0.5*(histogram[1]-histogram[0]), 0.)
+    right_edge = max(histogram[-1] + 0.5*(histogram[-1]-histogram[-2]), 0.)
     failed = False
     for level in levels:
         norm = float(
@@ -996,35 +1169,40 @@ def cubic_interpolation(info, hist, bincenters):
         # The bin width will be reduced here by exactly 10
         # (this factor 10 is hard-coded but it could be promoted as input parameter)
 
-        # If possible, try interpolation between bin centers and extrapolation up to side bin edges
+        # If possible, work on log(Like) iinstead of Like, and try interpolation between bin centers + extrapolation up to side bin edges
         try:
+            from scipy.interpolate import UnivariateSpline
+
+            # test that all elements are strictly positive, otherwise we could not take the log, and we must switch to the robust method
+            for elem in hist:
+                if elem <= 0.:
+                    raise exception()
+
+            # define finer grid
             binwidth = bincenters[1]-bincenters[0]
             interp_grid = np.linspace(bincenters[0]-0.5*binwidth, bincenters[-1]+0.5*binwidth, len(bincenters)*10+1)
 
-            from scipy.interpolate import UnivariateSpline
-
-            # we could do the gaussian smoothing here, before the interpolation, or
-            # we could do it later after the interpolation. These lines are commented because
-            # it is usually better to do it later.
-            #hist_smooth = scipy.ndimage.filters.gaussian_filter(hist,info.gaussian_smoothing)
-            #f = UnivariateSpline(bincenters, hist_smooth,
-            #                     bbox=[interp_grid[0],interp_grid[-1]])
-
-            # prepare the interpolation (before gaussian smoothing that will be done later):
-            f = UnivariateSpline(bincenters, hist,
+            # prepare the interpolation on log(Like) (before gaussian smoothing that will be done later):
+            ln_hist = np.log(hist)
+            f = UnivariateSpline(bincenters, ln_hist,
+                                 s=0,
                                  bbox=[interp_grid[0],interp_grid[-1]])
 
-        # if it does not work, simple interpolation between bin centers
+            # do the interpolation
+            interp_hist = f(interp_grid)
+
+            # go back from ln_Like to Like
+            interp_hist = np.exp(interp_hist)
+
+        # if it does not work, simple robust linear interpolation between bin centers, which can never fail, nor create artefacts
         except:
-            print "For 1d: using simplest scheme with no extrapolation at boundaries"
+            print "Warning: this probability had to be interpolated using a simplified scheme, with no spline nor extrapolation at boundaries"
             interp_grid = np.linspace(bincenters[0], bincenters[-1], (len(bincenters)-1)*10+1)
             from scipy.interpolate import interp1d
-            f = interp1d(bincenters, hist,kind='cubic')
+            f = interp1d(bincenters, hist,kind='linear')#kind='cubic')
+            interp_hist = f(interp_grid)
 
-        # do the interpolation
-        interp_hist = f(interp_grid)
-
-        # re-normalise the curve
+        # re-normalise the interpolated curve
         interp_hist = interp_hist / interp_hist.max()
 
         return interp_hist, interp_grid
@@ -1329,9 +1507,11 @@ def extract_parameter_names(info):
                         ref_names.append(name)
                         # Take care of the scales
                         scale = array[4]
+                        rescale = 1.
                         if name in info.new_scales.iterkeys():
                             scale = info.new_scales[name]
-                        scales.append(scale)
+                            rescale = info.new_scales[name]/array[4]
+                        scales.append(rescale)
 
                         # Given the scale, decide for the pretty tex name
                         number = 1./scale
@@ -1508,7 +1688,7 @@ def remove_bad_points(info):
 
             # Remove fixed fraction as requested by user (usually not useful if non-markovian is also removed)
             if info.keep_fraction < 1:
-                start = start + (1-info.keep_fraction)*(line_count - start)
+                start = start + int((1.-info.keep_fraction)*(line_count - start))
 
             print ": Removed",
             if info.markovian:
@@ -1626,6 +1806,7 @@ def adjust_ticks(param, information_instances):
     # The new x_range and tick should min/max all the existing ones
     new_x_range = np.array(
         [min([e[0] for e in x_ranges]), max([e[1] for e in x_ranges])])
+
     temp_ticks = np.array(
         [min([e[0] for e in ticks]), max([e[-1] for e in ticks])])
 
@@ -1690,16 +1871,30 @@ class Information(object):
     # Flag checking the absence or presence of the interp1d function
     has_interpolate_module = False
 
-    # Global colormap for the 1d plots. Colours will get chosen from this.
-    # Some old versions of matplotlib do not have CMRmap, so the colours will
-    # be harcoded
+    # Actual pairs of colors used by MP.
+    # For each pair, the first color is for the 95% contour,
+    # and the second for the 68% contour + the 1d probability.
     # Note that, as with the other customisation options, you can specify new
     # values for this in the extra plot_file.
-    cm = ['purple','r','g','darkorange','b','k']
-
-    # Define colormaps for the contour plots
-    cmaps = [plt.cm.Purples, plt.cm.Reds_r, plt.cm.Greens, plt.cm.Oranges, plt.cm.Blues, plt.cm.gray_r]
-    alphas = [1.0, 0.8, 0.6, 0.4,0.3,0.2]
+    MP_color = {
+        'Red':['#E37C80','#CE121F'],
+        'Blue':['#7A98F6','#1157EF'],
+        'Green':['#88B27A','#297C09'],
+        'Orange':['#F3BE82','#ED920F'],
+        'Grey':['#ABABAB','#737373'],
+        'Purple':['#B87294','#88004C']
+    }
+    # order used when several directories are analysed
+    MP_color_cycle = [
+        MP_color['Red'],
+        MP_color['Blue'],
+        MP_color['Green'],
+        MP_color['Orange'],
+        MP_color['Grey'],
+        MP_color['Purple']
+    ]
+    # in the same order, list of transparency levels
+    alphas = [0.9, 0.9, 0.9, 0.9, 0.9, 0.9]
 
     def __init__(self, command_line, other=None):
         """
@@ -1733,6 +1928,7 @@ class Information(object):
         name, and the value its scale.
 
         """
+
         # Assign a unique id to this instance
         self.id = self._ids.next()
 
@@ -1750,17 +1946,28 @@ class Information(object):
             if elem.find('__') == -1:
                 setattr(self, elem, getattr(command_line, elem))
 
+        # initialise the legend flags
+        self.plot_legend_1d = None
+        self.plot_legend_2d = None
+
         # initialize the legend size to be the same as fontsize, but can be
         # altered in the extra file
         self.legendsize = self.fontsize
         self.legendnames = []
+
+        # initialize the customisation script flags
+        self.custom1d = []
+        self.custom2d = []
+
+        # initialise the dictionary enmforcing limit
+        self.force_limits = {}
 
         # Read a potential file describing changes to be done for the parameter
         # names, and number of paramaters plotted (can be let empty, all will
         # then be plotted), but also the style of the plot. Note that this
         # overrides the command line options
         if command_line.optional_plot_file:
-            plot_file_vars = {'info': self}
+            plot_file_vars = {'info': self,'plt': plt}
             execfile(command_line.optional_plot_file, plot_file_vars)
 
         # check and store keep_fraction

@@ -345,9 +345,9 @@ def write_covariance_matrix(covariance_matrix, names, path):
         for i in range(len(names)):
             for j in range(len(names)):
                 if covariance_matrix[i][j] > 0:
-                    cov.write(' %.5e\t' % covariance_matrix[i][j])
+                    cov.write(' %.6e\t' % covariance_matrix[i][j])
                 else:
-                    cov.write('%.5e\t' % covariance_matrix[i][j])
+                    cov.write('%.6e\t' % covariance_matrix[i][j])
             cov.write('\n')
 
 def write_bestfit_file(bestfit, names, path):
@@ -362,9 +362,9 @@ def write_bestfit_file(bestfit, names, path):
             #bfvalue = chain[a[0], 2+i]*info.scales[i, i]
             bf_value = bestfit[i]
             if bf_value > 0:
-                bestfit_file.write(' %.5e\t' % bf_value)
+                bestfit_file.write(' %.6e\t' % bf_value)
             else:
-                bestfit_file.write('%.5e\t' % bf_value)
+                bestfit_file.write('%.6e\t' % bf_value)
         bestfit_file.write('\n')
 
 

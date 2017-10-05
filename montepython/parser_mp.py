@@ -509,6 +509,9 @@ def create_parser():
         <**>--stop-after-update<**> : bool
             <++>When using update mode, stop run after updating the covariant matrix.<++>
             Useful if you want to change settings after the first guess (*OPT*) (flag)<++>
+        <**>--display-each-chi2<**> : bool
+            <++>Shows the effective chi2 from each likelihood and the total.<++>
+            Useful e.g. if you run at the bestfit point with -f 0 (flag)<++>
 
         For Nested Sampling and Cosmo Hammer arguments, see
         :mod:`nested_sampling` and :mod:`cosmo_hammer`.
@@ -542,6 +545,8 @@ def create_parser():
             plotting marginalised 1D posteriors, the code also shows the mean
             likelihood per bin with dashed lines; this flag switches off the
             dashed lines.<++>
+        <**>--short-title-1d<**> : None
+            <++>short 1D plot titles<++>. Remove mean and confidence limits above each 1D plots.<++>
         <**>--extra<**> : str
             <++>extra file to customize the output plots<++>. You can actually
             set all the possible options in this file, including line-width,
@@ -575,6 +580,8 @@ def create_parser():
             <++>change the extension for the output file. Any extension handled
             by :code:`matplotlib` can be used<++>. (`pdf` (default), `png`
             (faster))<++>
+        <**>--num-columns-1d<**> : int
+            <++>for 1d plot, number of plots per horizontal raw; if 'None' this is set automatically<++> (trying to approach a square plot).<++>
         <**>--fontsize<**> : int
             <++>desired fontsize<++> (default to 16)<++>
         <**>--ticksize<**> : int
@@ -699,6 +706,9 @@ def create_parser():
     # -- stop run after first successful update using --update (EXPERIMENTAL)
     runparser.add_argument('--stop-after-update', help=helpdict['stop-after-update'],
                            dest='stop_after_update', action='store_true')
+    # display option
+    runparser.add_argument('--display-each-chi2', help=helpdict['display-each-chi2'],
+                           dest='display_each_chi2', action='store_true')
 
     ###############
     # MCMC restart from chain or best fit file
@@ -782,6 +792,9 @@ def create_parser():
     # -- to remove the mean-likelihood line
     infoparser.add_argument('--no-mean', help=helpdict['no-mean'],
                             dest='mean_likelihood', action='store_false')
+    # -- to remove the mean and 68% limits on top of each 1D plot
+    infoparser.add_argument('--short-title-1d', help=helpdict['short-title-1d'],
+                            dest='short_title_1d', action='store_true')
     # -- possible plot file describing custom commands
     infoparser.add_argument('--extra', help=helpdict['extra'],
                             dest='optional_plot_file', default='')
@@ -802,6 +815,9 @@ def create_parser():
     # but takes long, valid options are png and eps)
     infoparser.add_argument('--ext', help=helpdict['ext'],
                             type=str, dest='extension', default='pdf')
+    # -- to set manually the number of plots per hoorizontal raw in 1d plot
+    infoparser.add_argument('--num-columns-1d', help=helpdict['num-columns-1d'],
+                            type=int, dest='num_columns_1d')
     # -- only analyze the markovian part of the chains
     infoparser.add_argument('--keep-non-markovian', help=helpdict['keep-non-markovian'],
                             dest='markovian', action='store_false')

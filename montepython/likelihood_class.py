@@ -885,7 +885,8 @@ class Likelihood_clik(Likelihood):
         except clik.lkl.CError:
             raise io_mp.LikelihoodError(
                 "The path to the .clik file for the likelihood "
-                "%s was not found where indicated." % self.name +
+                "%s was not found where indicated:\n%s\n"
+                % (self.name,self.path_clik) +
                 " Note that the default path to search for it is"
                 " one directory above the path['clik'] field. You"
                 " can change this behaviour in all the "
@@ -903,7 +904,7 @@ class Likelihood_clik(Likelihood):
         self.nuisance = list(self.clik.extra_parameter_names)
 
         # line added to deal with a bug in planck likelihood release: A_planck called A_Planck in plik_lite
-        if (self.name == 'Planck_highl_lite'):
+        if (self.name == 'Planck_highl_lite') or (self.name == 'Planck_highl_TTTEEE_lite'):
             for i in range(len(self.nuisance)):
                 if (self.nuisance[i] == 'A_Planck'):
                     self.nuisance[i] = 'A_planck'
@@ -1019,7 +1020,7 @@ class Likelihood_clik(Likelihood):
         for nuisance in self.clik.get_extra_parameter_names():
 
             # line added to deal with a bug in planck likelihood release: A_planck called A_Planck in plik_lite
-            if (self.name == 'Planck_highl_lite'):
+            if (self.name == 'Planck_highl_lite') or (self.name == 'Planck_highl_TTTEEE_lite'):
                 if nuisance == 'A_Planck':
                     nuisance = 'A_planck'
 
@@ -2004,21 +2005,29 @@ class Likelihood_mpk(Likelihood):
                 self.create_fid = False
 
             if self.create_fid == True:
-                print 'sdss_lrgDR7: Creating fiducial file with Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
-                print '             Required for non-linear modeling'
                 # Calculate relevant flat fiducial quantities
                 fidnlratio, fidNEAR, fidMID, fidFAR = self.get_flat_fid(cosmo,data,kh,z,sigma2bao)
-                # Save non-linear corrections from N-body sims for each redshift bin
-                arr=np.zeros((np.size(kh),7))
-                arr[:,0]=kh
-                arr[:,1]=fidNEAR
-                arr[:,2]=fidMID
-                arr[:,3]=fidFAR
-                # Save non-linear corrections from halofit for each redshift bin
-                arr[:,4:7]=fidnlratio
-                np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
-                self.create_fid = False
-                print '             Fiducial created'
+                try:
+                    existing_fid = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
+                    print 'Fiducial deviations, near, mid far:', np.sum(existing_fid[:,1] - fidNEAR),np.sum(existing_fid[:,2] - fidMID), np.sum(existing_fid[:,3] - fidFAR)
+                    if np.sum(existing_fid[:,1] - fidNEAR) < 10**-5:
+                        self.create_fid = False
+                except:
+                    pass
+                if self.create_fid == True:
+                    print 'sdss_lrgDR7: Creating fiducial file with Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
+                    print '             Required for non-linear modeling'
+                    # Save non-linear corrections from N-body sims for each redshift bin
+                    arr=np.zeros((np.size(kh),7))
+                    arr[:,0]=kh
+                    arr[:,1]=fidNEAR
+                    arr[:,2]=fidMID
+                    arr[:,3]=fidFAR
+                    # Save non-linear corrections from halofit for each redshift bin
+                    arr[:,4:7]=fidnlratio
+                    np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
+                    self.create_fid = False
+                    print '             Fiducial created'
 
             # Load fiducial model
             fiducial = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
@@ -2293,6 +2302,7 @@ class Likelihood_mpk(Likelihood):
         cosmo.empty()
         data.cosmo_arguments = param_backup
         cosmo.set(data.cosmo_arguments)
+        cosmo.compute(['lensing'])
 
         return fidnlratio, fidNEAR, fidMID, fidFAR
 
