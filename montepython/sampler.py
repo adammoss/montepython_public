@@ -328,17 +328,17 @@ def get_covariance_matrix(cosmo, data, command_line):
 
 
 def get_fisher_matrix(cosmo, data, command_line, matrix):
-    # Adapted by T. Brinckmann
+    # Adapted by T. Brinckmann, T. Tram
     # We will work out the fisher matrix for all the parameters and
     # write it to a file
     if not command_line.silent:
         warnings.warn("Fisher implementation is being tested")
 
     # Let us create a separate copy of data
-    from copy import deepcopy
+    #from copy import deepcopy
     # Do not modify data, instead copy
-    temp_data = deepcopy(data)
-    done = False
+    #temp_data = deepcopy(data)
+    #done = False
 
     # Create the center dictionary, which will hold the center point
     # information (or best-fit) TODO
@@ -348,15 +348,22 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
     parameter_names = data.get_mcmc_parameters(['varying'])
     if not command_line.bf:
         for elem in parameter_names:
-            temp_data.mcmc_parameters[elem]['current'] = (
-                data.mcmc_parameters[elem]['initial'][0])
+            #temp_data.mcmc_parameters[elem]['current'] = (
+            #    data.mcmc_parameters[elem]['initial'][0])
             center[elem] = data.mcmc_parameters[elem]['initial'][0]
     else:
-        read_args_from_bestfit(temp_data, command_line.bf)
+        #read_args_from_bestfit(temp_data, command_line.bf)
+        read_args_from_bestfit(data, command_line.bf)
         for elem in parameter_names:
-            temp_data.mcmc_parameters[elem]['current'] = (
-                temp_data.mcmc_parameters[elem]['last_accepted'])
-            center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
+            #temp_data.mcmc_parameters[elem]['current'] = (
+            #    temp_data.mcmc_parameters[elem]['last_accepted'])
+            #center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
+            center[elem] = data.mcmc_parameters[elem]['last_accepted']
+
+    scales = np.zeros((len(parameter_names)))
+    for index, elem in enumerate(parameter_names):
+        data.mcmc_parameters[elem]['current'] = center[elem]
+        scales[index] = data.mcmc_parameters[elem]['scale']
 
     # Load stepsize from input covmat or covmat generated from param file
     # JL TODO: check this, and try another scheme to be sure that index and elem refer to the same params in the same order
@@ -373,8 +380,10 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
         print ("Compute Fisher [iteration %d/%d] with following stepsizes:" % (fisher_iteration,command_line.fisher_it))
         for index in range(len(parameter_names)):
             print "%s : %e" % (parameter_names[index],stepsize[index])
+        #fisher_matrix, gradient = compute_fisher(
+        #    temp_data, cosmo, center, stepsize)
         fisher_matrix, gradient = compute_fisher(
-            temp_data, cosmo, center, stepsize)
+            data, cosmo, center, stepsize)
         if not command_line.silent:
             print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,command_line.fisher_it))
         io_mp.write_covariance_matrix(
@@ -395,6 +404,9 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
 
         for index in range(len(parameter_names)):
             stepsize[index] = (inv_fisher_matrix[index,index])**0.5
+
+    # Removing scale factors in order to store true parameter covariance
+    inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
 
     # Write the last inverse Fisher matrix as the new covariance matrix
     io_mp.write_covariance_matrix(

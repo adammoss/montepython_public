@@ -479,15 +479,16 @@ def create_parser():
             <++>start a new chain from the bestfit file<++> computed with
             analyze.  (*OPT*)<++>
         <**>--fisher<**> : None
-            <++>Calculates the fisher matrix and its inverse<++>, which can be used
-            as proposal distribution<++>
+            <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
+            The inverse Fisher matrix can be used as a proposal distribution covmat,
+            or to make plots with Fisher ellipses.<++>
         <**>--fisher-it<**> : int
-            <++>Number of iterations for fisher matrix computation<++>
-            (Default: 1)
+            <++>Number of iterations for Fisher matrix computation<++>,
+            used by both options --fisher and --start-from-fisher (Default: 1)
             <++>
         <**>--start-from-fisher<**> : None
-            <++>Calculates the inverse of the fisher matrix<++> to use as
-            proposal distribution<++>
+            <++>Calculates the inverse Fisher matrix, and then run<++> using it as
+            a proposal distribution covmat.<++>
         <**>--silent<**> : None
             <++>silence the standard output<++> (useful when running on
             clusters)<++>
@@ -605,8 +606,11 @@ def create_parser():
             <++>interpolation factor for plotting posteriors<++>,
             1 means no interpolation, increase for smoother curves<++>
         <**>--plot-fisher<**> : None
-            <++>tries to plot Fisher ellipses<++>,
-            if the previous run has produced a Fisher matrix and stored it<++>
+            <++>Tries to add Fisher ellipses to contour plots<++>,
+            if a previous run has produced a Fisher matrix and stored it.<++>
+        <**>--use-fisher-it<**> : int
+            <++>if set to N, Fisher ellipses based on file inv_fisherN.mat<++>,
+            (Default: 1)<++>
 
 
     Returns
@@ -843,6 +847,8 @@ def create_parser():
     # -- plot Fisher ellipses
     infoparser.add_argument('--plot-fisher', help=helpdict['plot-fisher'],
                            dest='plot_fisher',action='store_true')
+    infoparser.add_argument('--use-fisher-it', help=helpdict['use-fisher-it'],
+                            dest='use_fisher_it',type=int,default=1)
 
     return parser
 

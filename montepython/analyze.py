@@ -407,7 +407,7 @@ def compute_posterior(information_instances):
     if info.plot_fisher:
         try:
             # read inv_fisher file
-            file_name = os.path.join(info.folder, 'inv_fisher1.mat')
+            file_name = os.path.join(info.folder, 'inv_fisher%d.mat' % info.use_fisher_it)
             n=0
             with open(file_name, 'r') as f:
                 inv_fisher = np.zeros((len(info.ref_names), len(info.ref_names)), 'float64')
