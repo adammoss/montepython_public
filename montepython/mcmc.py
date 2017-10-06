@@ -199,7 +199,7 @@ def chain(cosmo, data, command_line):
     After having selected a starting point in parameter space defining the
     first **last accepted** one, it will, for a given amount of steps :
 
-    + choose randomnly a new point following the *proposal density*,
+    + choose randomly a new point following the *proposal density*,
     + compute the cosmological *observables* through the cosmological module,
     + compute the value of the *likelihoods* of the desired experiments at this
       point,
@@ -538,7 +538,7 @@ def chain(cosmo, data, command_line):
                         jump_file.close()
                     # End of main part of superupdate routine
 
-                if not (k-1) % command_line.update:
+                if not (k-1) % command_line.update/3:
                     try:
                         # Read the covmat
                         sigma_eig, U, C = sampler.get_covariance_matrix(
@@ -641,7 +641,7 @@ def chain(cosmo, data, command_line):
                 # End of slave superupdate routine
 
                 # Start of slave update routine
-                if not (k-1) % command_line.update:
+                if not (k-1) % command_line.update/3:
                     try:
                         sigma_eig, U, C = sampler.get_covariance_matrix(
                             cosmo, data, command_line)
