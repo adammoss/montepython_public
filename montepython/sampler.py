@@ -370,9 +370,12 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
     # Load stepsize from input covmat or covmat generated from param file
     # JL TODO: check this, and try another scheme to be sure that index and elem refer to the same params in the same order
     # here the stepsizes are for the scaled parameter (e.g. 100*omega_b)
-    stepsize = np.zeros(len(parameter_names))
+    stepsize = np.zeros([len(parameter_names),2])
     for index in range(len(parameter_names)):
-        stepsize[index] = (matrix[index][index])**0.5
+        stepsize[index,0] = (matrix[index][index])**0.5
+        stepsize[index,1] = (matrix[index][index])**0.5
+    # Adjust stepsize in case step exceeds boundary
+    adjust_fisher_bounds(data,center,stepsize)
 
     fisher_iteration = 0
     while fisher_iteration < command_line.fisher_it:
@@ -381,7 +384,7 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
         # point.
         print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,command_line.fisher_it))
         for index in range(len(parameter_names)):
-            print "%s : %e" % (parameter_names[index],stepsize[index])
+            print "%s : left %e, right %e" % (parameter_names[index],stepsize[index,0],stepsize[index,1])
 
         fisher_matrix, gradient = compute_fisher(data, cosmo, center, stepsize)
         if not command_line.silent:
@@ -398,7 +401,10 @@ def get_fisher_matrix(cosmo, data, command_line, matrix):
 
         # stepsize for the next iteration
         for index in range(len(parameter_names)):
-            stepsize[index] = (inv_fisher_matrix[index,index])**0.5
+            stepsize[index,0] = (inv_fisher_matrix[index,index])**0.5
+            stepsize[index,1] = (inv_fisher_matrix[index,index])**0.5
+        # Adjust stepsize in case step exceeds boundary
+        adjust_fisher_bounds(data,center,stepsize)
 
         # take scalings into account and write the matrices in files
         fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
@@ -469,7 +475,7 @@ def compute_lkl(cosmo, data):
         sum of the likelihoods of the experiments specified in the input
         parameter file.
 
-        This function returns :attr:`data.boundary_loglkie
+        This function returns :attr:`data.boundary_loglike
         <data.data.boundary_loglike>`, defined in the module :mod:`data` if
         *i)* the current point in the parameter space has hit a prior edge, or
         *ii)* the cosmological module failed to compute the model. This value
@@ -641,32 +647,69 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
     if two:
         name_2, diff_2 = two
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1)
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2)
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
         data.update_cosmo_arguments()
         loglike_1 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1)
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2)
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
         data.update_cosmo_arguments()
         loglike_2 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1)
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2)
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
         data.update_cosmo_arguments()
         loglike_3 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1)
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2)
+        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
+        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
         data.update_cosmo_arguments()
         loglike_4 = compute_lkl(cosmo, data)
+
+        # If the left and right step sizes are equal these terms will cancel
+        if diff_2[0] == diff_2[1]:
+            loglike_5 = 0.
+            loglike_6 = 0.
+        else:
+            data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2])
+            data.update_cosmo_arguments()
+            loglike_5 = compute_lkl(cosmo, data)
+
+            data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2])
+            data.update_cosmo_arguments()
+            loglike_6 = compute_lkl(cosmo, data)
+
+        # If the left and right step sizes are equal these terms will cancel
+        if diff_1[0] == diff_1[1]:
+            loglike_7 = 0.
+            loglike_8 = 0.
+        else:
+            data.mcmc_parameters[name_1]['current'] = (center[name_1])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
+            data.update_cosmo_arguments()
+            loglike_7 = compute_lkl(cosmo, data)
+
+            data.mcmc_parameters[name_1]['current'] = (center[name_1])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
+            data.update_cosmo_arguments()
+            loglike_8 = compute_lkl(cosmo, data)
 
         data.mcmc_parameters[name_1]['current'] = (center[name_1])
         data.mcmc_parameters[name_2]['current'] = (center[name_2])
         data.update_cosmo_arguments()
 
-        fisher_off_diagonal = -(
-            loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
+        #fisher_off_diagonal = -(
+        #    loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
+        # In the case of symmetric steps reduces to -(loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
+        fisher_off_diagonal = -((1./(diff_2[0]**2./diff_2[1]+diff_2[0]))* # sym. \Delta p_j: reduces to 1/(2 \Delta p_j)
+                                (1./(diff_1[0]**2./diff_1[1]+diff_1[0]))* # sym. \Delta p_i: reduces to 1/(2 \Delta p_i)
+                                ((diff_2[0]/diff_2[1])**2. * ((diff_1[0]/diff_1[1])**2.*loglike_1 - loglike_3) # sym. \Delta p_i and \Delta p_j: reduces to loglike_1 - loglike_3
+                                 -(diff_1[0]/diff_1[1])**2.*loglike_2 + loglike_4 # sym \Delta p_i: reduces to loglike_4 - loglike_2
+                                 +((diff_2[0]/diff_2[1])**2.-1.) * (loglike_6 - (diff_1[0]/diff_1[1])**2.*loglike_5 + ((diff_1[0]/diff_1[1])**2.-1.)*loglike_min) # cancels if sym. \Delta p_j
+                                 +((diff_1[0]/diff_1[1])**2.-1.) * (loglike_8 - (diff_2[0]/diff_2[1])**2.*loglike_7))) # cancels if sym. \Delta p_i
 
         return fisher_off_diagonal
     # It is otherwise a diagonal component
@@ -680,7 +723,7 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
 
         #print center[name_1] - 2.*diff_1,-loglike_left
 
-        data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1
+        data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1[0]
         data.update_cosmo_arguments()
         loglike_left = compute_lkl(cosmo, data)
 
@@ -700,7 +743,7 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
 
         #print center[name_1] + 0.5*diff_1,-loglike_right
 
-        data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1
+        data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1[1]
         data.update_cosmo_arguments()
         loglike_right = compute_lkl(cosmo, data)
 
@@ -717,7 +760,31 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
         data.mcmc_parameters[name_1]['current'] = center[name_1]
         data.update_cosmo_arguments()
 
-        fisher_diagonal = -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
-        gradient = -(loglike_right-loglike_left)/(2.*diff_1)
+        #fisher_diagonal = -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
+        # In case of symmetric steps reduces to -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
+        fisher_diagonal = -2.*((diff_1[0]/diff_1[1])*loglike_right-(diff_1[0]/diff_1[1]+1.)
+                               *loglike_min+loglike_left)/(diff_1[0]*diff_1[1]+diff_1[0]**2.)
+
+        #gradient = -(loglike_right-loglike_left)/(2.*diff_1)
+        # In case of symmetric steps reduces to -(loglike_right-loglike_left)/(2.*diff_1)
+        gradient = -((diff_1[0]/diff_1[1])**2.*loglike_right-loglike_left-((diff_1[0]/diff_1[1])**2.-1.)
+                     *loglike_min)/((diff_1[0]**2./diff_1[0])*diff_1[0])
 
         return fisher_diagonal, gradient
+
+
+def adjust_fisher_bounds(data, center, step_size):
+    # For the Fisher approach we may need to adjust the step size if the step
+    # exceed the bounds on the parameter given in the param file. We Loop through
+    # all parameters, adjusting the step size of any parameter where that step
+    # exceeded the bounds.
+    for index, elem in enumerate(data.get_mcmc_parameters(['varying'])):
+        param = data.mcmc_parameters[elem]['initial']
+        if param[1] != None:
+            if param[1] > center[elem] - step_size[index,0]:
+                step_size[index,0] = center[elem] - param[1]
+        if param[2] != None:
+            if param[2] < center[elem] + step_size[index,1]:
+                step_size[index,1] = param[2] - center[elem]
+
+    return step_size
