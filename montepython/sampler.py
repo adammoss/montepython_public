@@ -616,30 +616,35 @@ def compute_fisher(data, cosmo, center, step_size):
     for k, elem_k in enumerate(parameter_names):
         kdiff = step_size[k]
 
-        # loop over second parameter
-        for h, elem_h in enumerate(parameter_names):
-            hdiff = step_size[h]
+        # loop over step direction
+        for step_index in [0,1]:
 
-            # Since the matrix is symmetric, we only compute the
-            # elements of one half of it plus the diagonal.
-            if k > h:
-                continue
-            print 'Computing fisher element (%d,%d)' % (k,h)
-            if k != h:
-                fisher_matrix[k][h] = compute_fisher_element(
-                    data, cosmo, center, loglike_min,
-                    (elem_k, kdiff),
-                    (elem_h, hdiff))
-                fisher_matrix[h][k] = fisher_matrix[k][h]
-            else:
-                fisher_matrix[k][k], gradient[k] = compute_fisher_element(
-                    data, cosmo, center, loglike_min,
-                    (elem_k, kdiff))
+            # loop over second parameter
+            for h, elem_h in enumerate(parameter_names):
+                hdiff = step_size[h]
+
+                # Since the matrix is symmetric, we only compute the
+                # elements of one half of it plus the diagonal.
+                if k > h:
+                    continue
+                print 'Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
+                elif != h:
+                    fisher_matrix[k][h] += compute_fisher_element(
+                        data, cosmo, center, loglike_min, step_index,
+                        (elem_k, kdiff),
+                        (elem_h, hdiff))
+                    fisher_matrix[h][k] = fisher_matrix[k][h]
+                else:
+                    temp1, temp2 = compute_fisher_element(
+                        data, cosmo, center, loglike_min, step_index,
+                        (elem_k, kdiff))
+                    fisher_matrix[k][k] += temp1
+                    gradient[k] += temp2
 
     return fisher_matrix, gradient
 
 
-def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
+def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, two=None):
     # JL TODO: add tests: if a point goes beyond the boundary, use single-sided values
     # note that here everything stands for unscaled parameters (e.g. 100*omega_b)
     # Unwrap
@@ -647,59 +652,114 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
     if two:
         name_2, diff_2 = two
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
-        data.update_cosmo_arguments()
-        loglike_1 = compute_lkl(cosmo, data)
+        if step_index == 1:
+            step_vector = vectorize_dictionary(data,center,diff_1[1],name_1,diff_2[1],name_2)
+            data.check_for_slow_step(step_vector)
+            for elem in center:
+                data.mcmc_parameters[elem]['current'] = center[elem]
+            #print name_1, name_2, '++', data.need_cosmo_update
+            data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
+            data.update_cosmo_arguments()
+            loglike_1 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
-        data.update_cosmo_arguments()
-        loglike_2 = compute_lkl(cosmo, data)
+            step_vector = vectorize_dictionary(data,center,diff_1[1],name_1,-diff_2[0],name_2)
+            data.check_for_slow_step(step_vector)
+            #print name_1, name_2, '+-', data.need_cosmo_update
+            data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
+            data.update_cosmo_arguments()
+            loglike_2 = compute_lkl(cosmo, data)
+        else:
+            loglike_1 = 0
+            loglike_2 = 0
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
-        data.update_cosmo_arguments()
-        loglike_3 = compute_lkl(cosmo, data)
+        if step_index == 0:
+            step_vector = vectorize_dictionary(data,center,-diff_1[0],name_1,diff_2[1],name_2)
+            data.check_for_slow_step(step_vector)
+            for elem in center:
+                data.mcmc_parameters[elem]['current'] = center[elem]
+            #print name_1, name_2, '-+', data.need_cosmo_update
+            data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
+            data.update_cosmo_arguments()
+            loglike_3 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
-        data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
-        data.update_cosmo_arguments()
-        loglike_4 = compute_lkl(cosmo, data)
+            step_vector = vectorize_dictionary(data,center,-diff_1[0],name_1,-diff_2[0],name_2)
+            data.check_for_slow_step(step_vector)
+            #print name_1, name_2, '--', data.need_cosmo_update
+            data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
+            data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
+            data.update_cosmo_arguments()
+            loglike_4 = compute_lkl(cosmo, data)
+        else:
+            loglike_3 = 0
+            loglike_4 = 0
+
 
         # If the left and right step sizes are equal these terms will cancel
         if diff_2[0] == diff_2[1]:
             loglike_5 = 0.
             loglike_6 = 0.
         else:
-            data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
-            data.mcmc_parameters[name_2]['current'] = (center[name_2])
-            data.update_cosmo_arguments()
-            loglike_5 = compute_lkl(cosmo, data)
+            if step_index == 1:
+                step_vector = vectorize_dictionary(data,center,diff_1[1],name_1,None,None)
+                data.check_for_slow_step(step_vector)
+                for elem in center:
+                    data.mcmc_parameters[elem]['current'] = center[elem]
+                #print name_1, name_2, '+/', data.need_cosmo_update
+                data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
+                data.mcmc_parameters[name_2]['current'] = (center[name_2])
+                data.update_cosmo_arguments()
+                loglike_5 = compute_lkl(cosmo, data)
+            else:
+                loglike_5 = 0
 
-            data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
-            data.mcmc_parameters[name_2]['current'] = (center[name_2])
-            data.update_cosmo_arguments()
-            loglike_6 = compute_lkl(cosmo, data)
+            if step_index == 0:
+                step_vector = vectorize_dictionary(data,center,-diff_1[0],name_1,None,None)
+                data.check_for_slow_step(step_vector)
+                for elem in center:
+                    data.mcmc_parameters[elem]['current'] = center[elem]
+                #print name_1, name_2, '-/', data.need_cosmo_update
+                data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
+                data.mcmc_parameters[name_2]['current'] = (center[name_2])
+                data.update_cosmo_arguments()
+                loglike_6 = compute_lkl(cosmo, data)
+            else:
+                loglike_6 = 0
 
         # If the left and right step sizes are equal these terms will cancel
         if diff_1[0] == diff_1[1]:
             loglike_7 = 0.
             loglike_8 = 0.
         else:
+            step_vector = vectorize_dictionary(data,center,None,None,diff_2[1],name_2)
+            data.check_for_slow_step(step_vector)
+            for elem in center:
+                data.mcmc_parameters[elem]['current'] = center[elem]
+            #print name_1, name_2, '/+', data.need_cosmo_update
             data.mcmc_parameters[name_1]['current'] = (center[name_1])
             data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
             data.update_cosmo_arguments()
             loglike_7 = compute_lkl(cosmo, data)
 
+            step_vector = vectorize_dictionary(data,center,None,None,-diff_2[0],name_2)
+            data.check_for_slow_step(step_vector)
+            #print name_1, name_2, '/-', data.need_cosmo_update
             data.mcmc_parameters[name_1]['current'] = (center[name_1])
             data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
             data.update_cosmo_arguments()
             loglike_8 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] = (center[name_1])
-        data.mcmc_parameters[name_2]['current'] = (center[name_2])
-        data.update_cosmo_arguments()
+        #data.mcmc_parameters[name_1]['current'] = (center[name_1])
+        #data.mcmc_parameters[name_2]['current'] = (center[name_2])
+        #data.update_cosmo_arguments()
+
+        # Count the bestfit term at most once
+        if step_index:
+            loglike_min = 0
+
+        #print loglike_min, loglike_1, loglike_2, loglike_3, loglike_4, loglike_5, loglike_6, loglike_7, loglike_8
 
         #fisher_off_diagonal = -(
         #    loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
@@ -714,56 +774,43 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
         return fisher_off_diagonal
     # It is otherwise a diagonal component
     else:
+        if step_index == 0:
+            step_vector = vectorize_dictionary(data,center,-diff_1[0],name_1,None,None)
+            data.check_for_slow_step(step_vector)
+            for elem in center:
+                data.mcmc_parameters[elem]['current'] = center[elem]
+            #print name_1, '-', data.need_cosmo_update
+            data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1[0]
+            data.update_cosmo_arguments()
+            loglike_left = compute_lkl(cosmo, data)
+        else:
+            loglike_left = 0
 
-        #print center[name_1], diff_1
+        if step_index == 1:
+            step_vector = vectorize_dictionary(data,center,diff_1[1],name_1,None,None)
+            data.check_for_slow_step(step_vector)
+            for elem in center:
+                data.mcmc_parameters[elem]['current'] = center[elem]
+            #print name_1, '+', data.need_cosmo_update
+            data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1[1]
+            data.update_cosmo_arguments()
+            loglike_right = compute_lkl(cosmo, data)
+        else:
+            loglike_right = 0
 
-        #data.mcmc_parameters[name_1]['current'] = center[name_1] - 2.*diff_1
+        #data.mcmc_parameters[name_1]['current'] = center[name_1]
         #data.update_cosmo_arguments()
-        #loglike_left = compute_lkl(cosmo, data)
 
-        #print center[name_1] - 2.*diff_1,-loglike_left
+        # Count the bestfit term at most once
+        if step_index:
+            loglike_min = 0
 
-        data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1[0]
-        data.update_cosmo_arguments()
-        loglike_left = compute_lkl(cosmo, data)
-
-        #print center[name_1] - diff_1,-loglike_left
-
-        #data.mcmc_parameters[name_1]['current'] = center[name_1] - 0.5*diff_1
-        #data.update_cosmo_arguments()
-        #loglike_left = compute_lkl(cosmo, data)
-
-        #print center[name_1] - 0.5*diff_1,-loglike_left
-
-        #print center[name_1],-loglike_min
-
-        #data.mcmc_parameters[name_1]['current'] = center[name_1] + 0.5*diff_1
-        #data.update_cosmo_arguments()
-        #loglike_right = compute_lkl(cosmo, data)
-
-        #print center[name_1] + 0.5*diff_1,-loglike_right
-
-        data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1[1]
-        data.update_cosmo_arguments()
-        loglike_right = compute_lkl(cosmo, data)
-
-        #print center[name_1]+diff_1,-loglike_right
-
-        #data.mcmc_parameters[name_1]['current'] = center[name_1] + 2.*diff_1
-        #data.update_cosmo_arguments()
-        #loglike_right = compute_lkl(cosmo, data)
-
-        #print center[name_1] + 2.*diff_1,-loglike_right
-
-        #exit()
-
-        data.mcmc_parameters[name_1]['current'] = center[name_1]
-        data.update_cosmo_arguments()
+        #print loglike_min, loglike_right, loglike_left
 
         #fisher_diagonal = -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
         # In case of symmetric steps reduces to -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
         fisher_diagonal = -2.*((diff_1[0]/diff_1[1])*loglike_right-(diff_1[0]/diff_1[1]+1.)
-                               *loglike_min+loglike_left)/(diff_1[0]*diff_1[1]+diff_1[0]**2.)
+                                *loglike_min+loglike_left)/(diff_1[0]*diff_1[1]+diff_1[0]**2.)
 
         #gradient = -(loglike_right-loglike_left)/(2.*diff_1)
         # In case of symmetric steps reduces to -(loglike_right-loglike_left)/(2.*diff_1)
@@ -781,10 +828,34 @@ def adjust_fisher_bounds(data, center, step_size):
     for index, elem in enumerate(data.get_mcmc_parameters(['varying'])):
         param = data.mcmc_parameters[elem]['initial']
         if param[1] != None:
+            if param[1] > center[elem]:
+                raise io_mp.ConfigurationError("Error in parameter ranges: left edge %e bigger than central value %e.\n"
+                                               %(param[1],center[elem]))
             if param[1] > center[elem] - step_size[index,0]:
                 step_size[index,0] = center[elem] - param[1]
         if param[2] != None:
+            if param[2] < center[elem]:
+                raise io_mp.ConfigurationError("Error in parameter ranges: right edge %e smaller than central value %e.\n"
+                                               %(param[2],center[elem]))
             if param[2] < center[elem] + step_size[index,1]:
                 step_size[index,1] = param[2] - center[elem]
 
     return step_size
+
+
+def vectorize_dictionary(data, center, diff_1, name_1, diff_2, name_2):
+    # In order to compare the last step to the current step via
+    # data.check_for_slow_step we need the parameters ordered
+    # correctly as an array.
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    step_vector = np.zeros(len(center))
+    for elem in parameter_names:
+        index = parameter_names.index(elem)
+        step_vector[index] = center[elem]
+        if elem == name_1:
+            step_vector[index] += diff_1
+        if elem == name_2:
+            step_vector[index] += diff_2
+
+    return step_vector
+
