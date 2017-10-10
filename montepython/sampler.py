@@ -628,7 +628,7 @@ def compute_fisher(data, cosmo, center, step_size):
                 if k > h:
                     continue
                 print 'Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
-                elif != h:
+                if k != h:
                     fisher_matrix[k][h] += compute_fisher_element(
                         data, cosmo, center, loglike_min, step_index,
                         (elem_k, kdiff),
