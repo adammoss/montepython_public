@@ -400,6 +400,15 @@ class Data(object):
         # Finally create all the instances of the Parameter given the input.
         for key, value in self.parameters.iteritems():
             self.mcmc_parameters[key] = Parameter(value, key)
+
+            # When there is no prior edge requested, the syntax consists in setting it to 'None' in the input file.
+            # There is also an old syntax which is deprecated: '-1'.
+            # We still allow for that, but just after parsing it, we substitute it with 'None'.
+            # When the user really wants a prior edge in -1, he can write -1.0, then the next lines will not substitute it.
+            for i in [1,2]:
+                if (str(self.mcmc_parameters[key]['initial'][i]) == '-1'):
+                    self.mcmc_parameters[key]['initial'][i] = None
+
         """
         Transform from parameters dictionary to mcmc_parameters dictionary of
         instances from the class :class:`parameter` (inheriting from dict)
