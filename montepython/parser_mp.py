@@ -619,13 +619,15 @@ def create_parser():
         <**>--interpolation-smoothing<**> : float
             <++>interpolation factor for plotting posteriors<++>,
             1 means no interpolation, increase for smoother curves<++>
+        <**>--posterior-smoothing<**> : int
+            <++>smoothing scheme for 1d posteriors<++>,
+            0 means no smoothing, 1 means cubic interpolation, higher means fitting ln(L) with polynomial of order n<++>
         <**>--plot-fisher<**> : None
             <++>Tries to add Fisher ellipses to contour plots<++>,
             if a previous run has produced a Fisher matrix and stored it.<++>
         <**>--use-fisher-it<**> : int
             <++>if set to N, Fisher ellipses based on file inv_fisherN.mat<++>,
             (Default: 1)<++>
-
 
     Returns
     -------
@@ -872,6 +874,9 @@ def create_parser():
                            dest='plot_fisher',action='store_true')
     infoparser.add_argument('--use-fisher-it', help=helpdict['use-fisher-it'],
                             dest='use_fisher_it',type=int,default=1)
+
+    infoparser.add_argument('--posterior-smoothing', help=helpdict['posterior-smoothing'],
+                            type=int, default=5)
 
     return parser
 
