@@ -780,10 +780,18 @@ def adjust_fisher_bounds(data, center, step_size):
     # exceeded the bounds.
     for index, elem in enumerate(data.get_mcmc_parameters(['varying'])):
         param = data.mcmc_parameters[elem]['initial']
+
         if param[1] != None:
+            if param[1] > center[elem]:
+                raise io_mp.ConfigurationError("Error in parameter ranges: left edge %e bigger than central value %e.\n"
+                                               %(param[1],center[elem]))
             if param[1] > center[elem] - step_size[index,0]:
                 step_size[index,0] = center[elem] - param[1]
+
         if param[2] != None:
+            if param[2] < center[elem]:
+                raise io_mp.ConfigurationError("Error in parameter ranges: right edge %e smaller than central value %e.\n"
+                                               %(param[2],center[elem]))
             if param[2] < center[elem] + step_size[index,1]:
                 step_size[index,1] = param[2] - center[elem]
 
