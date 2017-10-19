@@ -8,9 +8,10 @@ from math import exp, log, pi, log10
 # 'TS;' marks modifications by Tim Sprenger in 2017
 # to account for the difference between mu_fid and mu_th and V_fid and V_th
 # and to make all volumes comoving
-# In addition a new linear cutoff function 
-# and the nonlinear velocity dispersion sigma_NL have been added
-# and the theoretical error has been rescaled
+# In addition a new linear cutoff function and the nonlinear velocity dispersion sigma_NL have been added
+# The theoretical error has been rescaled
+# The possibility of bias nuisance was added
+
 
 class euclid_pk(Likelihood):
 
@@ -24,13 +25,9 @@ class euclid_pk(Likelihood):
         self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 1.5*self.k_cut(self.zmax)})
 
         # TS;Compute non-linear power spectrum if requested
-        if (self.theoretical_error!=0. or self.use_halofit):
+        if self.use_halofit:
             	self.need_cosmo_arguments(data, {'non linear':'halofit'})
 		print("Using halofit")
-
-	# TS;Print warning for combining theo. error and NL cutoff
-	if (self.use_zscaling and self.theoretical_error!=0.):
-		warnings.warn("You are using a theoretical error together with a nonlinear cutoff, which should be redundant!")
 
         #################
         # find number of galaxies for each mean redshift value
@@ -55,10 +52,6 @@ class euclid_pk(Likelihood):
         self.z = np.linspace(
             self.zmin-self.dz/2., self.zmax+self.dz/2.,
             num=2*self.nbin+1)
-
-        # At the center of each bin, compute the biais function, simply taken
-        # as sqrt(z_mean+1)
-        self.b = np.sqrt(self.z_mean+1)
 
         # Define the k values for the integration (from kmin to kmax), at which
         # the spectrum will be computed (and stored for the fiducial model)
@@ -104,6 +97,7 @@ class euclid_pk(Likelihood):
         self.D_A_fid = np.zeros(2*self.nbin+1, 'float64')
         self.sigma_r_fid = np.zeros(self.nbin, 'float64')
         self.V_fid = np.zeros(self.nbin, 'float64')
+        self.b_fid = np.zeros(self.nbin, 'float64')
 
         fid_file_path = os.path.join(self.data_directory, self.fiducial_file)
         if os.path.exists(fid_file_path):
@@ -126,6 +120,8 @@ class euclid_pk(Likelihood):
                     self.sigma_r_fid[index_z] = float(line.split()[0])
 		    #TS; store fiducial volume
 		    self.V_fid[index_z] = float(line.split()[1])
+		    #TS; store fiducial bias
+		    self.b_fid[index_z] = float(line.split()[2])
                     line = fid_file.readline()
 		#TS; save fiducial sigma_NL
 		self.sigma_NL_fid = float(line)
@@ -173,8 +169,12 @@ class euclid_pk(Likelihood):
 	if 'sigma_NL' in self.use_nuisance:
 		sigma_NL = data.mcmc_parameters['sigma_NL']['current']*data.mcmc_parameters['sigma_NL']['scale']
 
-	#for index_z in xrange(self.nbin):
-	#	print("sigma_r^2="+str(sigma_r[index_z]**2)+"\t sigma_NL^2="+str(sigma_NL**2))
+        # At the center of each bin, compute the bias function, simply taken
+        # as sqrt(z_mean+1)
+	if 'beta_0^Euclid' in self.use_nuisance:
+        	b = pow(1.+self.z_mean,0.5*data.mcmc_parameters['beta_1^Euclid']['current']*data.mcmc_parameters['beta_1^Euclid']['scale'])*data.mcmc_parameters['beta_0^Euclid']['current']*data.mcmc_parameters['beta_0^Euclid']['scale']
+	else:
+        	b = np.sqrt(1.+self.z_mean)
 
         # Compute V_survey, for each given redshift bin,
         # which is the volume of a shell times the sky coverage:
@@ -184,7 +184,7 @@ class euclid_pk(Likelihood):
             V_survey[index_z] = 4./3.*pi*self.fsky*(
                 r[2*index_z+2]**3-r[2*index_z]**3)
 
-        # If the fiducial model does not exists, recover the power spectrum and
+        # If the fiducial model does not exist, recover the power spectrum and
         # store it, then exit.
         if self.fid_values_exist is False:
             pk = np.zeros((self.k_size, 2*self.nbin+1), 'float64')
@@ -205,7 +205,7 @@ class euclid_pk(Likelihood):
                     fid_file.write('%.8g %.8g\n' % (H[index_z], D_A[index_z]))
                 for index_z in xrange(self.nbin):
 		# TS; get fiducial survey volume V_fid
-                    fid_file.write('%.8g %.8g\n' % (sigma_r[index_z], V_survey[index_z]))
+                    fid_file.write('%.8g %.8g %.8g\n' % (sigma_r[index_z], V_survey[index_z], b[index_z]))
 		# TS; get fiducial sigma_NL
 		fid_file.write('%.8g\n' % sigma_NL)
             print '\n'
@@ -224,14 +224,14 @@ class euclid_pk(Likelihood):
         # beta_fid(k_fid,z) = 1/2b(z) * d log(P_nl_fid(k_fid,z))/d log a
         #                   = -1/2b(z)* (1+z) d log(P_nl_fid(k_fid,z))/dz
 
-        beta_fid = -0.5/self.b*(1+self.z_mean)*np.log(
+        beta_fid = -0.5/self.b_fid*(1+self.z_mean)*np.log(
             self.pk_nl_fid[:, 2::2]/self.pk_nl_fid[:, :-2:2])/self.dz
 
         # Compute the tilde P_fid(k_ref,z,mu) = H_fid(z)/D_A_fid(z)**2 ( 1 + beta_fid(k_fid,z)mu^2)^2 P_nl_fid(k_fid,z)exp ( -k_fid^2 mu^2 sigma_r_fid^2)
         self.tilde_P_fid = np.zeros((self.k_size, self.nbin, self.mu_size),
                                     'float64')
         self.tilde_P_fid = self.H_fid[na, 1::2, na]/(
-            self.D_A_fid[na, 1::2, na])**2*(
+            self.D_A_fid[na, 1::2, na])**2*self.b_fid[na,:,na]**2*(
                 1. + beta_fid[:, :, na] * self.mu_fid[na, na, :]**2)**2 * (
             self.pk_nl_fid[:, 1::2, na]) * np.exp(
                 -self.k_fid[:, na, na]**2 * self.mu_fid[na, na, :]**2 *
@@ -249,7 +249,7 @@ class euclid_pk(Likelihood):
             for index_z in xrange(2*self.nbin+1):
                 self.k[index_k,index_z,:] = np.sqrt((1.-self.mu_fid[:]**2)*self.D_A_fid[index_z]**2/D_A[index_z]**2 + self.mu_fid[:]**2*H[index_z]**2/self.H_fid[index_z]**2 )*self.k_fid[index_k]
 
-	# TS; Compute values of mu based on mu_fid with formula
+	# TS; Compute values of mu based on mu_fid with
 	# mu^2 = mu_fid^2 / (mu_fid^2 + ((H_fid*D_A_fid)/(H*D_A))^2)*(1 - mu_fid^2))
 	self.mu = np.zeros((self.nbin,self.mu_size),'float64')
 	for index_z in xrange(self.nbin):
@@ -270,47 +270,49 @@ class euclid_pk(Likelihood):
         # affected, set the scale to one, and make sure that the nuisance parameter
         # epsilon is set to zero
 	# TS; added self to use it in integrand function
-        self.k_sigma = np.zeros(2*self.nbin+1, 'float64')
-        if (cosmo.nonlinear_method == 0):
-            self.k_sigma[:]=1.e6
-        else :
-            self.k_sigma = cosmo.nonlinear_scale(self.z,2*self.nbin+1)
+        #self.k_sigma = np.zeros(2*self.nbin+1, 'float64')
+        #if (cosmo.nonlinear_method == 0):
+        #    self.k_sigma[:]=1.e6
+        #else :
+        #    self.k_sigma = cosmo.nonlinear_scale(self.z,2*self.nbin+1)
 
         # Define the alpha function, that will characterize the theoretical
-        # uncertainty.
-	# TS; added self, removed self.theoretical_error in new error normalization (see commented)
-        self.alpha = np.zeros((self.k_size,2*self.nbin+1,self.mu_size),'float64')
-        for index_z in xrange(2*self.nbin+1):
-            for index_mu in xrange(self.mu_size):
-                #self.alpha[:,index_z,index_mu] = np.log(1. + self.k[:,index_z,index_mu]/self.k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/self.k_sigma[index_z]))*self.theoretical_error
-                self.alpha[:,index_z,index_mu] = np.log(1. + self.k[:,index_z,index_mu]/self.k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/self.k_sigma[index_z]))
+        # uncertainty. (TS; = theoretical error envelope)
+	# TS; introduced new envelope (0:optimistic 1:pessimistic for ~2023), (for old envelope see commented)
+        self.alpha = np.zeros((self.k_size,self.nbin,self.mu_size),'float64')
+	th_c1 = 0.75056
+	th_c2 = 1.5120
+	th_a1 = 0.014806
+	th_a2 = 0.022047
+       	for index_z in xrange(self.nbin):
+	    k_z = cosmo.h()*pow(1.+self.z_mean[index_z],2./(2.+cosmo.n_s()))
+	    for index_mu in xrange(self.mu_size):
+	        for index_k in xrange(self.k_size):
+	            if self.k[index_k,2*index_z+1,index_mu]/k_z<0.3:
+	                self.alpha[index_k,index_z,index_mu] = th_a1*np.exp(th_c1*np.log10(self.k[index_k,2*index_z+1,index_mu]/k_z))
+	            else:
+	                self.alpha[index_k,index_z,index_mu] = th_a2*np.exp(th_c2*np.log10(self.k[index_k,2*index_z+1,index_mu]/k_z))
+	            #print('%s\t%s' % (self.k[index_k,2*index_z+1,index_mu]/k_z, self.alpha[index_k,index_z,index_mu]))
+                #alpha[:,index_z,index_mu] = np.log(1. + self.k[:,index_z,index_mu]/self.k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/self.k_sigma[index_z]))*self.theoretical_error
 
-        # recover the e_th part of the error function
-        e_th = self.coefficient_f_nu*cosmo.Omega_nu/cosmo.Omega_m()
 
-        # Compute the Error E_th function
-        #E_th = np.zeros((self.k_size,2*self.nbin+1,self.mu_size),'float64')
-        #for index_z in xrange(2*self.nbin+1):
-        #  for index_mu in xrange(self.mu_size):
-        #    E_th[:,index_z,index_mu] = np.log(1. + self.k[:,index_z,index_mu]/k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/k_sigma[index_z])) * e_th
+	# TS; Define fractional theoretical error variance R/P^2
+	self.R_var = np.zeros((self.k_size,self.nbin,self.mu_size),'float64')
+	for index_k in xrange(self.k_size):
+	    for index_z in xrange(self.nbin):
+	        self.R_var[index_k,index_z,:] = self.V_fid[index_z]/(2.*np.pi)**2*self.k_CorrLength_hMpc*cosmo.h()/self.z_CorrLength*self.dz*self.k_fid[index_k]**2*self.alpha[index_k,index_z,:]**2
 
-        #e_th=0.05
 
-        #index_z = self.nbin-1
-        #index_mu =self.mu_size-1
-        #for index_k in xrange(self.k_size):
-        #  print self.k[index_k,index_z,index_mu],pk_nl_th[index_k,index_z,index_mu]
+	# TS; neutrino error obsolete since halofit update, so commented
+	# TS; removed many commented lines that included an older neutrino error
 
-        if 'epsilon' in self.use_nuisance:
-            for index_z in xrange(2*self.nbin+1):
-                for index_mu in xrange(self.mu_size):
-                    pk_nl_th[:,index_z,index_mu] *= (1.+data.mcmc_parameters['epsilon']['current']*data.mcmc_parameters['epsilon']['scale']*np.log(1. + self.k[:,index_z,index_mu]/self.k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/self.k_sigma[index_z])) * e_th)
+        # recover the e_th part of the error function,
+        #e_th = self.coefficient_f_nu*cosmo.Omega_nu/cosmo.Omega_m()
 
-        #index_z = self.nbin-1
-        #index_mu =self.mu_size-1
-        #print ''
-        #for index_k in xrange(self.k_size):
-        #  print self.k[index_k,index_z,index_mu],pk_nl_th[index_k,index_z,index_mu]
+        #if 'epsilon' in self.use_nuisance:
+        #    for index_z in xrange(2*self.nbin+1):
+        #        for index_mu in xrange(self.mu_size):
+        #            pk_nl_th[:,index_z,index_mu] *= (1.+data.mcmc_parameters['epsilon']['current']*data.mcmc_parameters['epsilon']['scale']*np.log(1. + self.k[:,index_z,index_mu]/self.k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/self.k_sigma[index_z])) * e_th)
 
         # Compute the beta function for nl,
         # beta(k,z) = 1/2b(z) * d log(P_nl_th (k,z))/d log a
@@ -318,20 +320,14 @@ class euclid_pk(Likelihood):
         beta_th = np.zeros((self.k_size,self.nbin,self.mu_size),'float64')
         for index_k in xrange(self.k_size):
             for index_z in xrange(self.nbin):
-                beta_th[index_k,index_z,:] = -1./(2.*self.b[index_z]) * (1.+self.z_mean[index_z]) * np.log(pk_nl_th[index_k,2*index_z+2,:]/pk_nl_th[index_k,2*index_z,:])/(self.dz)
-
-        # Approximate the beta function without the error, and create the \tilde P_th_correction
-        #self.tilde_P_th_corr = np.zeros( (self.k_size,self.nbin,self.mu_size), 'float64')
-        #for index_k in xrange(self.k_size):
-        #  for index_z in xrange(self.nbin):
-        #    self.tilde_P_th_corr[index_k,index_z,:] = H[2*index_z+1]/(D_A[2*index_z+1]**2) * (1. + beta_th[index_k,index_z,:]*mu[:]*mu[:])**2*data.mcmc_parameters['epsilon']['current']*data.mcmc_parameters['epsilon']['scale']*E_th[index_k,2*index_z+1,:]* pk_nl_th[index_k,2*index_z+1,:] *np.exp(-self.k[index_k,2*index_z+1,:]**2*mu[:]**2*sigma_r[index_z]**2)
+                beta_th[index_k,index_z,:] = -1./(2.*b[index_z]) * (1.+self.z_mean[index_z]) * np.log(pk_nl_th[index_k,2*index_z+2,:]/pk_nl_th[index_k,2*index_z,:])/(self.dz)
 
         # Compute \tilde P_th(k,mu,z) = H(z)/D_A(z)^2 * (1 + beta(z,k) mu^2)^2 P_nl_th(k,z) exp(-k^2 mu^2 (sigma_r^2+sigma_NL^2))
 	# TS; mu -> self.mu, added sigma_NL contribution
         self.tilde_P_th = np.zeros( (self.k_size,self.nbin,self.mu_size), 'float64')
         for index_k in xrange(self.k_size):
             for index_z in xrange(self.nbin):
-                self.tilde_P_th[index_k,index_z,:] = H[2*index_z+1]/(D_A[2*index_z+1]**2) * (1. + beta_th[index_k,index_z,:]*self.mu[index_z,:]*self.mu[index_z,:])**2* pk_nl_th[index_k,2*index_z+1,:]*np.exp(-self.k[index_k,2*index_z+1,:]**2*self.mu[index_z,:]**2*(sigma_r[index_z]**2+sigma_NL**2))
+                self.tilde_P_th[index_k,index_z,:] = H[2*index_z+1]/(D_A[2*index_z+1]**2) * b[index_z]**2*(1. + beta_th[index_k,index_z,:]*self.mu[index_z,:]*self.mu[index_z,:])**2* pk_nl_th[index_k,2*index_z+1,:]*np.exp(-self.k[index_k,2*index_z+1,:]**2*self.mu[index_z,:]**2*(sigma_r[index_z]**2+sigma_NL**2))
 
         # Shot noise spectrum:
 	# TS; Removed necessity of specifying a nuisance P_shot (not used in standard)
@@ -339,9 +335,9 @@ class euclid_pk(Likelihood):
         self.P_shot = np.zeros( (self.nbin),'float64')
         for index_z in xrange(self.nbin):
         	if 'P_shot' in self.use_nuisance:
-			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2*self.b[index_z]**2)*(data.mcmc_parameters['P_shot']['current']*data.mcmc_parameters['P_shot']['scale'] + self.V_fid[index_z]/self.n_g[index_z])
+			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2)*(data.mcmc_parameters['P_shot']['current']*data.mcmc_parameters['P_shot']['scale'] + self.V_fid[index_z]/self.n_g[index_z])
         	else:
-			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2*self.b[index_z]**2)*(self.V_fid[index_z]/self.n_g[index_z])
+			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2)*(self.V_fid[index_z]/self.n_g[index_z])
 
         #for index_z in xrange(self.nbin):
         #  for index_k in xrange(self.k_size):
@@ -416,21 +412,23 @@ class euclid_pk(Likelihood):
                     # TS; mu -> mu_fid
                     chi2 += (mu_integrand_hi + mu_integrand_lo)/2.*(self.mu_fid[index_mu] - self.mu_fid[index_mu-1])
 
-        if 'epsilon' in self.use_nuisance:
-            chi2 += (data.mcmc_parameters['epsilon']['current']*data.mcmc_parameters['epsilon']['scale'])**2
+        #if 'epsilon' in self.use_nuisance:
+        #    chi2 += (data.mcmc_parameters['epsilon']['current']*data.mcmc_parameters['epsilon']['scale'])**2
+        if 'beta_0^Euclid' in self.use_nuisance:
+            chi2 += ((data.mcmc_parameters['beta_0^Euclid']['current']*data.mcmc_parameters['beta_0^Euclid']['scale']-1.)/self.bias_accuracy)**2
+            chi2 += ((data.mcmc_parameters['beta_1^Euclid']['current']*data.mcmc_parameters['beta_1^Euclid']['scale']-1.)/self.bias_accuracy)**2
 
         return - chi2/2.
 
     # TS; V_fid, index_k: index->argument, rescaled theoretical error (see commented)
     # and added triggers to avoid computation of zero theoretical error
     def integrand(self,index_k,index_z,index_mu):
-        if (self.theoretical_error == 0.):
+        if not self.UseTheoError:
             return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
-            #return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((1.e-3*self.tilde_P_th[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
         #return self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*self.k_fid[index_k]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
-        return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + 5.97*self.theoretical_error*(self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*(self.k_fid[index_k]/self.k_sigma[2*index_z+1])**3))
+        return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + self.R_var[index_k,index_z,index_mu]*self.tilde_P_th[index_k,index_z,index_mu]**2))
     def array_integrand(self,index_z,index_mu):
-        if (self.theoretical_error == 0.):
+        if not self.UseTheoError:
             return (self.V_fid[index_z]/2.)*self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2))
         #return self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[:,2*index_z+1,index_mu]*self.tilde_P_th[:,index_z,index_mu])**2*self.k_fid[:]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
-        return (self.V_fid[index_z]/2.)*self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + 5.97*self.theoretical_error*(self.alpha[:,2*index_z+1,index_mu]*self.tilde_P_th[:,index_z,index_mu])**2*(self.k_fid[:]/self.k_sigma[2*index_z+1])**3))
+        return (self.V_fid[index_z]/2.)*self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + self.R_var[:,index_z,index_mu]*self.tilde_P_th[:,index_z,index_mu]**2))
