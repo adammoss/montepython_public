@@ -640,8 +640,8 @@ def compute_fisher(data, cosmo, center, step_size):
 
 
 def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
-    # JL TODO: add tests: if a point goes beyond the boundary, use single-sided values
-    # note that here everything stands for unscaled parameters (e.g. 100*omega_b)
+
+    debug_info = False
     # Unwrap
     name_1, diff_1 = one
     if two:
@@ -651,21 +651,29 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
         data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
         data.update_cosmo_arguments()
         loglike_1 = compute_lkl(cosmo, data)
+        if debug_info:
+            print ">>>> For %s[+], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_1-loglike_min)
 
         data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
         data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
         data.update_cosmo_arguments()
         loglike_2 = compute_lkl(cosmo, data)
+        if debug_info:
+            print ">>>> For %s[+], %s[-], Delta ln(L)=%e"%(name_1,name_2,loglike_2-loglike_min)
 
         data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
         data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
         data.update_cosmo_arguments()
         loglike_3 = compute_lkl(cosmo, data)
+        if debug_info:
+            print ">>>> For %s[-], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_3-loglike_min)
 
         data.mcmc_parameters[name_1]['current'] = (center[name_1]-diff_1[0])
         data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
         data.update_cosmo_arguments()
         loglike_4 = compute_lkl(cosmo, data)
+        if debug_info:
+            print ">>>> For %s[-], %s[-], Delta ln(L)=%e"%(name_1,name_2,loglike_4-loglike_min)
 
         # If the left and right step sizes are equal these terms will cancel
         if diff_2[0] == diff_2[1]:
@@ -726,6 +734,9 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
         data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1[0]
         data.update_cosmo_arguments()
         loglike_left = compute_lkl(cosmo, data)
+        if debug_info:
+            print ">>>> For %s[-],Delta ln(L)=%e"%(name_1,loglike_left-loglike_min)
+
 
         #print center[name_1] - diff_1,-loglike_left
 
@@ -746,6 +757,8 @@ def compute_fisher_element(data, cosmo, center, loglike_min, one, two=None):
         data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1[1]
         data.update_cosmo_arguments()
         loglike_right = compute_lkl(cosmo, data)
+        if debug_info:
+            print ">>>> For %s[+],Delta ln(L)=%e"%(name_1,loglike_right-loglike_min)
 
         #print center[name_1]+diff_1,-loglike_right
 
