@@ -493,16 +493,17 @@ def compute_posterior(information_instances):
 
                 # 1D posterior normalised to P_max=1 (third step, used only for plotting)
                 #
-                # apply gaussian smoothing
+                # apply gaussian smoothing (obsolete - we don't do it anymore since the option --posterior-smoothing
+                # was defined, so we commented out this part)
                 #
                 # factor by which the grid has been made thinner (10 means 10 times more bins)
                 interpolation_factor = float(len(info.interp_grid))/float(len(info.bincenters))
                 # factor for gaussian smoothing
                 sigma = interpolation_factor*info.gaussian_smoothing
                 # smooth
-                smoothed_interp_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
+                #smoothed_interp_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
                 # re-normalised
-                smoothed_interp_hist = smoothed_interp_hist/smoothed_interp_hist.max()
+                #smoothed_interp_hist = smoothed_interp_hist/smoothed_interp_hist.max()
 
                 if conf.plot_2d:
 
@@ -511,7 +512,10 @@ def compute_posterior(information_instances):
                     ##################################################
                     plot = ax2d.plot(
                         info.interp_grid,
-                        smoothed_interp_hist,
+                        # version without gaussian smoothing:
+                        info.interp_hist,
+                        # version with gaussian smoothing (commented)
+                        #smoothed_interp_hist,
                         linewidth=info.line_width, ls='-',
                         color = info.MP_color_cycle[info.id][1],
                         # the [1] picks up the color of the 68% contours
@@ -590,8 +594,10 @@ def compute_posterior(information_instances):
                     ##################################################
                     ax1d.plot(
                         info.interp_grid,
-                        # gaussian filtered 1d posterior:
-                        smoothed_interp_hist,
+                        # 1d posterior without gaussian filter:
+                        info.interp_hist,
+                        # gaussian filtered 1d posterior (commented):
+                        #smoothed_interp_hist,
                         # raw 1d posterior:
                         #info.interp_hist,
                         lw=info.line_width, ls='-',
@@ -635,12 +641,13 @@ def compute_posterior(information_instances):
 
                         # 1D mean likelihood normalised to P_max=1 (third step, used only for plotting)
                         #
-                        # apply gaussian smoothing
+                        # apply gaussian smoothing (obsolete - we don't do it anymore since the option --posterior-smoothing
+                        # was defined, so we commented out this part)
                         #
                         # smooth
-                        smoothed_interp_lkl_mean = scipy.ndimage.filters.gaussian_filter(interp_lkl_mean,sigma)
+                        #smoothed_interp_lkl_mean = scipy.ndimage.filters.gaussian_filter(interp_lkl_mean,sigma)
                         # re-normalised
-                        smoothed_interp_lkl_mean = smoothed_interp_lkl_mean/smoothed_interp_lkl_mean.max()
+                        #smoothed_interp_lkl_mean = smoothed_interp_lkl_mean/smoothed_interp_lkl_mean.max()
 
                         # Execute some customisation scripts for the 1d plots
                         if (info.custom1d != []):
@@ -657,7 +664,11 @@ def compute_posterior(information_instances):
                             #          color = info.MP_color_cycle[info.id][1],
                             #          alpha = info.alphas[info.id])
                             # smoothed and interpolated mean likelihoods:
-                            ax2d.plot(interp_grid, smoothed_interp_lkl_mean,
+                            ax2d.plot(interp_grid,
+                                      # version without gaussian smoothing:
+                                      interp_lkl_mean,
+                                      # version with gaussian smoothing (commented)
+                                      #smoothed_interp_lkl_mean,
                                       ls='--', lw=conf.line_width,
                                       color = info.MP_color_cycle[info.id][1],
                                       alpha = info.alphas[info.id])
@@ -672,7 +683,11 @@ def compute_posterior(information_instances):
                             #          color = info.MP_color_cycle[info.id][1],
                             #          alpha = info.alphas[info.id])
                             # smoothed and interpolated mean likelihoods:
-                            ax1d.plot(interp_grid, smoothed_interp_lkl_mean,
+                            ax1d.plot(interp_grid,
+                                      # version without gaussian smoothing
+                                      interp_lkl_mean,
+                                      # version with gaussian smoothing (commented)
+                                      #smoothed_interp_lkl_mean,
                                       ls='--', lw=conf.line_width,
                                       color = info.MP_color_cycle[info.id][1],
                                       alpha = info.alphas[info.id])
