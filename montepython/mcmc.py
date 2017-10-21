@@ -272,14 +272,6 @@ def chain(cosmo, data, command_line):
             sampler.get_fisher_matrix(cosmo, data, command_line, C)
             return
 
-        # if we want to compute Fisher and then run
-        if command_line.start_from_fisher:
-            sampler.get_fisher_matrix(cosmo, data, command_line, C)
-            # subtitute input covariance matrix with calculated one
-            command_line.cov = os.path.join(
-                command_line.folder, 'covariance_fisher.covmat')
-            sigma_eig, U, C = sampler.get_covariance_matrix(cosmo, data, command_line)
-
         # warning if no jumps are requested
         if data.jumping_factor == 0:
             warnings.warn(

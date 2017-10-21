@@ -493,9 +493,6 @@ def create_parser():
             <++>Number of iterations for Fisher matrix computation<++>,
             used by both options --fisher and --start-from-fisher (Default: 1)
             <++>
-        <**>--start-from-fisher<**> : None
-            <++>Calculates the inverse Fisher matrix, and then run<++> using it as
-            a proposal distribution covmat.<++>
         <**>--silent<**> : None
             <++>silence the standard output<++> (useful when running on
             clusters)<++>
@@ -697,15 +694,12 @@ def create_parser():
     # -- temperature (OPTIONAL)
     runparser.add_argument('-T', help=helpdict['T'], type=float,
                            dest='temperature', default=1.0)
-    # -- fisher (EXPERIMENTAL)
+    # -- fisher (OPTIONAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
-    # -- iterative fisher argument (EXPERIMENTAL)
+    # -- iterative fisher argument (OPTIONAL)
     runparser.add_argument('--fisher-it', help=helpdict['fisher-it'], type=int,
                            dest='fisher_it', default=1)
-    # -- fisher as MCMC input (EXPERIMENTAL)
-    runparser.add_argument('--start-from-fisher', help=helpdict['start-from-fisher'],
-                           dest='start_from_fisher', action='store_true')
     # -- configuration file (OPTIONAL)
     runparser.add_argument('--conf', help=helpdict['conf'],
                            type=str, dest='config_file',
