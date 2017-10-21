@@ -643,10 +643,10 @@ def compute_fisher(data, cosmo, center, step_size):
 
     return fisher_matrix, gradient
 
-
 def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, two=None):
-    # JL TODO: add tests: if a point goes beyond the boundary, use single-sided values
-    # note that here everything stands for unscaled parameters (e.g. 100*omega_b)
+
+    debug_info = False
+
     # Unwrap
     name_1, diff_1 = one
     if two:
@@ -662,6 +662,8 @@ def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, tw
             data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
             data.update_cosmo_arguments()
             loglike_1 = compute_lkl(cosmo, data)
+            if debug_info:
+                print ">>>> For %s[+], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_1-loglike_min)
 
             step_vector = vectorize_dictionary(data,center,diff_1[1],name_1,-diff_2[0],name_2)
             data.check_for_slow_step(step_vector)
@@ -670,6 +672,9 @@ def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, tw
             data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
             data.update_cosmo_arguments()
             loglike_2 = compute_lkl(cosmo, data)
+            if debug_info:
+                print ">>>> For %s[+], %s[-], Delta ln(L)=%e"%(name_1,name_2,loglike_2-loglike_min)
+
         else:
             loglike_1 = 0
             loglike_2 = 0
@@ -684,6 +689,8 @@ def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, tw
             data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
             data.update_cosmo_arguments()
             loglike_3 = compute_lkl(cosmo, data)
+            if debug_info:
+                print ">>>> For %s[-], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_3-loglike_min)
 
             step_vector = vectorize_dictionary(data,center,-diff_1[0],name_1,-diff_2[0],name_2)
             data.check_for_slow_step(step_vector)
@@ -692,10 +699,12 @@ def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, tw
             data.mcmc_parameters[name_2]['current'] = (center[name_2]-diff_2[0])
             data.update_cosmo_arguments()
             loglike_4 = compute_lkl(cosmo, data)
+            if debug_info:
+                print ">>>> For %s[-], %s[-], Delta ln(L)=%e"%(name_1,name_2,loglike_4-loglike_min)
+
         else:
             loglike_3 = 0
             loglike_4 = 0
-
 
         # If the left and right step sizes are equal these terms will cancel
         if diff_2[0] == diff_2[1]:
@@ -783,6 +792,9 @@ def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, tw
             data.mcmc_parameters[name_1]['current'] = center[name_1] - diff_1[0]
             data.update_cosmo_arguments()
             loglike_left = compute_lkl(cosmo, data)
+            if debug_info:
+                print ">>>> For %s[-],Delta ln(L)=%e"%(name_1,loglike_left-loglike_min)
+
         else:
             loglike_left = 0
 
@@ -795,11 +807,11 @@ def compute_fisher_element(data, cosmo, center, loglike_min, step_index, one, tw
             data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1[1]
             data.update_cosmo_arguments()
             loglike_right = compute_lkl(cosmo, data)
+            if debug_info:
+                print ">>>> For %s[+],Delta ln(L)=%e"%(name_1,loglike_right-loglike_min)
+
         else:
             loglike_right = 0
-
-        #data.mcmc_parameters[name_1]['current'] = center[name_1]
-        #data.update_cosmo_arguments()
 
         # Count the bestfit term at most once
         if step_index:
@@ -827,12 +839,14 @@ def adjust_fisher_bounds(data, center, step_size):
     # exceeded the bounds.
     for index, elem in enumerate(data.get_mcmc_parameters(['varying'])):
         param = data.mcmc_parameters[elem]['initial']
+
         if param[1] != None:
             if param[1] > center[elem]:
                 raise io_mp.ConfigurationError("Error in parameter ranges: left edge %e bigger than central value %e.\n"
                                                %(param[1],center[elem]))
             if param[1] > center[elem] - step_size[index,0]:
                 step_size[index,0] = center[elem] - param[1]
+
         if param[2] != None:
             if param[2] < center[elem]:
                 raise io_mp.ConfigurationError("Error in parameter ranges: right edge %e smaller than central value %e.\n"
@@ -858,4 +872,3 @@ def vectorize_dictionary(data, center, diff_1, name_1, diff_2, name_2):
             step_vector[index] += diff_2
 
     return step_vector
-
