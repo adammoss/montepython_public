@@ -310,7 +310,7 @@ def chain(cosmo, data, command_line):
     if command_line.update:
         if not rank and not command_line.silent:
             print 'Update routine is enabled with value %d (recommended: 50)' % command_line.update
-            print 'This number is rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
+            print 'This number is rescaled by cycle length %d (N_slow + f_fast * N_fast) to %d' % (fpm,fpm*command_line.update)
         # Rescale update number by cycle length N_slow + f_fast * N_fast to account for fast parameters
         command_line.update *= fpm
         previous = (sigma_eig, U, C, Cholesky)
@@ -347,7 +347,7 @@ def chain(cosmo, data, command_line):
     if command_line.superupdate:
         if not rank and not command_line.silent:
             print 'Superupdate routine is enabled with value %d (recommended: 20)' % command_line.superupdate
-            print 'This number is rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
+            print 'This number is rescaled by cycle length %d (N_slow + f_fast * N_fast) to %d' % (fpm,fpm*command_line.superupdate)
         # Rescale superupdate number by cycle length N_slow + f_fast * N_fast to account for fast parameters
         command_line.superupdate *= fpm
         # Define needed parameters
