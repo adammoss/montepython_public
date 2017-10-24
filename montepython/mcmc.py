@@ -304,7 +304,11 @@ def chain(cosmo, data, command_line):
     # This is equal to N_slow + f_fast N_fast, where N_slow is the number of slow
     # parameters, f_fast is the over sampling number for each fast block and f_fast
     # is the number of parameters in each fast block.
-    fpm = np.dot(np.array(data.over_sampling), np.array(data.block_parameters))
+    for i in range(len(data.block_parameters)):
+        if i == 0:
+            fpm = data.over_sampling[i]*data.block_parameters[i]
+        else:
+            fpm += data.over_sampling[i]*(data.block_parameters[i] - data.block_parameters[i-1])
 
     # If the update mode was selected, the previous (or original) matrix should be stored
     if command_line.update:
