@@ -627,7 +627,7 @@ def compute_fisher(data, cosmo, center, step_size):
                 # elements of one half of it plus the diagonal.
                 if k > h:
                     continue
-                print 'Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
+                #print 'Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
                 if k != h:
                     fisher_matrix[k][h] += compute_fisher_element(
                         data, cosmo, center, loglike_min, step_index,
