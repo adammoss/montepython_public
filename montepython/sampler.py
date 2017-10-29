@@ -386,12 +386,19 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
         for index in range(len(parameter_names)):
             print "%s : left %e, right %e" % (parameter_names[index],stepsize[index,0],stepsize[index,1])
 
-        # Compute eigenvectors in order to take steps in the basis
-        # of the covariance matrix instead of the basis of the parameter space
-        sigma_eig, eigV = la.eig(inv_fisher_matrix)
+
+        fisher_mode = 2
+        if fisher_mode == 1:
+            # Compute eigenvectors in order to take steps in the basis
+            # of the covariance matrix instead of the basis of the parameter space
+            sigma_eig, step_matrix = la.eig(inv_fisher_matrix)
+        elif fisher_mode == 2:
+            step_matrix = la.cholesky(inv_fisher_matrix).T
+        else:
+            step_matrix = np.identity(len(parameter_names), dtype='float64')
 
         # Compute fisher matrix
-        fisher_matrix, gradient = compute_fisher(data, cosmo, center, stepsize, eigV)
+        fisher_matrix, gradient = compute_fisher(data, cosmo, center, stepsize, step_matrix)
         if not command_line.silent:
             print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,command_line.fisher_it))
 
@@ -605,7 +612,7 @@ def compute_lkl(cosmo, data):
     return loglike/data.command_line.temperature
 
 
-def compute_fisher(data, cosmo, center, step_size, eigV):
+def compute_fisher(data, cosmo, center, step_size, step_matrix):
     # Adapted by T. Brinckmann
     parameter_names = data.get_mcmc_parameters(['varying'])
     fisher_matrix = np.zeros(
@@ -641,26 +648,26 @@ def compute_fisher(data, cosmo, center, step_size, eigV):
                     if k > h:
                         continue
                     if k == h and elem == 'diag':
-                        #print ''
-                        #print '---> Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
+                        print ''
+                        print '---> Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
                         temp1, temp2, diff_1 = compute_fisher_element(
-                            data, cosmo, center, eigV, loglike_min, step_index,
+                            data, cosmo, center, step_matrix, loglike_min, step_index,
                             (elem_k, kdiff))
                         fisher_matrix[k][k] += temp1
                         gradient[k] += temp2
                         step_size[k] = diff_1
                     elif k < h and elem == 'off-diag':
-                        #print ''
-                        #print '---> Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
+                        print ''
+                        print '---> Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
                         fisher_matrix[k][h] += compute_fisher_element(
-                            data, cosmo, center, eigV, loglike_min, step_index,
+                            data, cosmo, center, step_matrix, loglike_min, step_index,
                             (elem_k, kdiff),
                             (elem_h, hdiff))
                         fisher_matrix[h][k] = fisher_matrix[k][h]
 
     return fisher_matrix, gradient
 
-def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1, one, two=None):
+def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_index_1, one, two=None):
 
     # 0: no print
     # 1: print derivatives for diagonal elements
@@ -674,7 +681,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
 
         if step_index_1 == 1:
             step_index_2 = 1
-            loglike_1 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -689,7 +696,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
             #    print ">>>> For %s[+], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_1-loglike_min)
 
             step_index_2 = 0
-            loglike_2 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_2 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -706,7 +713,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
 
         if step_index_1 == 0:
             step_index_2 = 1
-            loglike_3 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_3 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -721,7 +728,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
             #    print ">>>> For %s[-], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_3-loglike_min)
 
             step_index_2 = 0
-            loglike_4 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_4 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -743,7 +750,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
         else:
             if step_index_1 == 1:
                 step_index_2 = None
-                loglike_5 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+                loglike_5 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
                 #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
                 #data.check_for_slow_step(step_vector)
@@ -758,7 +765,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
 
             if step_index_1 == 0:
                 step_index_2 = None
-                loglike_6 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+                loglike_6 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
                 #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
                 #data.check_for_slow_step(step_vector)
@@ -779,7 +786,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
             step_index_1 = None
 
             step_index_2 = 1
-            loglike_7 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_7 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -791,7 +798,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
             #loglike_7 = compute_lkl(cosmo, data)
 
             step_index_2 = 0
-            loglike_8 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_8 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -829,7 +836,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
     else:
         if step_index_1 == 0:
             step_index_2 = None
-            loglike_left, diff_1 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_left, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -846,7 +853,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
 
         if step_index_1 == 1:
             step_index_2 = None
-            loglike_right, diff_1 = compute_fisher_step(data,cosmo,center,eigV,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_right, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
             #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
             #data.check_for_slow_step(step_vector)
@@ -886,7 +893,7 @@ def compute_fisher_element(data, cosmo, center, eigV, loglike_min, step_index_1,
         return fisher_diagonal, gradient, diff_1
 
 
-def compute_fisher_step(data, cosmo, center, eigV, loglike_min, one, two, step_index_1, step_index_2):
+def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two, step_index_1, step_index_2):
     name_1, diff_1 = one
     if two:
         name_2, diff_2 = two
@@ -903,28 +910,35 @@ def compute_fisher_step(data, cosmo, center, eigV, loglike_min, one, two, step_i
     while repeat:
         # Create array with new steps in the basis of the parameters
         step_array = np.zeros(len(parameter_names), 'float64')
+        fisher_mode = 2
         if not step_index_1 == None:
             index = parameter_names.index(name_1)
             step_array[index] = diff_1[step_index_1]
+            if fisher_mode == 2:
+                step_array[index] *= step_matrix[index,index]**-1.
+
         if two and not step_index_2 == None:
             index = parameter_names.index(name_2)
             step_array[index] = diff_2[step_index_2]
+            if fisher_mode == 2:
+                step_array[index] *= step_matrix[index,index]**-1.
 
         #### Debug
         #print ''
         #print ''
-        np.set_printoptions(suppress=False)
-        #print 'eigV'
-        #print eigV
+        #np.set_printoptions(suppress=False)
+        #print 'step_matrix'
+        #print step_matrix
         #print ''
         #print 'new_step =',
         #for i in range(len(step_array)):
         #    print step_array[i],
         #print ''
+        #print 'diff_1 =',diff_1[0]
         #### /Debug
 
         # Rotate the step vector to the basis of the covariance matrix
-        rotated_array = np.dot(eigV, step_array)
+        rotated_array = np.dot(step_matrix, step_array)
 
         # Construct step vector for comparison with previous step
         step_array = center_array + rotated_array
@@ -953,7 +967,7 @@ def compute_fisher_step(data, cosmo, center, eigV, loglike_min, one, two, step_i
             #print 'index=%d, elem=%s, center[elem]=%f, rotated_array[index]=%f, new_step_array[index]=%f' %(index, elem, center[elem], rotated_array[index], center[elem] + rotated_array[index])
             data.mcmc_parameters[elem]['current'] = center[elem] + rotated_array[index]
 
-        #print 'Need cosmo update:', data.need_cosmo_update
+        print 'Need cosmo update:', data.need_cosmo_update
         # Update current parameters to the new parameters, only taking steps as requested
         #if not step_index_1 == None:
         #    data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[step_index_1])
