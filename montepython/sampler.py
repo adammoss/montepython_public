@@ -440,7 +440,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Load the covmat from computed fisher matrix as the new starting covariance matrix
     # eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)
 
-    return matrix
+    return inv_fisher_matrix
 
 
 def accept_step(data):
