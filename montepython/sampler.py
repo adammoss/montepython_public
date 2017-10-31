@@ -370,7 +370,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Load stepsize from input covmat or covmat generated from param file
     # JL TODO: check this, and try another scheme to be sure that index and elem refer to the same params in the same order
     # here the stepsizes are for the scaled parameter (e.g. 100*omega_b)
-    stepsize = np.zeros([len(parameter_names),2])
+    stepsize = np.zeros([len(parameter_names),3])
     for index in range(len(parameter_names)):
         stepsize[index,0] = -(inv_fisher_matrix[index][index])**0.5
         stepsize[index,1] = (inv_fisher_matrix[index][index])**0.5
@@ -668,12 +668,6 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
     return fisher_matrix, gradient
 
 def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_index_1, one, two=None):
-
-    # 0: no print
-    # 1: print derivatives for diagonal elements
-    # 2: print derivatives for non-diagonal elements
-    debug_info = 1
-
     # Unwrap
     name_1, diff_1 = one
     if two:
@@ -683,30 +677,8 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             step_index_2 = 1
             loglike_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #for elem in center:
-            #    data.mcmc_parameters[elem]['current'] = center[elem]
-            #data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
-            #data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
-            #data.update_cosmo_arguments()
-            #loglike_1 = compute_lkl(cosmo, data)
-
-            #if (debug_info > 1):
-            #    print ">>>> For %s[+], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_1-loglike_min)
-
             step_index_2 = 0
             loglike_2 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
-            #data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[0])
-            #data.update_cosmo_arguments()
-            #loglike_2 = compute_lkl(cosmo, data)
-
-            #if (debug_info > 1):
-            #    print ">>>> For %s[+], %s[-], Delta ln(L)=%e"%(name_1,name_2,loglike_2-loglike_min)
         else:
             loglike_1 = 0
             loglike_2 = 0
@@ -715,30 +687,8 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             step_index_2 = 1
             loglike_3 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #for elem in center:
-            #    data.mcmc_parameters[elem]['current'] = center[elem]
-            #data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[0])
-            #data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
-            #data.update_cosmo_arguments()
-            #loglike_3 = compute_lkl(cosmo, data)
-
-            #if (debug_info > 1):
-            #    print ">>>> For %s[-], %s[+], Delta ln(L)=%e"%(name_1,name_2,loglike_3-loglike_min)
-
             step_index_2 = 0
             loglike_4 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[0])
-            #data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[0])
-            #data.update_cosmo_arguments()
-            #loglike_4 = compute_lkl(cosmo, data)
-
-            #if (debug_info > 1):
-            #    print ">>>> For %s[-], %s[-], Delta ln(L)=%e"%(name_1,name_2,loglike_4-loglike_min)
         else:
             loglike_3 = 0
             loglike_4 = 0
@@ -751,30 +701,12 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             if step_index_1 == 1:
                 step_index_2 = None
                 loglike_5 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-
-                #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-                #data.check_for_slow_step(step_vector)
-                #for elem in center:
-                #    data.mcmc_parameters[elem]['current'] = center[elem]
-                #data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[1])
-                #data.mcmc_parameters[name_2]['current'] = (center[name_2])
-                #data.update_cosmo_arguments()
-                #loglike_5 = compute_lkl(cosmo, data)
             else:
                 loglike_5 = 0
 
             if step_index_1 == 0:
                 step_index_2 = None
                 loglike_6 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-
-                #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-                #data.check_for_slow_step(step_vector)
-                #for elem in center:
-                #    data.mcmc_parameters[elem]['current'] = center[elem]
-                #data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[0])
-                #data.mcmc_parameters[name_2]['current'] = (center[name_2])
-                #data.update_cosmo_arguments()
-                #loglike_6 = compute_lkl(cosmo, data)
             else:
                 loglike_6 = 0
 
@@ -788,24 +720,8 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             step_index_2 = 1
             loglike_7 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #for elem in center:
-            #    data.mcmc_parameters[elem]['current'] = center[elem]
-            #data.mcmc_parameters[name_1]['current'] = (center[name_1])
-            #data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[1])
-            #data.update_cosmo_arguments()
-            #loglike_7 = compute_lkl(cosmo, data)
-
             step_index_2 = 0
             loglike_8 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #data.mcmc_parameters[name_1]['current'] = (center[name_1])
-            #data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[0])
-            #data.update_cosmo_arguments()
-            #loglike_8 = compute_lkl(cosmo, data)
 
         # Count the bestfit term at most once
         if step_index_1:
@@ -837,35 +753,12 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         if step_index_1 == 0:
             step_index_2 = None
             loglike_left, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #for elem in center:
-            #    data.mcmc_parameters[elem]['current'] = center[elem]
-            #data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1[0]
-            #data.update_cosmo_arguments()
-            #loglike_left = compute_lkl(cosmo, data)
-
-            #if (debug_info > 0):
-            #    print ">>>> For %s[-],Delta ln(L)=%e"%(name_1,loglike_left-loglike_min)
         else:
             loglike_left = 0
 
         if step_index_1 == 1:
             step_index_2 = None
             loglike_right, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-
-            #step_vector = vectorize_dictionary(data,center,one,two,step_index_1,step_index_2)
-            #data.check_for_slow_step(step_vector)
-            #for elem in center:
-            #    data.mcmc_parameters[elem]['current'] = center[elem]
-            #data.mcmc_parameters[name_1]['current'] = center[name_1] + diff_1[1]
-            #data.update_cosmo_arguments()
-            #loglike_right = compute_lkl(cosmo, data)
-
-            #if (debug_info > 0):
-            #    print ">>>> For %s[+],Delta ln(L)=%e"%(name_1,loglike_right-loglike_min)
-
         else:
             loglike_right = 0
 
@@ -905,6 +798,8 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
         index = parameter_names.index(elem)
         center_array[index] = center[elem]
 
+    use_cholesky_step = False
+
     backup_step = [0.]
     repeat = 1
     while repeat:
@@ -913,29 +808,57 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
         fisher_mode = 2
         if not step_index_1 == None:
             index = parameter_names.index(name_1)
-            step_array[index] = diff_1[step_index_1]
             if fisher_mode == 2:
-                step_array[index] *= step_matrix[index,index]**-1.
+                norm = 1.
+                # If we are changing two parameters we need to add a normalization 1/sqrt(2)
+                if two and not step_index_2 == None:
+                    norm = 2.
+                # If we want to use the Cholesky to determine the stepsize
+                if use_cholesky_step == True:
+                    # Check if the parameter step had exceeded a boundary.
+                    # Assume symmetric likelihood and use opposite step if so.
+                    # I.e. both steps (+/-) will be the same and will return the same -loglkl.
+                    # ISSUE: this removes the iterative steps
+                    if not diff_1[2]:
+                        step_array[index] = (-1.)**(step_index_1+1.))/norm**0.5
+                    else:
+                        step_array[index] = np.sign(diff_1[2])/norm**0.5
+                else:
+                    # Use input stepsize and normalized by the diagonal element of the Cholesky.
+                    step_array[index] = diff_1[step_index_1]/norm**0.5
+                    step_array[index] *= step_matrix[index,index]**-1
+
+                    # Use instead only one symmetric stepsize
+                    #step_array[index] = (-1.)**(step_index_1+1.))*abs(diff_1[1])/norm**0.5
+                    #step_array[index] *= step_matrix[index,index]**-1
+            else:
+                step_array[index] = diff_1[step_index_1]
 
         if two and not step_index_2 == None:
             index = parameter_names.index(name_2)
-            step_array[index] = diff_2[step_index_2]
             if fisher_mode == 2:
-                step_array[index] *= step_matrix[index,index]**-1.
+                # We are changing two parameters so we need to add a normalization 1/sqrt(2)
+                norm = 2.
+                # If we want to use the Cholesky to determine the stepsize
+                if use_cholesky_step == True:
+                    # Check if the parameter step had exceeded a boundary.
+                    # Assume symmetric likelihood and use opposite step if so.
+                    # I.e. both steps (+/-) will be the same and will return the same -loglkl.
+                    # ISSUE: this removes the iterative steps
+                    if not diff_2[2]:
+                        step_array[index] = (-1.)**(step_index_2+1.))/norm**0.5
+                    else:
+                        step_array[index] = np.sign(diff_2[2])/norm**0.5
+                else:
+                    # Use input stepsize and normalized by the diagonal element of the Cholesky.
+                    step_array[index] = diff_2[step_index_2]/norm**0.5
+                    step_array[index] *= step_matrix[index,index]**-1.
 
-        #### Debug
-        #print ''
-        #print ''
-        #np.set_printoptions(suppress=False)
-        #print 'step_matrix'
-        #print step_matrix
-        #print ''
-        #print 'new_step =',
-        #for i in range(len(step_array)):
-        #    print step_array[i],
-        #print ''
-        #print 'diff_1 =',diff_1[0]
-        #### /Debug
+                    # Use instead only one symmetric stepsize
+                    #step_array[index] = (-1.)**(step_index_2+1.))*abs(diff_2[1])/norm**0.5
+                    #step_array[index] *= step_matrix[index,index]**-1.
+            else:
+                step_array[index] = diff_2[step_index_2]
 
         # Rotate the step vector to the basis of the covariance matrix
         rotated_array = np.dot(step_matrix, step_array)
@@ -947,32 +870,14 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
         # This means calling CLASS can be skipped if only nuisance parameters changed.
         data.check_for_slow_step(step_array)
 
-        #### Debug
-        #print ''
-        #print ''
-        #print 'rotated_array =',
-        #for i in range(len(rotated_array)):
-        #    print rotated_array[i],
-        #print ''
-        #print 'step_array =',
-        #for i in range(len(step_array)):
-        #    print step_array[i],
-        #print ''
-        #### /Debug
-
         # In order to take the correct new step we need to re-center
         # the parameters and add the rotated step vector.
         for elem in center:
             index = parameter_names.index(elem)
-            #print 'index=%d, elem=%s, center[elem]=%f, rotated_array[index]=%f, new_step_array[index]=%f' %(index, elem, center[elem], rotated_array[index], center[elem] + rotated_array[index])
             data.mcmc_parameters[elem]['current'] = center[elem] + rotated_array[index]
 
         print 'Need cosmo update:', data.need_cosmo_update
         # Update current parameters to the new parameters, only taking steps as requested
-        #if not step_index_1 == None:
-        #    data.mcmc_parameters[name_1]['current'] = (center[name_1]+diff_1[step_index_1])
-        #if two and not step_index_2 == None:
-        #    data.mcmc_parameters[name_2]['current'] = (center[name_2]+diff_2[step_index_2])
         data.update_cosmo_arguments()
 
         # Compute loglike value for the new parameters
@@ -980,22 +885,46 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
 
         # Iterative stepsize. If -Delta ln(L) > 1, change step size and repeat steps above
         if not two:
-            backup_step.append(diff_1[step_index_1])
+            # Save previous step
+            if use_cholesky_step == True:
+                # For Cholesky step
+                # ISSUE: this doesn't make sense
+                backup_step.append((-1.)**(step_index_1+1.)*abs(diff_1[1]))
+
+                # For symmetric step
+                #backup_step.append((-1.)**(step_index_1+1.)*abs(diff_1[1]))
+            else:
+                # For normal step
+                backup_step.append(diff_1[step_index_1])
+
+            # Calculate Delta ln(L)
             Deltaloglike = loglike - loglike_min
             print ">>>> For %s[%d],Delta ln(L)=%e using min(ln(L))=%e"%(name_1,int(np.sign(diff_1[step_index_1])),loglike-loglike_min,loglike_min)
+
             # If -Delta ln(L) is > 1.1 reduce stepsize
             if Deltaloglike < -1.1:
-                diff_1[step_index_1] -= np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
+                if use_cholesky_step == True:
+                    diff_1[1] -= np.sign((-1.)**(step_index_1+1.)*abs(diff_1[1])) * 0.5 * abs(backup_step[abs(repeat)-1] - (-1.)**(step_index_1+1.)*abs(diff_1[1]))
+                else:
+                    diff_1[step_index_1] -= np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
                 print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                 repeat = len(backup_step)
+
             # If -Delta ln(L) < 0.5 increase stepsize
+            # TODO: what about boundaries?
             elif Deltaloglike > -0.5:
                 if repeat > 1:
-                    diff_1[step_index_1] += np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
+                    if use_cholesky_step == True:
+                        diff_1[1] += np.sign((-1.)**(step_index_1+1.)*abs(diff_1[1])) * 0.5 * abs(backup_step[abs(repeat)-1] - (-1.)**(step_index_1+1.)*abs(diff_1[1]))
+                    else:
+                        diff_1[step_index_1] += np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
                     print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                 # I'm not sure if we want the stepsize to increase if -Delta ln(L) < 0.5 from the param file/covmat
                 else:
-                    diff_1[step_index_1] *= 2.
+                    if use_cholesky_step == True:
+                        diff_1[1] = (-1.)**(step_index_1+1.)*2.*abs(diff_1[1])
+                    else:
+                        diff_1[step_index_1] *= 2.
                     print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                     repeat = -len(backup_step)
             else:
@@ -1016,15 +945,23 @@ def adjust_fisher_bounds(data, center, step_size):
             if param[1] > center[elem]:
                 raise io_mp.ConfigurationError("Error in parameter ranges: left edge %e bigger than central value %e.\n"
                                                %(param[1],center[elem]))
+            # When encountering a boundary, set stepsize to boundary limit
             if param[1] > center[elem] + step_size[index,0]:
                 step_size[index,0] = -(center[elem] - param[1])
+                # Instead of asymmetric steps, assumme symmetric likelihood and use positive step
+                if not param[2] < center[elem] + step_size[index,1]:
+                    step_size[index,2] = step_size[index,1]
 
         if param[2] != None:
             if param[2] < center[elem]:
                 raise io_mp.ConfigurationError("Error in parameter ranges: right edge %e smaller than central value %e.\n"
                                                %(param[2],center[elem]))
+            # When encountering a boundary, set stepsize to boundary limit
             if param[2] < center[elem] + step_size[index,1]:
                 step_size[index,1] = param[2] - center[elem]
+                # Instead of asymmetric steps, assumme symmetric likelihood and use negative step
+                if not param[1] > center[elem] + step_size[index,0]:
+                    step_size[index,2] = step_size[index,0]
 
     return step_size
 
