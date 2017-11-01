@@ -820,7 +820,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                     # I.e. both steps (+/-) will be the same and will return the same -loglkl.
                     # ISSUE: this removes the iterative steps
                     if not diff_1[2]:
-                        step_array[index] = (-1.)**(step_index_1+1.))/norm**0.5
+                        step_array[index] = (-1.)**(step_index_1+1.)/norm**0.5
                     else:
                         step_array[index] = np.sign(diff_1[2])/norm**0.5
                 else:
@@ -846,7 +846,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                     # I.e. both steps (+/-) will be the same and will return the same -loglkl.
                     # ISSUE: this removes the iterative steps
                     if not diff_2[2]:
-                        step_array[index] = (-1.)**(step_index_2+1.))/norm**0.5
+                        step_array[index] = (-1.)**(step_index_2+1.)/norm**0.5
                     else:
                         step_array[index] = np.sign(diff_2[2])/norm**0.5
                 else:
