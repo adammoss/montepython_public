@@ -705,7 +705,7 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             loglike_4 = 0
 
         # If the left and right step sizes are equal these terms will cancel
-        if abs(diff_2[0]) == abs(diff_2[1]):
+        if abs(diff_2[0]) == abs(diff_2[1]) or diff_2[2] or data.use_symmetric_step:
             loglike_5 = 0.
             loglike_6 = 0.
         else:
@@ -722,7 +722,7 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
                 loglike_6 = 0
 
         # If the left and right step sizes are equal these terms will cancel
-        if abs(diff_1[0]) == abs(diff_1[1]):
+        if abs(diff_1[0]) == abs(diff_1[1]) or diff_1[2] or data.use_symmetric_step:
             loglike_7 = 0.
             loglike_8 = 0.
         else:
