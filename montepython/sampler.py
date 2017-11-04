@@ -743,6 +743,18 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         diff_2_backup = diff_2[:]
         diff_1 = abs(diff_1)
         diff_2 = abs(diff_2)
+        # Remember that in some cases only used diff_1[2] or diff_1[0]
+        if diff_1[2]:
+            diff_1[0] = diff_1[2]
+            diff_1[1] = diff_1[2]
+        elif data.use_symmetric_step:
+            diff_1[1] = diff_1[0]
+        # And only used diff_2[2] or diff_2[0]
+        if diff_2[2]
+            diff_2[0] = diff_2[2]
+            diff_2[1] = diff_2[2]
+        elif data.use_symmetric_step:
+            diff_2[1] = diff_2[0]
 
         #fisher_off_diagonal = -(
         #    loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
@@ -780,6 +792,12 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         # In the following we want only the step magnitude, not sign
         diff_1_backup = diff_1[:]
         diff_1 = abs(diff_1)
+        # Remember that in some cases only used diff_1[2] or diff_1[0]
+        if diff_1[2]:
+            diff_1[0] = diff_1[2]
+            diff_1[1] = diff_1[2]
+        elif data.use_symmetric_step:
+            diff_1[1] = diff_1[0]
 
         #fisher_diagonal = -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
         # In case of symmetric steps reduces to -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
