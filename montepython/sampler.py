@@ -340,7 +340,9 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Additional option relevant for fisher_mode=2
     # use_cholesky_step=True use Cholesky decomposition to determine stepsize
     # use_cholesky_step=False use input stepsize from covariance matrix of param file
-    data.use_cholesky_step = False
+    data.use_cholesky_step = True
+    # Force step to always be symmetric
+    data.use_symmetric_step = True
 
     if not command_line.silent:
         warnings.warn("Fisher implementation is being tested")
@@ -818,58 +820,47 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
             # If we are changing two parameters we need to add a normalization 1/sqrt(2)
             if two and not step_index_2 == None:
                 norm = 2.
-            # If we want to use the Cholesky to rotate parameter space
-            if data.fisher_mode == 2:
-                # Check if the parameter step had exceeded a boundary.
-                # Assume symmetric likelihood and use opposite step if so.
-                # I.e. both steps (+/-) will be the same and will return the same -loglkl.
-                if diff_1[2]:
-                    step_array[index] = diff_1[2]/norm**0.5
-                else:
-                    step_array[index] = diff_1[step_index_1]/norm**0.5
 
-                # If we don't want to use the Cholesky to determine stepsize, instead
-                # use input stepsize normalized by the diagonal element of the Cholesky.
-                if not data.use_cholesky_step:
-                    step_array[index] *= step_matrix[index,index]**-1
-
-                # Use instead only one symmetric stepsize
-                #step_array[index] = (-1.)**(step_index_1+1.))*abs(diff_1[1])/norm**0.5
-                #step_array[index] *= step_matrix[index,index]**-1
-            # If we want to use eigenvectors to rotate steps in parameter space
-            elif data.fisher_mode == 1:
-                step_array[index] = diff_1[step_index_1]/norm**0.5
-            # Otherwise we want to do non-rotated steps (e.g. have a diagonal covmat)
+            # Check if the parameter step had exceeded a boundary.
+            # Assume symmetric likelihood and use opposite step if so.
+            # I.e. both steps (+/-) will be the same and will return the same -loglkl.
+            if diff_1[2]:
+                step_array[index] = diff_1[2]/norm**0.5
+            # If symmetric step is required use diff_1[0] to determine size of step.
+            # Only step_index_1=0 goes through the iteration cycle in this case.
+            # If diff_1[2] is defined, will instead use that value.
+            elif data.use_symmetric_step:
+                step_array[index] = np.sign(diff_1[step_index_1])*abs(diff_1[0])/norm**0.5
             else:
-                step_array[index] = diff_1[step_index_1]
+                step_array[index] = diff_1[step_index_1]/norm**0.5
+
+            # If we don't want to use the Cholesky to determine stepsize, instead
+            # use input stepsize normalized by the diagonal element of the Cholesky.
+            if not data.use_cholesky_step and data.fisher_mode == 2:
+                step_array[index] *= step_matrix[index,index]**-1
 
         if two and not step_index_2 == None:
             index = parameter_names.index(name_2)
             # We are changing two parameters so we need to add a normalization 1/sqrt(2)
             norm = 2.
-            if data.fisher_mode == 2:
-                # Check if the parameter step had exceeded a boundary.
-                # Assume symmetric likelihood and use opposite step if so.
-                # I.e. both steps (+/-) will be the same and will return the same -loglkl.
-                if diff_1[2]:
-                    step_array[index] = diff_2[2]/norm**0.5
-                else:
-                    step_array[index] = diff_2[step_index_2]/norm**0.5
 
-                # If we don't want to use the Cholesky to determine stepsize, instead
-                # use input stepsize normalized by the diagonal element of the Cholesky.
-                if not data.use_cholesky_step:
-                    step_array[index] *= step_matrix[index,index]**-1.
-
-                # Use instead only one symmetric stepsize
-                #step_array[index] = (-1.)**(step_index_2+1.))*abs(diff_2[1])/norm**0.5
-                #step_array[index] *= step_matrix[index,index]**-1.
-            # If we want to use eigenvectors to rotate parameter space
-            elif data.fisher_mode == 1:
-                step_array[index] = diff_2[step_index_2]/norm**0.5
-            # Otherwise we want to make steps in non-rotated parameter space (e.g. diagonal covmat)
+            # Check if the parameter step had exceeded a boundary.
+            # Assume symmetric likelihood and use opposite step if so.
+            # I.e. both steps (+/-) will be the same and will return the same -loglkl.
+            if diff_1[2]:
+                step_array[index] = diff_2[2]/norm**0.5
+            # If symmetric step is required use diff_2[0] to determine size of step.
+            # Only step_index_2=0 goes through the iteration cycle in this case.
+            # If diff_2[2] is defined, will instead use that value.
+            elif data.use_symmetric_step:
+                step_array[index] = np.sign(diff_2[step_index_2])*abs(diff_2[0])/norm**0.5
             else:
-                step_array[index] = diff_2[step_index_2]
+                step_array[index] = diff_2[step_index_2]/norm**0.5
+
+            # If we don't want to use the Cholesky to determine stepsize, instead
+            # use input stepsize normalized by the diagonal element of the Cholesky.
+            if not data.use_cholesky_step and data.fisher_mode == 2:
+                step_array[index] *= step_matrix[index,index]**-1.
 
         # Rotate the step vector to the basis of the covariance matrix
         rotated_array = np.dot(step_matrix, step_array)
@@ -895,12 +886,9 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
         loglike = compute_lkl(cosmo, data)
 
         # Iterative stepsize. If -Delta ln(L) > 1, change step size and repeat steps above
-        # WISHLIST:
-        # 1. if encountered boundary (if diff_1[2]) only positive/negative step CHECK
-        # 2. always use symmetric step for cholesky and eigV (diff_1[0] = diff_1[1]) #### Is this necessary?
-        # 3. allow for iteration even of Cholesky step CHECK
+        # if data.use_symmetric_step=True only runs for step_index_1=0
         # ISSUE: what about Cholesky boundaries?
-        if not two:
+        if not two and not (data.use_symmetric_step and step_index_1 == 1):
             # Save previous step
             # For symmetric step
             if diff_1[2]:
@@ -925,7 +913,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                 repeat = len(backup_step)
 
             # If -Delta ln(L) < 0.5 increase stepsize
-            # TODO: what about boundaries?
+            # ISSUE: what about boundaries when increasing stepsize?
             elif Deltaloglike > -0.5:
                 if repeat > 1:
                     #if data.use_cholesky_step:
@@ -947,6 +935,8 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                     repeat = -len(backup_step)
             else:
                 return loglike, diff_1
+        elif not two:
+            return loglike, diff_1
         else:
             return loglike
 
@@ -982,7 +972,8 @@ def adjust_fisher_bounds(data, center, step_size):
                     step_size[index,2] = step_size[index,0]
 
         # If we want to use the Cholesky to determine stepsizes, normalize step_size to 1
-        #### ISSUE: what about when the Cholesky step (rather than parameter basis step) exceeds the boundary?
+        # ISSUE: what about when the Cholesky step (rather than parameter basis step) exceeds the boundary?
+        # TODO: proper test for Cholesky step boundary.
         if data.use_cholesky_step:
             step_size[index,0] = -1.
             step_size[index,1] = 1.
