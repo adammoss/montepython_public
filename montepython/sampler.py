@@ -750,7 +750,7 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         elif data.use_symmetric_step:
             diff_1[1] = diff_1[0]
         # And only used diff_2[2] or diff_2[0]
-        if diff_2[2]
+        if diff_2[2]:
             diff_2[0] = diff_2[2]
             diff_2[1] = diff_2[2]
         elif data.use_symmetric_step:
