@@ -264,6 +264,10 @@ def chain(cosmo, data, command_line):
     # of parameters is non-zero
     if (data.get_mcmc_parameters(['varying']) != []):
 
+        # if we want to compute the starting point by minimising lnL (instead of taking it from input file or bestfit file)
+        if command_line.minimize:
+            minimum = sampler.get_minimum(cosmo, data, command_line)
+
         # Read input covariance matrix
         sigma_eig, U, C = sampler.get_covariance_matrix(cosmo, data, command_line)
 
