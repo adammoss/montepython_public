@@ -340,7 +340,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Additional option relevant for fisher_mode=2
     # use_cholesky_step=True use Cholesky decomposition to determine stepsize
     # use_cholesky_step=False use input stepsize from covariance matrix of param file
-    data.use_cholesky_step = True
+    data.use_cholesky_step = False
     # Force step to always be symmetric
     data.use_symmetric_step = False
 
@@ -656,6 +656,7 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
             # DEBUG: elements have been computed. This may be non-trivial to code,
             # DEBUG: but allowing off-diagonal elements to use step_index will
             # DEBUG: keep all of the speed-up and would still be correct.
+            # DEBUG: fixed
             for step_index in [0,1]:
                 if elem == 'diag' and step_index == 1:
                     continue
@@ -803,8 +804,8 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         #    loglike_right = 0
 
         # Count the bestfit term at most once
-        if step_index_1:
-            loglike_min = 0
+        #if step_index_1:
+        #    loglike_min = 0
 
         # In the following we want only the step magnitude, not sign
         diff_1_backup = diff_1[:]
@@ -822,6 +823,7 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         # DEBUG: below diff_1[1] is incorrect due to step_index split. It uses the provided diff_1 value,
         # DEBUG: but this is then iterated on, meaning a different value should have been used.
         # DEBUG: Only with use_symmetric_step or if diff_1[2] is non-zero is this part correct.
+        # DEBUG: fixed
         fisher_diagonal = -2.*((diff_1[0]/diff_1[1])*loglike_right-(diff_1[0]/diff_1[1]+1.)
                                 *loglike_min+loglike_left)/(diff_1[0]*diff_1[1]+diff_1[0]**2.)
 
@@ -830,8 +832,9 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         # DEBUG: below diff_1[1] is incorrect due to step_index split. It uses the provided diff_1 value,
         # DEBUG: but this is then iterated on, meaning a different value should have been used.
         # DEBUG: Only with use_symmetric_step or if diff_1[2] is non-zero is this part correct.
+        # DEBUG: fixed, also fixed typos in denominator
         gradient = -((diff_1[0]/diff_1[1])**2.*loglike_right-loglike_left-((diff_1[0]/diff_1[1])**2.-1.)
-                     *loglike_min)/((diff_1[0]**2./diff_1[0])*diff_1[0])
+                     *loglike_min)/((diff_1[0]**2./diff_1[1])+diff_1[0])
 
         # Restore step sign
         diff_1 = diff_1_backup
