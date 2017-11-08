@@ -429,7 +429,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Additional option relevant for fisher_mode=2
     # use_cholesky_step=True use Cholesky decomposition to determine stepsize
     # use_cholesky_step=False use input stepsize from covariance matrix of param file
-    data.use_cholesky_step = False
+    data.use_cholesky_step = True
     # Force step to always be symmetric
     data.use_symmetric_step = False
 
@@ -856,6 +856,13 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         elif data.use_symmetric_step:
             diff_2[1] = diff_2[0]
 
+        if data.use_cholesky_step:
+            parameter_names = data.get_mcmc_parameters(['varying'])
+            index_1 = parameter_names.index(name_1)
+            diff_1 *= step_matrix[index_1,index_1]
+            index_2 = parameter_names.index(name_2)
+            diff_2 *= step_matrix[index_2,index_2]
+
         #fisher_off_diagonal = -(
         #    loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
         # In the case of symmetric steps reduces to -(loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
@@ -904,6 +911,11 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             diff_1[1] = diff_1[2]
         elif data.use_symmetric_step:
             diff_1[1] = diff_1[0]
+
+        if data.use_cholesky_step:
+            parameter_names = data.get_mcmc_parameters(['varying'])
+            index = parameter_names.index(name_1)
+            diff_1 *= step_matrix[index,index]
 
         #fisher_diagonal = -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
         # In case of symmetric steps reduces to -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
