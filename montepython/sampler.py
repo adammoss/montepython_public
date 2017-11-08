@@ -429,7 +429,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Additional option relevant for fisher_mode=2
     # use_cholesky_step=True use Cholesky decomposition to determine stepsize
     # use_cholesky_step=False use input stepsize from covariance matrix of param file
-    data.use_cholesky_step = False
+    data.use_cholesky_step = True
     # Force step to always be symmetric
     data.use_symmetric_step = False
 
@@ -744,7 +744,8 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
             # DEBUG: but allowing off-diagonal elements to use step_index will
             # DEBUG: keep all of the speed-up and would still be correct.
             for step_index in [0,1]:
-
+                if elem == 'diag' and step_index == 1:
+                    continue
                 # loop over second parameter
                 for h, elem_h in enumerate(parameter_names):
                     hdiff = step_size[h]
@@ -755,7 +756,7 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
                         continue
                     if k == h and elem == 'diag':
                         print ''
-                        print '---> Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
+                        print '---> Computing fisher element (%d,%d)' % (k,h)
                         temp1, temp2, diff_1 = compute_fisher_element(
                             data, cosmo, center, step_matrix, loglike_min, step_index,
                             (elem_k, kdiff))
@@ -873,17 +874,20 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         return fisher_off_diagonal
     # It is otherwise a diagonal component
     else:
-        if step_index_1 == 0:
-            step_index_2 = None
-            loglike_left, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-        else:
-            loglike_left = 0
+        #if step_index_1 == 0:
+        step_index_1 = 0
+        step_index_2 = None
+        loglike_left, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+        one = (one[0],diff_1)
+        #else:
+        #    loglike_left = 0
 
-        if step_index_1 == 1:
-            step_index_2 = None
-            loglike_right, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
-        else:
-            loglike_right = 0
+        #if step_index_1 == 1:
+        #step_index_2 = None
+        step_index_1 = 1
+        loglike_right, diff_1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+        #else:
+        #    loglike_right = 0
 
         # Count the bestfit term at most once
         if step_index_1:
