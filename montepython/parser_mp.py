@@ -485,6 +485,11 @@ def create_parser():
         <**>-b<**> : str
             <++>start a new chain from the bestfit file<++> computed with
             analyze.  (*OPT*)<++>
+        <**>--minimize<**> : None
+            <++>Minimize the log likelihood before starting the engine or the fisher<++>.
+            Instead of starting the chains or centering the Fisher calculation on the model
+            passed through the input parameter file or through the .bestfit file, find the
+            minimum of the log likelihood up to some tolerance<++>
         <**>--fisher<**> : None
             <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
             The inverse Fisher matrix can be used as a proposal distribution covmat,
@@ -694,6 +699,9 @@ def create_parser():
     # -- temperature (OPTIONAL)
     runparser.add_argument('-T', help=helpdict['T'], type=float,
                            dest='temperature', default=1.0)
+    # -- minimize (OPTIONAL)
+    runparser.add_argument('--minimize', help=helpdict['minimize'],
+                           action='store_true')
     # -- fisher (OPTIONAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')

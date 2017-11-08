@@ -25,6 +25,7 @@ import warnings
 import io_mp
 import os
 import scipy.linalg as la
+import scipy.optimize as op
 
 def run(cosmo, data, command_line):
     """
@@ -326,6 +327,94 @@ def get_covariance_matrix(cosmo, data, command_line):
 
     return eigv, eigV, matrix
 
+def get_minimum(cosmo, data, command_line):
+
+    if not command_line.silent:
+        warnings.warn("Minimization implementation is being tested")
+
+    # Create the center dictionary, which will hold the center point
+    # information
+    center = {}
+    parameter_names = data.get_mcmc_parameters(['varying'])
+
+    if not command_line.bf:
+        for elem in parameter_names:
+            #temp_data.mcmc_parameters[elem]['current'] = (
+            #    data.mcmc_parameters[elem]['initial'][0])
+            center[elem] = data.mcmc_parameters[elem]['initial'][0]
+    else:
+        #read_args_from_bestfit(temp_data, command_line.bf)
+        read_args_from_bestfit(data, command_line.bf)
+        for elem in parameter_names:
+            #temp_data.mcmc_parameters[elem]['current'] = (
+            #    temp_data.mcmc_parameters[elem]['last_accepted'])
+            #center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
+            center[elem] = data.mcmc_parameters[elem]['last_accepted']
+
+    print center
+    #print chi2_eff(center, cosmo, data)
+    #print gradient_chi2_eff(center, cosmo, data)
+
+    stepsizes = np.zeros(len(parameter_names), 'float64')
+    parameters = np.zeros(len(parameter_names), 'float64')
+    for index, elem in enumerate(parameter_names):
+        parameters[index] = center[elem]
+        stepsizes[index] = center[elem]*0.01
+
+    print parameters
+    print stepsizes
+
+    minimum, chi2 = op.fmin_cg(chi2_eff,
+                               parameters,
+                               #fprime = gradient_chi2_eff,
+                               epsilon = stepsizes,
+                               args = (cosmo,data),
+                               full_output = True,
+                               disp = True,
+                               retall = True)
+
+    print minimum
+    print chi2
+
+    return center
+
+def chi2_eff(params, cosmo, data):
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    for index, elem in enumerate(parameter_names):
+        #print elem,params[index]
+        data.mcmc_parameters[elem]['current'] = params[index]
+    # Update current parameters to the new parameters, only taking steps as requested
+    data.update_cosmo_arguments()
+    # Compute loglike value for the new parameters
+    chi2 = -2.*compute_lkl(cosmo, data)
+    print chi2,' at ',params
+    return chi2
+
+def gradient_chi2_eff(params, cosmo, data):
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    for index, elem in enumerate(parameter_names):
+        data.mcmc_parameters[elem]['current'] = params[elem]
+    # Update current parameters to the new parameters, only taking steps as requested
+    data.update_cosmo_arguments()
+    # Compute loglike value for the new parameters
+    chi2 = -2.*compute_lkl(cosmo, data)
+    # Initialise the gradient field
+    gradient = np.zeros(len(parameter_names), 'float64')
+    for index, elem in enumerate(parameter_names):
+        dx = 0.01*params[elem]
+        #
+        data.mcmc_parameters[elem]['current'] += dx
+        data.update_cosmo_arguments()
+        chi2_plus = -2.*compute_lkl(cosmo, data)
+        #
+        data.mcmc_parameters[elem]['current'] -= 2.*dx
+        data.update_cosmo_arguments()
+        chi2_minus = -2.*compute_lkl(cosmo, data)
+        #
+        gradient[index] = (chi2_plus - chi2_minus)/2./dx
+        #
+        data.mcmc_parameters[elem]['current'] += dx
+    return gradient
 
 def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Adapted by T. Brinckmann, T. Tram
@@ -354,9 +443,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     #done = False
 
     # Create the center dictionary, which will hold the center point
-    # information (or best-fit) TODO
-    # This dictionary will be updated in case it was too far from the
-    # best-fit, and found a non positive-definite symmetric fisher matrix.
+    # information
     center = {}
     parameter_names = data.get_mcmc_parameters(['varying'])
     if not command_line.bf:
