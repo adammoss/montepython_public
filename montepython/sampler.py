@@ -422,16 +422,19 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # write it to a file
 
     # Fisher method options
+    # fisher_mode=3 use covariance matrix in 2-d for off-diagonal elements
     # fisher_mode=2 use Cholesky decomposition to rotate parameter space
     # fisher_mode=1 use eigenvectors of covariance matrix to rotate parameter space
     # fisher_mode=0 use non-rotated parameter space
-    data.fisher_mode = 2
+    data.fisher_mode = 1
     # Additional option relevant for fisher_mode=2
     # use_cholesky_step=True use Cholesky decomposition to determine stepsize
     # use_cholesky_step=False use input stepsize from covariance matrix of param file
-    data.use_cholesky_step = True
+    data.use_cholesky_step = False
     # Force step to always be symmetric
     data.use_symmetric_step = True
+    # Rotate back to cosmological parameter basis
+    data.rotate_back = True
 
     if not command_line.silent:
         warnings.warn("Fisher implementation is being tested")
@@ -484,7 +487,8 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
         # point.
         print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,command_line.fisher_it))
         for index in range(len(parameter_names)):
-            print "%s : left %e, right %e" % (parameter_names[index],stepsize[index,0],stepsize[index,1])
+            #print "%s : left %e, right %e" % (parameter_names[index],stepsize[index,0],stepsize[index,1])
+            print "%s : diagonal element = %e" % (parameter_names[index],inv_fisher_matrix[index,index])
 
         if data.fisher_mode == 1:
             # Compute eigenvectors in order to take steps in the basis
@@ -492,11 +496,16 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
             sigma_eig, step_matrix = la.eig(inv_fisher_matrix)
         elif data.fisher_mode == 2:
             step_matrix = la.cholesky(inv_fisher_matrix).T
+        elif data.fisher_mode == 3:
+            step_matrix = inv_fisher_matrix
         else:
             step_matrix = np.identity(len(parameter_names), dtype='float64')
 
         # Compute fisher matrix
         fisher_matrix, gradient = compute_fisher(data, cosmo, center, stepsize, step_matrix)
+        # If we want to rotate back to the cosmological parameter basis
+        if (data.fisher_mode == 1 or data.fisher_mode == 2) and data.rotate_back:
+            fisher_matrix = step_matrix.T * fisher_matrix * step_matrix
         if not command_line.silent:
             print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,command_line.fisher_it))
 
@@ -743,7 +752,7 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
             # DEBUG: elements have been computed. This may be non-trivial to code,
             # DEBUG: but allowing off-diagonal elements to use step_index will
             # DEBUG: keep all of the speed-up and would still be correct.
-            # DEBUG: fixed
+            # DEBUG: FIXED (but what about with proper treatment of steps?)
             for step_index in [0,1]:
                 if elem == 'diag' and step_index == 1:
                     continue
@@ -782,56 +791,61 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         name_2, diff_2 = two
 
         if step_index_1 == 1:
+            # Calculate step (++)
             step_index_2 = 1
-            loglike_1, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_1, rotated_step_xx = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
+            # Calculate step (+-)
             step_index_2 = 0
-            loglike_2, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_2, rotated_step_xy = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
         else:
             loglike_1 = 0
             loglike_2 = 0
 
         if step_index_1 == 0:
+            # Calculate step (-+). Assuming symmetry rotated_step_yx = rotated_step_xy
             step_index_2 = 1
-            loglike_3, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_3, rotated_step_xy = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
+            # Calculate step (--). Assuming symmetry rotated_step_yy = rotated_step_xx
             step_index_2 = 0
-            loglike_4, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_4, rotated_step_xx = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
         else:
             loglike_3 = 0
             loglike_4 = 0
 
         # If the left and right step sizes are equal these terms will cancel
-        # DEBUG: 2nd and 3rd condition is new
         if abs(diff_2[0]) == abs(diff_2[1]) or diff_2[2] or data.use_symmetric_step:
             loglike_5 = 0.
             loglike_6 = 0.
         else:
             if step_index_1 == 1:
+                # Calculate step (+/)
                 step_index_2 = None
-                loglike_5, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+                loglike_5, rotated_step_x = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
             else:
                 loglike_5 = 0
 
             if step_index_1 == 0:
+                # Calculate step (-/)
                 step_index_2 = None
-                loglike_6, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+                loglike_6, rotated_step_x = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
             else:
                 loglike_6 = 0
 
         # If the left and right step sizes are equal these terms will cancel
-        # DEBUG: 2nd and 3rd condition is new
         if abs(diff_1[0]) == abs(diff_1[1]) or diff_1[2] or data.use_symmetric_step:
             loglike_7 = 0.
             loglike_8 = 0.
         else:
             step_index_1 = None
-
+            # Calculate step (/+)
             step_index_2 = 1
-            loglike_7, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_7, rotated_step_y1 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
+            # Calculate step (/-)
             step_index_2 = 0
-            loglike_8, rotated_step = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            loglike_8, rotated_step_y2 = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
         # Count the bestfit term at most once
         if step_index_1:
@@ -843,7 +857,6 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         diff_1 = abs(diff_1)
         diff_2 = abs(diff_2)
         # Remember that in some cases only used diff_1[2] or diff_1[0]
-        # DEBUG: new part
         if diff_1[2]:
             diff_1[0] = diff_1[2]
             diff_1[1] = diff_1[2]
@@ -855,25 +868,103 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             diff_2[1] = diff_2[2]
         elif data.use_symmetric_step:
             diff_2[1] = diff_2[0]
+        
+        # For Fisher mode 1 and 2 the stepsizes are more complicated.
+        # We need to compute the magnitude of the array (A * x), where
+        # A is the rotation matrix (i.e. the Cholesky decomposition or the
+        # eigenvectors of the covariance matrix) and x is the step array
+        # (remember the full step would be center + rotation_matrix*step_array).
+        # After computing the Fisher matrix we then need to rotate back to
+        # parameter space, this is done in the get_fisher_matrix function.
+        parameter_names = data.get_mcmc_parameters(['varying'])
+        index_1 = parameter_names.index(name_1)
+        index_2 = parameter_names.index(name_2)
+        #if data.fisher_mode == 1:
+        #    diff_1 *= step_matrix[index_1,index_1]**-1.
+        #    diff_1 *= step_matrix[index_2,index_2]**-1.
+        if data.fisher_mode == 2 or data.fisher_mode == 1:
+            #diff_1 *= step_matrix[index_1,index_1]
+            #diff_2 *= step_matrix[index_2,index_2]
+            # Re-compute the rotated step. Unfortunately we can't just use the output
+            # from compute_fisher_step because we need the two steps separated.
+            step_array_1 = np.zeros(len(parameter_names))
+            step_array_1[index_1] = diff_1[0]
+            if data.fisher_mode == 2:
+                rotated_step_1 = np.dot(step_matrix[:,index_1],step_array_1)**0.5
+            else:
+                rotated_step_1 = np.dot(step_matrix[:,index_1],step_array_1*step_matrix[index_1,index_1]**-1.)**0.5
+            step_array_2 = np.zeros(len(parameter_names))
+            step_array_2[index_2] = abs(diff_2[0])
+            if data.fisher_mode == 2:
+                rotated_step_2 = np.dot(step_matrix[:,index_2],step_array_2)**0.5
+            else:
+                rotated_step_2 = np.dot(step_matrix[:,index_2],step_array_2*step_matrix[index_2,index_2]**-1.)**0.5
+            # Instead of a simple stepsize (e.g. diagonal element of covariance matrix)
+            # we need to instead consider that we rotated our step in parameter space,
+            # and instead use the magnitude of the rotated step vector.
+            diff_1[0] = np.dot(abs(rotated_step_1),abs(rotated_step_1))**0.5
+            diff_2[0] = np.dot(abs(rotated_step_2),abs(rotated_step_2))**0.5
 
-        if data.use_cholesky_step:
-            parameter_names = data.get_mcmc_parameters(['varying'])
-            index_1 = parameter_names.index(name_1)
-            diff_1 *= step_matrix[index_1,index_1]
-            index_2 = parameter_names.index(name_2)
-            diff_2 *= step_matrix[index_2,index_2]
+            # The next part is if steps aren't symmetric, but in this part we had assumed
+            # symmetric steps for the derivation of the derivative, so this likely
+            # wouldn't work without additional modifications.
+            if not data.use_symmetric_step:
+                warnings.warn('Current implementation assumes symmetric step, this probably will not work')
+                step_array_1 = np.zeros(len(parameter_names))
+                step_array_1[index_1] = diff_1[1]
+                if data.fisher_mode == 2:
+                    rotated_step_1 = np.dot(step_matrix[:,index_1],step_array_1)**0.5
+                else:
+                    rotated_step_1 = np.dot(step_matrix[:,index_1],step_array_1*step_matrix[index_1,index_1]**-1.)**0.5
+                step_array_2 = np.zeros(len(parameter_names))
+                step_array_2[index_2] = abs(diff_2[1])
+                if data.fisher_mode == 1:
+                    rotated_step_2 = np.dot(step_matrix[:,index_2],step_array_2)**0.5
+                else:
+                    rotated_step_2 = np.dot(step_matrix[:,index_2],step_array_2*step_matrix[index_2,index_2]**-1.)**0.5
+                diff_1[1] = np.dot(abs(rotated_step_1),abs(rotated_step_1))**0.5
+                diff_2[1] = np.dot(abs(rotated_step_2),abs(rotated_step_2))**0.5
+            else:
+                diff_1[1] = diff_1[0]
+                diff_2[1] = diff_2[0]
+            #diff_1 *= np.dot(step_matrix[index_1:,index_1],step_matrix[index_1:,index_2])**0.5
+            #diff_2 *= np.dot(step_matrix[index_2:,index_2],step_matrix[index_2:,index_2])**0.5
 
+            #diff_1 *= np.dot(step_matrix[index_1:,index_1],step_matrix[index_2:,index_2])**-0.5
+            #diff_2 *= np.dot(step_matrix[index_2:,index_2],step_matrix[index_1:,index_1])**-0.5
         #fisher_off_diagonal = -(
         #    loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
+
+        # Fisher mode 2 only considers the covariance of parameters in two dimensions at a time.
+        # DEBUG: Maybe for the stepsize we need to compute the magnitude of the rotated step?
+        # DEBUG: Would we need to rotate back afterwards?
+        if data.fisher_mode == 3:
+            # Fisher mode 3 assumes symmetry, so loglike_5, 6, 7 and 8 are zero and the step size for
+            # loglike_1 (++) and loglike_4 (--), as well as loglike_2 (+-) and loglike_3 (-+), are the same.
+            # The computation can therefore be split into two parts, one for loglike_1 and loglike_4 and one
+            # for loglike_2 and loglike_3, with different step sizes for each pair corresponding to the rotated steps.
+            # loglike_1 (step_index_2 = 1) used step "xx", loglike_2 (step_index_2 = 0) used step "xy"
+            # loglike_3 (step_index_2 = 1) used step "xy" and loglike_4 (step_index_2 = 0) used step "xx"
+            fisher_off_diagonal = -((1./(4*abs(rotated_step_xx[index_1])*abs(rotated_step_xx[index_2]))) * (loglike_1 + loglike_4)
+                                    + (1./(4*abs(rotated_step_xy[index_1])*abs(rotated_step_xy[index_2]))) * (- loglike_2 - loglike_3))
         # In the case of symmetric steps reduces to -(loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
-        # DEBUG: for Cholesky step, diff_1 and diff_2 should be arrays, not numbers
-        # DEBUG: problem: rotated_step is for each combination of two diff arrays, and we need the four diff arrays separately!
-        fisher_off_diagonal = -((1./(diff_2[0]**2./diff_2[1]+diff_2[0]))* # sym. \Delta p_j: reduces to 1/(2 \Delta p_j)
-                                (1./(diff_1[0]**2./diff_1[1]+diff_1[0]))* # sym. \Delta p_i: reduces to 1/(2 \Delta p_i)
-                                ((diff_2[0]/diff_2[1])**2. * ((diff_1[0]/diff_1[1])**2.*loglike_1 - loglike_3) # sym. \Delta p_i and \Delta p_j: reduces to loglike_1 - loglike_3
-                                 -(diff_1[0]/diff_1[1])**2.*loglike_2 + loglike_4 # sym \Delta p_i: reduces to loglike_4 - loglike_2
-                                 +((diff_2[0]/diff_2[1])**2.-1.) * (loglike_6 - (diff_1[0]/diff_1[1])**2.*loglike_5 + ((diff_1[0]/diff_1[1])**2.-1.)*loglike_min) # cancels if sym. \Delta p_j
-                                 +((diff_1[0]/diff_1[1])**2.-1.) * (loglike_8 - (diff_2[0]/diff_2[1])**2.*loglike_7))) # cancels if sym. \Delta p_i
+        else:
+            # DEBUG: for Cholesky step, diff_1 and diff_2 should be magnitudes of step array.
+            # DEBUG: problem: rotated_step is for each combination of two diff arrays, and we need the four diff arrays separately!
+            # DEBUG: However, instead of arrays we can make an approximation:
+            # DEBUG: We could do something similar to fisher mode 3 for the step sizes of the general case. This
+            # DEBUG: would be an approximation, since it would assume only steps in two parameters, when several
+            # DEBUG: parameters may have changed. However, it is probably better than the current implementation.
+            # DEBUG: Note that it only works if we assume symmetry! Otherwise either the step_size=[0,1] scheme
+            # DEBUG: needs to be abandoned (slowing down the code a lot!) or rotated_step_xx/xy/yx/yy and loglike
+            # DEBUG: values need to be stored and the fisher matrix assembled at the end. Also, loglike_5,6,7,8
+            # DEBUG: may not be zero in that case.
+            fisher_off_diagonal = -((1./(diff_2[0]**2./diff_2[1]+diff_2[0]))* # sym. \Delta p_j: reduces to 1/(2 \Delta p_j)
+                                    (1./(diff_1[0]**2./diff_1[1]+diff_1[0]))* # sym. \Delta p_i: reduces to 1/(2 \Delta p_i)
+                                    ((diff_2[0]/diff_2[1])**2. * ((diff_1[0]/diff_1[1])**2.*loglike_1 - loglike_3) # sym. \Delta p_i and \Delta p_j: reduces to loglike_1 - loglike_3
+                                     -(diff_1[0]/diff_1[1])**2.*loglike_2 + loglike_4 # sym \Delta p_i: reduces to loglike_4 - loglike_2
+                                     +((diff_2[0]/diff_2[1])**2.-1.) * (loglike_6 - (diff_1[0]/diff_1[1])**2.*loglike_5 + ((diff_1[0]/diff_1[1])**2.-1.)*loglike_min) # cancels if sym. \Delta p_j
+                                     +((diff_1[0]/diff_1[1])**2.-1.) * (loglike_8 - (diff_2[0]/diff_2[1])**2.*loglike_7))) # cancels if sym. \Delta p_i
 
         # Restore step sign
         diff_1 = diff_1_backup
@@ -882,11 +973,14 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         return fisher_off_diagonal
     # It is otherwise a diagonal component
     else:
+        # Calculate left step
         step_index_1 = 0
         step_index_2 = None
         loglike_left, diff_1, rotated_step_left = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+        # Update 'one' with the new step size to pass to the next step
         one = (one[0],diff_1)
 
+        # Calculate right step
         step_index_1 = 1
         loglike_right, diff_1, rotated_step_right = compute_fisher_step(data,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
@@ -900,24 +994,53 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         elif data.use_symmetric_step:
             diff_1[1] = diff_1[0]
 
-        if data.use_cholesky_step:
-            parameter_names = data.get_mcmc_parameters(['varying'])
-            index = parameter_names.index(name_1)
-            diff_1 *= step_matrix[index,index]
-            #diff_1_backup2 = diff_1[:]
-            #diff_1 = [[],[]]
-            #diff_1[0] = rotated_step_left
-            #diff_1[1] = rotated_step_right
+        # For fisher mode 3 we need to use the rotated step size instead of the input step size
+        parameter_names = data.get_mcmc_parameters(['varying'])
+        index = parameter_names.index(name_1)
+        #if data.fisher_mode == 1:
+        #    diff_1 *= step_matrix[index,index]**-1.
+        if data.fisher_mode == 3:
+            # Due to symmetry assumed for fisher mode 3 the following two quantities should be equal
+            diff_1[0] = abs(rotated_step_left[index])
+            diff_1[1] = abs(rotated_step_right[index])
+            print 'steps equal?', diff_1[0]==diff_1[1]
+            print 'rotated array, rotated step =', rotated_step_left,rotated_step_left[index]
+        elif data.fisher_mode > 0:
+            #diff_1 *= step_matrix[index,index]
+            #print step_matrix[index:,index]
+            #print 'diag =',step_matrix[index,index]
+            #print 'modulus =',np.dot(step_matrix[index:,index],step_matrix[index:,index])**0.5
+            #print diff_1
+            #print 'old diff_1 ='
+            #for i in range(len(diff_1)):
+            #    print diff_1[i]*step_matrix[index,index]
+            #diff_1 *= np.dot(step_matrix[index:,index],step_matrix[index:,index])**0.5
+            #print 'alternate diff_1[0] =',diff_1[0]*np.dot(step_matrix[index:,index],step_matrix[index:,index])**0.5
+            #diff_1 /=np.dot(step_matrix[index:,index],step_matrix[index:,index])**0.5
+            diff_1[0] = (np.dot(abs(rotated_step_left),abs(rotated_step_left)))**0.5
+            diff_1[1] = (np.dot(abs(rotated_step_right),abs(rotated_step_right)))**0.5
+            print 'new diff_1 ='
+            for i in range(len(diff_1)):
+                print diff_1[i]
+            ##diff_1_backup2 = diff_1[:]
+            ##diff_1 = [[],[]]
+            # DEBUG: For Cholesky step, diff_1 should be an array, not scalars.
+            # DEBUG: However, instead of arrays we can make an approximation and use the same scheme
+            # DEBUG: as for fisher mode 3. Although more parameters are changed, it might be a good 
+            # DEBUG: approximation to take the rotated step left/right here as well.
+            #diff_1[0] = abs(rotated_step_left[index])
+            #diff_1[1] = abs(rotated_step_right[index])
 
         #fisher_diagonal = -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
         # In case of symmetric steps reduces to -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
-        # DEBUG: for Cholesky step, diff_1 should be an array, not a number
         fisher_diagonal = -2.*((diff_1[0]/diff_1[1])*loglike_right-(diff_1[0]/diff_1[1]+1.)
                                 *loglike_min+loglike_left)/(diff_1[0]*diff_1[1]+diff_1[0]**2.)
-        #fisher_diagonal = -2.*(np.dot(abs(diff_1[0]),abs(1./diff_1[1]))*loglike_right-(np.dot(abs(diff_1[0]),abs(1./diff_1[1]))+1.)
-        #                        *loglike_min+loglike_left)/(np.dot(abs(diff_1[0]),abs(diff_1[1]))+np.dot(diff_1[0],diff_1[0]))
+        print 'fisher_diag =',fisher_diagonal,' - loglike left, min, right =', loglike_left, loglike_min, loglike_right
 
-        #diff_1 = diff_1_backup2
+        ##fisher_diagonal = -2.*(np.dot(abs(diff_1[0]),abs(1./diff_1[1]))*loglike_right-(np.dot(abs(diff_1[0]),abs(1./diff_1[1]))+1.)
+        ##                        *loglike_min+loglike_left)/(np.dot(abs(diff_1[0]),abs(diff_1[1]))+np.dot(diff_1[0],diff_1[0]))
+
+        ##diff_1 = diff_1_backup2
 
         #gradient = -(loglike_right-loglike_left)/(2.*diff_1)
         # In case of symmetric steps reduces to -(loglike_right-loglike_left)/(2.*diff_1)
@@ -935,8 +1058,8 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
     if two:
         name_2, diff_2 = two
 
-    deltaloglkl_req = 0.02
-    deltaloglkl_tol = 0.01
+    deltaloglkl_req = 0.2
+    deltaloglkl_tol = 0.05
 
     # Create an array of the center value
     parameter_names = data.get_mcmc_parameters(['varying'])
@@ -944,6 +1067,25 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
     for elem in parameter_names:
         index = parameter_names.index(elem)
         center_array[index] = center[elem]
+
+    if two and data.fisher_mode == 3:
+        index1 = parameter_names.index(name_1)
+        index2 = parameter_names.index(name_2)
+        step_sub_matrix = np.zeros([2,2])
+        step_sub_matrix[0,0] = step_matrix[index1,index1]
+        step_sub_matrix[1,1] = step_matrix[index2,index2]
+        step_sub_matrix[0,1] = step_matrix[index1,index2]
+        step_sub_matrix[1,0] = step_matrix[index2,index1]
+        step_matrix = np.zeros(np.shape(step_matrix))
+        step_matrix[index1,index1] = step_sub_matrix[0,0]
+        step_matrix[index2,index2] = step_sub_matrix[1,1]
+        step_matrix[index1,index2] = step_sub_matrix[0,1]
+        step_matrix[index2,index1] = step_sub_matrix[1,0]
+    elif data.fisher_mode == 3:
+        index1 = parameter_names.index(name_1)
+        backup_step = step_matrix[index1,index1]
+        step_matrix = np.zeros(np.shape(step_matrix))
+        step_matrix[index1,index1] = backup_step
 
     backup_step = [0.]
     repeat = 1
@@ -955,7 +1097,8 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
             norm = 1.
             # If we are changing two parameters we need to add a normalization 1/sqrt(2)
             if two and not step_index_2 == None:
-                # DEBUG: why normalize by number of parameters?
+                # DEBUG: why normalize by number of parameters? (it was done in the mcmc)
+                # DEBUG: norm = 2 doesn't seem to work
                 #norm = 2.
                 norm = 1.
 
@@ -974,13 +1117,15 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
 
             # If we don't want to use the Cholesky to determine stepsize, instead
             # use input stepsize normalized by the diagonal element of the Cholesky.
-            if not data.use_cholesky_step and data.fisher_mode == 2:
+            #if not data.use_cholesky_step and data.fisher_mode > 1:
+            if not data.use_cholesky_step:
                 step_array[index] *= step_matrix[index,index]**-1
 
         if two and not step_index_2 == None:
             index = parameter_names.index(name_2)
             # We are changing two parameters so we need to add a normalization 1/sqrt(2)
-            # DEBUG: why normalize by number of parameters?
+            # DEBUG: why normalize by number of parameters? (it was done in the mcmc)
+            # DEBUG: norm = 2 doesn't seem to work
             #norm = 2.
             norm = 1.
 
@@ -999,11 +1144,23 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
 
             # If we don't want to use the Cholesky to determine stepsize, instead
             # use input stepsize normalized by the diagonal element of the Cholesky.
-            if not data.use_cholesky_step and data.fisher_mode == 2:
+            #if not data.use_cholesky_step and data.fisher_mode > 1:
+            # DEBUG: Trying out normalizing the eigenvectors by the diagonal element,
+            # DEBUG: but this shouldn't really matter, as we're just changing the
+            # DEBUG: starting point of the step iteration.
+            if not data.use_cholesky_step:
                 step_array[index] *= step_matrix[index,index]**-1.
 
         # Rotate the step vector to the basis of the covariance matrix
-        rotated_array = np.dot(step_matrix, step_array)
+        # DEBUG: I forgot, why square root of the rotated array?
+        # DEBUG: To account for the dimension of the step matrix elements
+        # DEBUG: The square root of the step_array part is irrelevant for
+        # DEBUG: cholesky step, it's "just a number"
+        if data.use_cholesky_step and data.fisher_mode > 1:
+            rotated_array = np.dot(step_matrix, step_array)
+            rotated_array = np.sign(rotated_array)*abs(rotated_array)**0.5
+        else:
+            rotated_array = np.dot(step_matrix, step_array)
 
         # Construct step vector for comparison with previous step
         step_array = center_array + rotated_array
@@ -1110,7 +1267,7 @@ def adjust_fisher_bounds(data, center, step_size):
         # If we want to use the Cholesky to determine stepsizes, normalize step_size to 1
         # ISSUE: what about when the Cholesky step (rather than parameter basis step) exceeds the boundary?
         # TODO: proper test for Cholesky step boundary.
-        if data.use_cholesky_step:
+        if data.use_cholesky_step and data.fisher_mode > 1:
             step_size[index,0] = -1.
             step_size[index,1] = 1.
             step_size[index,2] = np.sign(step_size[index,2])
