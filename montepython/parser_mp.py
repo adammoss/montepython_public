@@ -496,7 +496,21 @@ def create_parser():
             or to make plots with Fisher ellipses.<++>
         <**>--fisher-it<**> : int
             <++>Number of iterations for Fisher matrix computation<++>,
-            used by both options --fisher and --start-from-fisher (Default: 1)
+            used by option --fisher (Default: 1)
+            <++>
+        <**>--fisher-mode<**> : int
+            <++>Fisher mode: 0 (recommended) <++>,
+            1 (eigenvector rotation), 2 (Cholesky rotation), 3 (2d rotation for
+            off diagonal elements). Modes 1, 2 and 3 are experimental. 
+            Used by option --fisher (Default: 0)
+            <++>
+        <**>--fisher-delta<**> : float
+            <++>Target -deltaloglkl for fisher step iteration<++>.
+            Used by option --fisher (Default: 0.2)
+            <++>
+        <**>--fisher-tol<**> : float
+            <++>Tolerance for -deltaloglkl for fisher step iteration<++>.
+            Used by option --fisher (Default: 0.05)
             <++>
         <**>--silent<**> : None
             <++>silence the standard output<++> (useful when running on
@@ -713,6 +727,15 @@ def create_parser():
     # -- iterative fisher argument (OPTIONAL)
     runparser.add_argument('--fisher-it', help=helpdict['fisher-it'], type=int,
                            dest='fisher_it', default=1)
+    # -- fisher mode (EXPERIMENTAL)
+    runparser.add_argument('--fisher-mode', help=helpdict['fisher-mode'], type=int,
+                           dest='fisher_mode', default=0)
+    # -- fisher step iteration argument, -deltaloglkl target (OPTIONAL)
+    runparser.add_argument('--fisher-delta', help=helpdict['fisher-delta'], type=float,
+                           dest='fisher_delta', default=0.2)
+    # -- fisher step iteration argument, -deltaloglkl tolerance (OPTIONAL)
+    runparser.add_argument('--fisher-tol', help=helpdict['fisher-tol'], type=float,
+                           dest='fisher_tol', default=0.05)
     # -- configuration file (OPTIONAL)
     runparser.add_argument('--conf', help=helpdict['conf'],
                            type=str, dest='config_file',

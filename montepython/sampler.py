@@ -421,17 +421,28 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # We will work out the fisher matrix for all the parameters and
     # write it to a file
 
-    # Fisher method options
+    # Pass input to data structure
+    data.fisher_delta = command_line.fisher_delta
+    data.fisher_tol = command_line.fisher_tol
+
+    # Fisher method options (1,2, and 3 are experimental)
     # fisher_mode=3 use covariance matrix in 2-d for off-diagonal elements
     # fisher_mode=2 use Cholesky decomposition to rotate parameter space
     # fisher_mode=1 use eigenvectors of covariance matrix to rotate parameter space
-    # fisher_mode=0 use non-rotated parameter space
-    data.fisher_mode = 0
+    # fisher_mode=0 use non-rotated parameter space (recommended)
+    data.fisher_mode = command_line.fisher_mode
+    if data.fisher_mode not in [0,1,2,3]:
+        raise io_mp.ConfigurationError("Fisher mode not valid. Available modes: 0 (standard), 1 (eigevenctor rotation), "
+                                       "2 (Cholesky rotation), 3 (2d rotation for off-diagonal elements). "
+                                       "Modes 1, 2 and 3 are experimental.")
+
     # Additional option relevant for fisher_mode=2
     # use_cholesky_step=True use Cholesky decomposition to determine stepsize
     # use_cholesky_step=False use input stepsize from covariance matrix of param file
     data.use_cholesky_step = False
-    # Force step to always be symmetric
+    if data.fisher_mode == 2:
+        data.use_cholesky_step = True
+    # Force step to always be symmetric (recommended)
     data.use_symmetric_step = True
     # Rotate back to cosmological parameter basis
     data.rotate_back = False
@@ -1058,8 +1069,8 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
     if two:
         name_2, diff_2 = two
 
-    deltaloglkl_req = 0.2
-    deltaloglkl_tol = 0.05
+    deltaloglkl_req = data.fisher_delta
+    deltaloglkl_tol = data.fisher_tol
 
     # Create an array of the center value
     parameter_names = data.get_mcmc_parameters(['varying'])
