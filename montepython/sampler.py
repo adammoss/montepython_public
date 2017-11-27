@@ -426,7 +426,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # fisher_mode=2 use Cholesky decomposition to rotate parameter space
     # fisher_mode=1 use eigenvectors of covariance matrix to rotate parameter space
     # fisher_mode=0 use non-rotated parameter space
-    data.fisher_mode = 1
+    data.fisher_mode = 0
     # Additional option relevant for fisher_mode=2
     # use_cholesky_step=True use Cholesky decomposition to determine stepsize
     # use_cholesky_step=False use input stepsize from covariance matrix of param file
@@ -434,7 +434,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # Force step to always be symmetric
     data.use_symmetric_step = True
     # Rotate back to cosmological parameter basis
-    data.rotate_back = True
+    data.rotate_back = False
 
     if not command_line.silent:
         warnings.warn("Fisher implementation is being tested")
