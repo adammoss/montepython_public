@@ -630,6 +630,11 @@ def create_parser():
         <**>--use-fisher-it<**> : int
             <++>if set to N, Fisher ellipses based on file inv_fisherN.mat<++>,
             (Default: 1)<++>
+        <**>--constrained-parameter-name<**> : str
+            <++>Use correct Jeffreys prior for a single constrained (bounded) parameter.<++>
+            For a Gaussian posterior distribution at the boundary of parameter space we
+            can a posteriori change the prior, as if we had included this information
+            in the MCMC run. Follows the approach of arXiv:1710.08899.<++>
 
     Returns
     -------
@@ -838,6 +843,10 @@ def create_parser():
     # -- calculate the covariant matrix when analyzing the chains
     infoparser.add_argument('--want-covmat', help=helpdict['want-covmat'],
                             dest='want_covmat', action='store_true')
+    # -- use correct Jeffreys prior for a single constrained (bounded) parameter
+    infoparser.add_argument('--constrained-parameter-name',
+                            help=helpdict['constrained-parameter-name'], type=str,
+                            dest='constrained_parameter_name', default=False)
     # -------------------------------------
     # Further customization
     # -- fontsize of plots (defaulting to 16)
