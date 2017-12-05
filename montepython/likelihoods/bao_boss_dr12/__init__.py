@@ -80,9 +80,11 @@ class bao_boss_dr12(Likelihood):
             data_array = np.append(data_array, DM_diff)
             data_array = np.append(data_array, H_diff)
 
-        chi2 = np.log(np.dot(np.dot(data_array,self.cov_data),data_array))
+        # compute chi squared
+        inv_cov_data = np.linalg.inv(self.cov_data)
+        chi2 = np.dot(np.dot(data_array,inv_cov_data),data_array)
 
         # return ln(L)
-        lkl = - 0.5 * chi2
+        loglkl = - 0.5 * chi2
 
-        return lkl
+        return loglkl

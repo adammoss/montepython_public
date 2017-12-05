@@ -787,6 +787,16 @@ class Data(object):
                 Omega_L = self.cosmo_arguments['Omega_L']
                 self.cosmo_arguments['omega_cdm'] = (1.-Omega_L)*h*h-omega_b
                 del self.cosmo_arguments[elem]
+            # infer omega_cdm from omega_m (assuming one standard massive neutrino and omega_nu=m_nu/93.14) and delete omega_m
+            elif elem == 'omega_m':
+                omega_b = self.cosmo_arguments['omega_b']
+                omega_m = self.cosmo_arguments['omega_m']
+                try:
+                    omega_nu = self.cosmo_arguments['m_ncdm'] / 93.14
+                except:
+                    omega_nu = 0.
+                self.cosmo_arguments['omega_cdm'] = omega_m - omega_b - omega_nu
+                del self.cosmo_arguments[elem]
             elif elem == 'ln10^{10}A_s':
                 self.cosmo_arguments['A_s'] = math.exp(
                     self.cosmo_arguments[elem]) / 1.e10

@@ -264,6 +264,10 @@ def chain(cosmo, data, command_line):
     # of parameters is non-zero
     if (data.get_mcmc_parameters(['varying']) != []):
 
+        # if we want to compute the starting point by minimising lnL (instead of taking it from input file or bestfit file)
+        if command_line.minimize:
+            minimum = sampler.get_minimum(cosmo, data, command_line)
+
         # Read input covariance matrix
         sigma_eig, U, C = sampler.get_covariance_matrix(cosmo, data, command_line)
 
@@ -271,14 +275,6 @@ def chain(cosmo, data, command_line):
         if command_line.fisher:
             sampler.get_fisher_matrix(cosmo, data, command_line, C)
             return
-
-        # if we want to compute Fisher and then run
-        if command_line.start_from_fisher:
-            sampler.get_fisher_matrix(cosmo, data, command_line, C)
-            # subtitute input covariance matrix with calculated one
-            command_line.cov = os.path.join(
-                command_line.folder, 'covariance_fisher.covmat')
-            sigma_eig, U, C = sampler.get_covariance_matrix(cosmo, data, command_line)
 
         # warning if no jumps are requested
         if data.jumping_factor == 0:
@@ -312,13 +308,17 @@ def chain(cosmo, data, command_line):
     # This is equal to N_slow + f_fast N_fast, where N_slow is the number of slow
     # parameters, f_fast is the over sampling number for each fast block and f_fast
     # is the number of parameters in each fast block.
-    fpm = np.dot(np.array(data.over_sampling), np.array(data.block_parameters))
+    for i in range(len(data.block_parameters)):
+        if i == 0:
+            fpm = data.over_sampling[i]*data.block_parameters[i]
+        else:
+            fpm += data.over_sampling[i]*(data.block_parameters[i] - data.block_parameters[i-1])
 
     # If the update mode was selected, the previous (or original) matrix should be stored
     if command_line.update:
         if not rank and not command_line.silent:
             print 'Update routine is enabled with value %d (recommended: 50)' % command_line.update
-            print 'This number is rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
+            print 'This number is rescaled by cycle length %d (N_slow + f_fast * N_fast) to %d' % (fpm,fpm*command_line.update)
         # Rescale update number by cycle length N_slow + f_fast * N_fast to account for fast parameters
         command_line.update *= fpm
         previous = (sigma_eig, U, C, Cholesky)
@@ -355,7 +355,7 @@ def chain(cosmo, data, command_line):
     if command_line.superupdate:
         if not rank and not command_line.silent:
             print 'Superupdate routine is enabled with value %d (recommended: 20)' % command_line.superupdate
-            print 'This number is rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
+            print 'This number is rescaled by cycle length %d (N_slow + f_fast * N_fast) to %d' % (fpm,fpm*command_line.superupdate)
         # Rescale superupdate number by cycle length N_slow + f_fast * N_fast to account for fast parameters
         command_line.superupdate *= fpm
         # Define needed parameters

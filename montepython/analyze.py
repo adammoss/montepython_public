@@ -32,6 +32,8 @@ import io_mp
 from itertools import ifilterfalse
 from itertools import ifilter
 import scipy.ndimage
+import scipy.special
+import numpy.linalg as la
 
 # Defined to remove the burnin for all the points that were produced before the
 # first time where -log-likelihood <= min-minus-log-likelihood+LOG_LKL_CUTOFF
@@ -326,6 +328,23 @@ def convergence(info):
     # put together. This will serve for the plotting.
     info.chain = np.vstack(spam)
 
+    # Use correct Jeffreys prior for constrained parameter space
+    if info.constrained_parameter_name:
+        print '--> Adjusting weights for constrained parameter space'
+        for i in xrange(len(spam)):
+            spam[i][:,0] *= Jprior(info,spam[i])
+        print total[0]
+        # Re-compute mean for each chain (usd for plotting)
+        for j in xrange(len(spam)):
+            total[j+1] = spam[j][:, 0].sum()
+        total[0] = total[1:].sum()
+        print total[0]
+        print mean[0]
+        print '--> Re-computing mean values'
+        compute_mean(mean, spam, total)
+        info.mean = mean[0]
+        print mean[0]
+        info.chain = np.vstack(spam)
 
 def compute_posterior(information_instances):
     """
@@ -540,16 +559,17 @@ def compute_posterior(information_instances):
 
                 # 1D posterior normalised to P_max=1 (third step, used only for plotting)
                 #
-                # apply gaussian smoothing
+                # apply gaussian smoothing (obsolete - we don't do it anymore since the option --posterior-smoothing
+                # was defined, so we commented out this part)
                 #
                 # factor by which the grid has been made thinner (10 means 10 times more bins)
                 interpolation_factor = float(len(info.interp_grid))/float(len(info.bincenters))
                 # factor for gaussian smoothing
                 sigma = interpolation_factor*info.gaussian_smoothing
                 # smooth
-                smoothed_interp_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
+                #smoothed_interp_hist = scipy.ndimage.filters.gaussian_filter(info.interp_hist,sigma)
                 # re-normalised
-                smoothed_interp_hist = smoothed_interp_hist/smoothed_interp_hist.max()
+                #smoothed_interp_hist = smoothed_interp_hist/smoothed_interp_hist.max()
 
                 if conf.plot_2d:
 
@@ -558,7 +578,10 @@ def compute_posterior(information_instances):
                     ##################################################
                     plot = ax2d.plot(
                         info.interp_grid,
-                        smoothed_interp_hist,
+                        # version without gaussian smoothing:
+                        info.interp_hist,
+                        # version with gaussian smoothing (commented)
+                        #smoothed_interp_hist,
                         linewidth=info.line_width, ls='-',
                         color = info.MP_color_cycle[info.id][1],
                         # the [1] picks up the color of the 68% contours
@@ -637,8 +660,10 @@ def compute_posterior(information_instances):
                     ##################################################
                     ax1d.plot(
                         info.interp_grid,
-                        # gaussian filtered 1d posterior:
-                        smoothed_interp_hist,
+                        # 1d posterior without gaussian filter:
+                        info.interp_hist,
+                        # gaussian filtered 1d posterior (commented):
+                        #smoothed_interp_hist,
                         # raw 1d posterior:
                         #info.interp_hist,
                         lw=info.line_width, ls='-',
@@ -682,12 +707,13 @@ def compute_posterior(information_instances):
 
                         # 1D mean likelihood normalised to P_max=1 (third step, used only for plotting)
                         #
-                        # apply gaussian smoothing
+                        # apply gaussian smoothing (obsolete - we don't do it anymore since the option --posterior-smoothing
+                        # was defined, so we commented out this part)
                         #
                         # smooth
-                        smoothed_interp_lkl_mean = scipy.ndimage.filters.gaussian_filter(interp_lkl_mean,sigma)
+                        #smoothed_interp_lkl_mean = scipy.ndimage.filters.gaussian_filter(interp_lkl_mean,sigma)
                         # re-normalised
-                        smoothed_interp_lkl_mean = smoothed_interp_lkl_mean/smoothed_interp_lkl_mean.max()
+                        #smoothed_interp_lkl_mean = smoothed_interp_lkl_mean/smoothed_interp_lkl_mean.max()
 
                         # Execute some customisation scripts for the 1d plots
                         if (info.custom1d != []):
@@ -704,7 +730,11 @@ def compute_posterior(information_instances):
                             #          color = info.MP_color_cycle[info.id][1],
                             #          alpha = info.alphas[info.id])
                             # smoothed and interpolated mean likelihoods:
-                            ax2d.plot(interp_grid, smoothed_interp_lkl_mean,
+                            ax2d.plot(interp_grid,
+                                      # version without gaussian smoothing:
+                                      interp_lkl_mean,
+                                      # version with gaussian smoothing (commented)
+                                      #smoothed_interp_lkl_mean,
                                       ls='--', lw=conf.line_width,
                                       color = info.MP_color_cycle[info.id][1],
                                       alpha = info.alphas[info.id])
@@ -719,7 +749,11 @@ def compute_posterior(information_instances):
                             #          color = info.MP_color_cycle[info.id][1],
                             #          alpha = info.alphas[info.id])
                             # smoothed and interpolated mean likelihoods:
-                            ax1d.plot(interp_grid, smoothed_interp_lkl_mean,
+                            ax1d.plot(interp_grid,
+                                      # version without gaussian smoothing
+                                      interp_lkl_mean,
+                                      # version with gaussian smoothing (commented)
+                                      #smoothed_interp_lkl_mean,
                                       ls='--', lw=conf.line_width,
                                       color = info.MP_color_cycle[info.id][1],
                                       alpha = info.alphas[info.id])
@@ -1201,8 +1235,14 @@ def cubic_interpolation(info, hist, bincenters):
         ln_hist = np.log(hist)
 
         # define a finer grid on a wider range (assuming that the following method is fine both for inter- and extra-polation)
-        left = max(info.boundaries[info.native_index][0],bincenters[0]-2.5*(bincenters[1]-bincenters[0]))
-        right = min(info.boundaries[info.native_index][1],bincenters[-1]+2.5*(bincenters[-1]-bincenters[-2]))
+        left = bincenters[0]-2.5*(bincenters[1]-bincenters[0])
+        if (info.boundaries[info.native_index][0] != None):
+            if (info.boundaries[info.native_index][0] > left):
+                left = info.boundaries[info.native_index][0]
+        right = bincenters[-1]+2.5*(bincenters[-1]-bincenters[-2])
+        if (info.boundaries[info.native_index][1] != None):
+            if (info.boundaries[info.native_index][1] < right):
+                right = info.boundaries[info.native_index][1]
         interp_grid = np.linspace(left, right, (len(bincenters)+4)*10+1)
 
         ######################################
@@ -1226,10 +1266,16 @@ def cubic_interpolation(info, hist, bincenters):
             sub_indices = [i for i,elem in enumerate(hist) if elem > threshold]
             # The interpolation is done precisely in this range: hist[sub_indices[0]] < x < hist[sub_indices[-1]]
             g = np.poly1d(np.polyfit(bincenters[sub_indices],ln_hist[sub_indices],info.posterior_smoothing)) #,w=np.sqrt(hist[sub_indices])))
-            # The extrapolation is done in a range including one more bin on each side, excepted when the boundarty is hit
-            extrapolation_range_left = [info.boundaries[info.native_index][0] if sub_indices[0] == 0 else bincenters[sub_indices[0]-1]]
-            extrapolation_range_right = [info.boundaries[info.native_index][1] if sub_indices[-1] == len(hist)-1 else bincenters[sub_indices[-1]+1]]
-            # outisde of this range, log(L) is brutally set to a negligible value,e, log(1.e-10)
+            # The extrapolation is done in a range including one more bin on each side, excepted when the boundary is hit
+            if (info.boundaries[info.native_index][0] == None):
+                extrapolation_range_left = [bincenters[sub_indices[0]] if sub_indices[0] == 0 else bincenters[sub_indices[0]-1]]
+            else:
+                extrapolation_range_left = [info.boundaries[info.native_index][0] if sub_indices[0] == 0 else bincenters[sub_indices[0]-1]]
+            if (info.boundaries[info.native_index][1] == None):
+                extrapolation_range_right = [bincenters[sub_indices[-1]] if sub_indices[-1] == len(hist)-1 else bincenters[sub_indices[-1]+1]]
+            else:
+                extrapolation_range_right = [info.boundaries[info.native_index][1] if sub_indices[-1] == len(hist)-1 else bincenters[sub_indices[-1]+1]]
+            # outside of this range, log(L) is brutally set to a negligible value,e, log(1.e-10)
             interp_hist = [g(elem) if (elem > extrapolation_range_left and elem < extrapolation_range_right) else np.log(1.e-10) for elem in interp_grid]
 
         elif info.posterior_smoothing<0:
@@ -1255,8 +1301,14 @@ def cubic_interpolation(info, hist, bincenters):
             # failure probably caused by old scipy not having the fill_value='extrapolate' argument. Then, only interpoolate.
             except:
                 # define a finer grid but not a wider one
-                left = max(info.boundaries[info.native_index][0],bincenters[0])
-                right = min(info.boundaries[info.native_index][1],bincenters[-1])
+                left = bincenters[0]
+                if (info.boundaries[info.native_index][0] != None):
+                    if (info.boundaries[info.native_index][0] > left):
+                        left = info.boundaries[info.native_index][0]
+                right = bincenters[-1]
+                if (info.boundaries[info.native_index][1] != None):
+                    if (info.boundaries[info.native_index][1] < right):
+                        right = info.boundaries[info.native_index][1]
                 interp_grid = np.linspace(left, right, len(bincenters)*10+1)
                 # prepare to interpolate only:
                 if info.posterior_smoothing == 0:
@@ -1937,6 +1989,73 @@ def iscomment(s):
     Define what we call a comment in MontePython chain files
     """
     return s.startswith('#')
+
+
+def Jprior(info,spam):
+    # Following the approach of Hannestad & Tram 1710.08899 compute
+    # the correct Jeffreys prior for a constrained parameter space
+
+    # First compute the covariance matrix
+    info.covar = compute_covariance_matrix(info)
+
+    #### I don't think I need to rescale if I apply before rescaling in spam
+    # Then adjust the scales between stored parameters and the ones used
+    # in mcmc
+    scales = info.scales
+
+    # Compute the inverse matrix, and assert that the computation was
+    # precise enough, by comparing the product to the identity matrix.
+    invscales = np.linalg.inv(scales)
+    np.testing.assert_array_almost_equal(
+        np.dot(scales, invscales), np.eye(np.shape(scales)[0]),
+        decimal=5)
+
+    # Apply the newly computed scales to the input matrix
+    C = np.dot(invscales.T, np.dot(info.covar, invscales))
+    ####
+
+    # Compute Fisher matrix as the inverse of the covariance matrix
+    M = la.inv(C)
+
+    # Loop through parameter names to find interesting parameter:
+    parameter_names = info.ref_names#info.backup_names
+    foundparam = False
+    for index_name, name in enumerate(parameter_names):
+        if name == info.constrained_parameter_name:
+            foundparam=True
+            break
+    if foundparam==False:
+        print 'Did not find parameter'+info.constrained_parameter_name+'!'
+
+    if len(parameter_names)>1:
+        # Construct minor matrix W0 and the "coupling" vector V:
+        def minor(arr, i, j):
+            # ith column, jth row removed
+            return arr[np.array(range(i)+range(i+1, arr.shape[0]))[:,np.newaxis],
+                       np.array(range(j)+range(j+1,arr.shape[1]))]
+        W0 = minor(M,index_name,index_name)
+        U0 = M[index_name,index_name]
+        V = np.delete(M[index_name,:], index_name)
+        W0inv = la.inv(W0)
+        U = U0+np.dot(np.dot(V.T,W0inv),V)
+    else:
+        U = np.squeeze(M)
+
+    x = np.sqrt(0.5*U)*spam[:,index_name]
+    Z = np.exp(-x*x)/(1.+scipy.special.erf(x))
+
+    Jprior_correction = np.sqrt(1.-2./np.pi*(Z*Z+np.sqrt(np.pi)*x*Z))
+    a = 0
+    b = 0
+    for i in Jprior_correction:
+        if not Jprior_correction[i] == 1.:
+            print Jprior_correction[i]
+            a+=1
+        else:
+            b+=1
+    print a,b
+    exit()
+    return Jprior_correction
 
 class Information(object):
     """

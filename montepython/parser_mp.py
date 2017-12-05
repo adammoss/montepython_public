@@ -485,17 +485,33 @@ def create_parser():
         <**>-b<**> : str
             <++>start a new chain from the bestfit file<++> computed with
             analyze.  (*OPT*)<++>
+        <**>--minimize<**> : None
+            <++>Minimize the log likelihood before starting the engine or the fisher<++>.
+            Instead of starting the chains or centering the Fisher calculation on the model
+            passed through the input parameter file or through the .bestfit file, find the
+            minimum of the log likelihood up to some tolerance<++>
         <**>--fisher<**> : None
             <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
             The inverse Fisher matrix can be used as a proposal distribution covmat,
             or to make plots with Fisher ellipses.<++>
         <**>--fisher-it<**> : int
             <++>Number of iterations for Fisher matrix computation<++>,
-            used by both options --fisher and --start-from-fisher (Default: 1)
+            used by option --fisher (Default: 1)
             <++>
-        <**>--start-from-fisher<**> : None
-            <++>Calculates the inverse Fisher matrix, and then run<++> using it as
-            a proposal distribution covmat.<++>
+        <**>--fisher-mode<**> : int
+            <++>Fisher mode: 0 (recommended) <++>,
+            1 (eigenvector rotation), 2 (Cholesky rotation), 3 (2d rotation for
+            off diagonal elements). Modes 1, 2 and 3 are experimental. 
+            Used by option --fisher (Default: 0)
+            <++>
+        <**>--fisher-delta<**> : float
+            <++>Target -deltaloglkl for fisher step iteration<++>.
+            Used by option --fisher (Default: 0.2)
+            <++>
+        <**>--fisher-tol<**> : float
+            <++>Tolerance for -deltaloglkl for fisher step iteration<++>.
+            Used by option --fisher (Default: 0.05)
+            <++>
         <**>--silent<**> : None
             <++>silence the standard output<++> (useful when running on
             clusters)<++>
@@ -628,6 +644,11 @@ def create_parser():
         <**>--use-fisher-it<**> : int
             <++>if set to N, Fisher ellipses based on file inv_fisherN.mat<++>,
             (Default: 1)<++>
+        <**>--constrained-parameter-name<**> : str
+            <++>Use correct Jeffreys prior for a single constrained (bounded) parameter.<++>
+            For a Gaussian posterior distribution at the boundary of parameter space we
+            can a posteriori change the prior, as if we had included this information
+            in the MCMC run. Follows the approach of arXiv:1710.08899.<++>
 
     Returns
     -------
@@ -697,15 +718,24 @@ def create_parser():
     # -- temperature (OPTIONAL)
     runparser.add_argument('-T', help=helpdict['T'], type=float,
                            dest='temperature', default=1.0)
-    # -- fisher (EXPERIMENTAL)
+    # -- minimize (OPTIONAL)
+    runparser.add_argument('--minimize', help=helpdict['minimize'],
+                           action='store_true')
+    # -- fisher (OPTIONAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
-    # -- iterative fisher argument (EXPERIMENTAL)
+    # -- iterative fisher argument (OPTIONAL)
     runparser.add_argument('--fisher-it', help=helpdict['fisher-it'], type=int,
                            dest='fisher_it', default=1)
-    # -- fisher as MCMC input (EXPERIMENTAL)
-    runparser.add_argument('--start-from-fisher', help=helpdict['start-from-fisher'],
-                           dest='start_from_fisher', action='store_true')
+    # -- fisher mode (EXPERIMENTAL)
+    runparser.add_argument('--fisher-mode', help=helpdict['fisher-mode'], type=int,
+                           dest='fisher_mode', default=0)
+    # -- fisher step iteration argument, -deltaloglkl target (OPTIONAL)
+    runparser.add_argument('--fisher-delta', help=helpdict['fisher-delta'], type=float,
+                           dest='fisher_delta', default=0.2)
+    # -- fisher step iteration argument, -deltaloglkl tolerance (OPTIONAL)
+    runparser.add_argument('--fisher-tol', help=helpdict['fisher-tol'], type=float,
+                           dest='fisher_tol', default=0.05)
     # -- configuration file (OPTIONAL)
     runparser.add_argument('--conf', help=helpdict['conf'],
                            type=str, dest='config_file',
@@ -836,6 +866,10 @@ def create_parser():
     # -- calculate the covariant matrix when analyzing the chains
     infoparser.add_argument('--want-covmat', help=helpdict['want-covmat'],
                             dest='want_covmat', action='store_true')
+    # -- use correct Jeffreys prior for a single constrained (bounded) parameter
+    infoparser.add_argument('--constrained-parameter-name',
+                            help=helpdict['constrained-parameter-name'], type=str,
+                            dest='constrained_parameter_name', default=False)
     # -------------------------------------
     # Further customization
     # -- fontsize of plots (defaulting to 16)
