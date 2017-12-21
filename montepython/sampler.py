@@ -359,17 +359,18 @@ def get_minimum(cosmo, data, command_line):
     parameters = np.zeros(len(parameter_names), 'float64')
     for index, elem in enumerate(parameter_names):
         parameters[index] = center[elem]
-        stepsizes[index] = center[elem]*0.01
+        stepsizes[index] = center[elem]*0.0001
 
     print parameters
     print stepsizes
 
-    minimum, chi2 = op.fmin_cg(chi2_eff,
+    #minimum, chi2 = op.fmin_cg(chi2_eff,
+    minimum = op.fmin_cg(chi2_eff,
                                parameters,
                                #fprime = gradient_chi2_eff,
                                epsilon = stepsizes,
                                args = (cosmo,data),
-                               full_output = True,
+                               full_output = False,
                                disp = True,
                                retall = True)
 
@@ -431,6 +432,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # fisher_mode=1 use eigenvectors of covariance matrix to rotate parameter space
     # fisher_mode=0 use non-rotated parameter space (recommended)
     data.fisher_mode = command_line.fisher_mode
+    print 'delta, tol, mode =', data.fisher_delta, data.fisher_tol, command_line.fisher_mode
     if data.fisher_mode not in [0,1,2,3]:
         raise io_mp.ConfigurationError("Fisher mode not valid. Available modes: 0 (standard), 1 (eigevenctor rotation), "
                                        "2 (Cholesky rotation), 3 (2d rotation for off-diagonal elements). "
@@ -489,7 +491,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
         stepsize[index,0] = -(inv_fisher_matrix[index][index])**0.5
         stepsize[index,1] = (inv_fisher_matrix[index][index])**0.5
     # Adjust stepsize in case step exceeds boundary
-    adjust_fisher_bounds(data,center,stepsize)
+    stepsize = adjust_fisher_bounds(data,center,stepsize)
 
     fisher_iteration = 0
     while fisher_iteration < command_line.fisher_it:
@@ -529,13 +531,34 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
                 "sigma values (or covmat) or remove the option --fisher and run "
                 "with Metropolis-Hastings or another sampling method.")
 
-        # Stepsize for the next iteration
-        stepsize = np.zeros([len(parameter_names),3])
-        for index in range(len(parameter_names)):
-            stepsize[index,0] = -(inv_fisher_matrix[index,index])**0.5
-            stepsize[index,1] = (inv_fisher_matrix[index,index])**0.5
-        # Adjust stepsize in case step exceeds boundary
-        adjust_fisher_bounds(data,center,stepsize)
+        # Check if the inverse fisher matrix is positive definite
+        fisher_status = 1
+        try:
+            la.cholesky(inv_fisher_matrix).T
+        except:
+            print 'Fisher matrix computation failed - inverse not positive definite'
+            print 'Increasing fisher_it by 1, to %d, and adjusting fisher_tol and fisher_delta' %(command_line.fisher_it + 1)
+            fisher_status = 0
+            command_line.fisher_it += 1
+            if fisher_iteration == 20:
+                print 'Fisher matrix not obtained after 20 attempts, aborting.'
+                print 'Try with different fisher_tol, fisher_delta, input sigmas or covmat'
+            if data.fisher_tol < 0.25 * command_line.fisher_tol:
+                print 'Resetting fisher_tol to %f and changing fisher_delta from %f to %f' %(command_line.fisher_tol,data.fisher_delta,0.5*data.fisher_delta)
+                data.fisher_tol = command_line.fisher_tol
+                data.fisher_delta *= 0.5
+            else:
+                print 'Reducing fisher_tol from %f to %f for fisher_delta %f' %(data.fisher_tol,0.5*data.fisher_tol,data.fisher_delta)
+                data.fisher_tol *= 0.5
+
+        # Update stepsize for the next iteration after successful fisher matrix computation
+        if fisher_status:
+            stepsize = np.zeros([len(parameter_names),3])
+            for index in range(len(parameter_names)):
+                stepsize[index,0] = -(inv_fisher_matrix[index,index])**0.5
+                stepsize[index,1] = (inv_fisher_matrix[index,index])**0.5
+            # Adjust stepsize in case step exceeds boundary
+            stepsize = adjust_fisher_bounds(data,center,stepsize)
 
         # Take scalings into account and write the matrices in files
         fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
@@ -776,7 +799,7 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
                     if k > h:
                         continue
                     if k == h and elem == 'diag':
-                        print ''
+                        #print ''
                         print '---> Computing fisher element (%d,%d)' % (k,h)
                         temp1, temp2, diff_1 = compute_fisher_element(
                             data, cosmo, center, step_matrix, loglike_min, step_index,
@@ -785,7 +808,7 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
                         gradient[k] += temp2
                         step_size[k] = diff_1
                     elif k < h and elem == 'off-diag':
-                        print ''
+                        #print ''
                         print '---> Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
                         fisher_matrix[k][h] += compute_fisher_element(
                             data, cosmo, center, step_matrix, loglike_min, step_index,
@@ -1014,8 +1037,8 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             # Due to symmetry assumed for fisher mode 3 the following two quantities should be equal
             diff_1[0] = abs(rotated_step_left[index])
             diff_1[1] = abs(rotated_step_right[index])
-            print 'steps equal?', diff_1[0]==diff_1[1]
-            print 'rotated array, rotated step =', rotated_step_left,rotated_step_left[index]
+            #print 'steps equal?', diff_1[0]==diff_1[1]
+            #print 'rotated array, rotated step =', rotated_step_left,rotated_step_left[index]
         elif data.fisher_mode > 0:
             #diff_1 *= step_matrix[index,index]
             #print step_matrix[index:,index]
@@ -1030,9 +1053,9 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             #diff_1 /=np.dot(step_matrix[index:,index],step_matrix[index:,index])**0.5
             diff_1[0] = (np.dot(abs(rotated_step_left),abs(rotated_step_left)))**0.5
             diff_1[1] = (np.dot(abs(rotated_step_right),abs(rotated_step_right)))**0.5
-            print 'new diff_1 ='
-            for i in range(len(diff_1)):
-                print diff_1[i]
+            #print 'new diff_1 ='
+            #for i in range(len(diff_1)):
+            #    print diff_1[i]
             ##diff_1_backup2 = diff_1[:]
             ##diff_1 = [[],[]]
             # DEBUG: For Cholesky step, diff_1 should be an array, not scalars.
@@ -1046,7 +1069,7 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
         # In case of symmetric steps reduces to -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
         fisher_diagonal = -2.*((diff_1[0]/diff_1[1])*loglike_right-(diff_1[0]/diff_1[1]+1.)
                                 *loglike_min+loglike_left)/(diff_1[0]*diff_1[1]+diff_1[0]**2.)
-        print 'fisher_diag =',fisher_diagonal,' - loglike left, min, right =', loglike_left, loglike_min, loglike_right
+        #print 'fisher_diag =',fisher_diagonal,' - loglike left, min, right =', loglike_left, loglike_min, loglike_right
 
         ##fisher_diagonal = -2.*(np.dot(abs(diff_1[0]),abs(1./diff_1[1]))*loglike_right-(np.dot(abs(diff_1[0]),abs(1./diff_1[1]))+1.)
         ##                        *loglike_min+loglike_left)/(np.dot(abs(diff_1[0]),abs(diff_1[1]))+np.dot(diff_1[0],diff_1[0]))
@@ -1186,7 +1209,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
             index = parameter_names.index(elem)
             data.mcmc_parameters[elem]['current'] = center[elem] + rotated_array[index]
 
-        print 'Need cosmo update:', data.need_cosmo_update
+        #print 'Need cosmo update:', data.need_cosmo_update
         # Update current parameters to the new parameters, only taking steps as requested
         data.update_cosmo_arguments()
 
@@ -1207,7 +1230,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
 
             # Calculate Delta ln(L)
             Deltaloglike = loglike - loglike_min
-            print ">>>> For %s[%d],Delta ln(L)=%e using min(ln(L))=%e"%(name_1,int(np.sign(diff_1[step_index_1])),loglike-loglike_min,loglike_min)
+            #print ">>>> For %s[%d],Delta ln(L)=%e using min(ln(L))=%e"%(name_1,int(np.sign(diff_1[step_index_1])),loglike-loglike_min,loglike_min)
 
             # If -Delta ln(L) is larger than desired reduce stepsize
             if Deltaloglike < -(deltaloglkl_req + deltaloglkl_tol):
@@ -1215,7 +1238,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                     diff_1[2] -= np.sign(diff_1[2]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[2])
                 else:
                     diff_1[step_index_1] -= np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
-                print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                #print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                 repeat = len(backup_step)
 
             # If -Delta ln(L) is smaller than desired increase stepsize
@@ -1226,14 +1249,14 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                         diff_1[2] -= np.sign(diff_1[2]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[2])
                     else:
                         diff_1[step_index_1] += np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
-                    print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                    #print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                     repeat = len(backup_step)
                 else:
                     if diff_1[2]:
                         diff_1[2] *= 2.
                     else:
                         diff_1[step_index_1] *= 2.
-                    print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                    #print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                     repeat = -len(backup_step)
             else:
                 return loglike, diff_1, rotated_array
