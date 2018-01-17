@@ -670,24 +670,39 @@ def compute_lkl(cosmo, data):
         # output given the parameter values. This will be considered as a valid
         # point, but with minimum likelihood, so will be rejected, resulting in
         # the choice of a new point.
-        try:
-            cosmo.compute(["lensing"])
-        except CosmoComputationError as failure_message:
-            # could be useful to uncomment for debugging:
-            #np.set_printoptions(precision=30, linewidth=150)
-            #print 'cosmo params'
-            #print data.cosmo_arguments
-            #print data.cosmo_arguments['tau_reio']
-            sys.stderr.write(str(failure_message)+'\n')
-            sys.stderr.flush()
-            return data.boundary_loglike
-        except CosmoSevereError as critical_message:
-            raise io_mp.CosmologicalModuleError(
-                "Something went wrong when calling CLASS" +
-                str(critical_message))
-        except KeyboardInterrupt:
-            raise io_mp.CosmologicalModuleError(
-                "You interrupted execution")
+        if 'tSZ' in data.cosmo_arguments['output']:#=='tSZ') or (data.cosmo_arguments['output']=='tSZ,tSZ_Trispectrum')):
+            try:
+                cosmo.compute(["szpowerspectrum"])    
+            except CosmoComputationError as failure_message:
+                sys.stderr.write(str(failure_message)+'\n')
+                sys.stderr.flush()
+                return data.boundary_loglike
+            except CosmoSevereError as critical_message:
+                raise io_mp.CosmologicalModuleError(
+                    "Something went wrong when calling CLASS" +
+                    str(critical_message))
+            except KeyboardInterrupt:
+                raise io_mp.CosmologicalModuleError(
+                    "You interrupted execution")
+        else:
+            try:
+                cosmo.compute(["lensing"])
+            except CosmoComputationError as failure_message:
+                # could be useful to uncomment for debugging:
+                #np.set_printoptions(precision=30, linewidth=150)
+                #print 'cosmo params'
+                #print data.cosmo_arguments
+                #print data.cosmo_arguments['tau_reio']
+                sys.stderr.write(str(failure_message)+'\n')
+                sys.stderr.flush()
+                return data.boundary_loglike
+            except CosmoSevereError as critical_message:
+                raise io_mp.CosmologicalModuleError(
+                    "Something went wrong when calling CLASS" +
+                    str(critical_message))
+            except KeyboardInterrupt:
+                raise io_mp.CosmologicalModuleError(
+                    "You interrupted execution")
 
     # For each desired likelihood, compute its value against the theoretical
     # model

@@ -165,6 +165,54 @@ def get_new_position(data, eigv, U, k, Cholesky, Rotation):
                 vector_new[i] > value[2]):
             flag += 1  # same
 
+    # SZ angular power spectrum by B. Boillet
+    # Here we implement the rejection criterion: at each multipole,
+    # we compute A_FG(ell), the total amplitude of the foregrounds (CIB+IR+RS+CN).
+    # if A_FG(ell) is larger than (C_ell^(y2+fg)-ymap_clusters)(ell) the flag is
+    # incremented and the function return False to sample a
+    # new point in the parameter space.
+    if 'Planck_SZ_spectrum' in data.experiments:
+        #collect the amplitude of the foregrounds
+        #uncomment if no-nuisance
+        A_cib = 0.
+        A_rs = 0.
+        A_ir = 0.
+        for i, elem in enumerate(parameter_names):
+            #print elem
+            #print vector_new[i]
+            if (elem == 'A_CIB'):
+                A_cib = vector_new[i]
+            elif (elem == 'A_RS'):
+                A_rs = vector_new[i]
+            elif (elem == 'A_IR'):
+                A_ir = vector_new[i]
+        A_cn = 0.9033
+    
+        #path to data file
+        datafile = os.path.join(data.path['data'],'Planck_SZ_spectrum/ymap_diff.txt')
+        #read the datafile
+        MAX = np.array([], 'float64')
+        CIB = np.array([], 'float64')
+        RS = np.array([], 'float64')
+        IR = np.array([], 'float64')
+        CN = np.array([], 'float64')
+
+        for line in open(datafile, 'r'):
+            if (line.find('#') == -1):
+                MAX = np.append(MAX, float(line.split()[1]))
+                CIB = np.append(CIB, float(line.split()[2]))
+                RS = np.append(RS, float(line.split()[3]))
+                IR = np.append(IR, float(line.split()[4]))
+                CN = np.append(CN, float(line.split()[5]))
+        #collect number of multipole bins
+        number_of_bins = len(MAX)
+        #loop over multipole bin:
+        for ell in range(number_of_bins):
+            # Reject points where foreground are too large, see Boris et al. 1712.00788
+            if (MAX[ell]<(A_cib*CIB[ell]+A_ir*IR[ell]+A_rs*RS[ell]+A_cn*CN[ell])):
+                flag += 1
+                break
+
     # At this point, if a boundary condition is not fullfilled, ie, if flag is
     # different from zero, return False
     if flag != 0:
@@ -267,6 +315,7 @@ def chain(cosmo, data, command_line):
         # if we want to compute the starting point by minimising lnL (instead of taking it from input file or bestfit file)
         if command_line.minimize:
             minimum = sampler.get_minimum(cosmo, data, command_line)
+            #TODO use minimum instead of bestfit
 
         # Read input covariance matrix
         sigma_eig, U, C = sampler.get_covariance_matrix(cosmo, data, command_line)
