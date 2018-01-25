@@ -327,7 +327,7 @@ def get_covariance_matrix(cosmo, data, command_line):
 
     return eigv, eigV, matrix
 
-def get_minimum(cosmo, data, command_line):
+def get_minimum(cosmo, data, command_line, covmat):
 
     if not command_line.silent:
         warnings.warn("Minimization implementation is being tested")
@@ -357,33 +357,97 @@ def get_minimum(cosmo, data, command_line):
 
     stepsizes = np.zeros(len(parameter_names), 'float64')
     parameters = np.zeros(len(parameter_names), 'float64')
+    bounds = np.zeros([len(parameter_names),2], 'float64')
+    cons = ()
     for index, elem in enumerate(parameter_names):
         parameters[index] = center[elem]
-        stepsizes[index] = center[elem]*0.0001
+        #stepsizes[index] = center[elem]*0.0001
+        stepsizes[index] = 0.1*covmat[index,index]**0.5
+        bounds[index,0] = center[elem] - 1*covmat[index,index]**0.5
+        bounds[index,1] = center[elem] + 1*covmat[index,index]**0.5
+        cons += ({'type': 'ineq', 'fun': lambda x: x[index] - bounds[index,0]},
+                 {'type': 'ineq', 'fun': lambda x: bounds[index,1] - x[index]},)
+        print bounds[index,0],bounds[index,1]
 
     print parameters
     print stepsizes
 
     #minimum, chi2 = op.fmin_cg(chi2_eff,
-    minimum = op.fmin_cg(chi2_eff,
-                               parameters,
-                               #fprime = gradient_chi2_eff,
-                               epsilon = stepsizes,
-                               args = (cosmo,data),
-                               full_output = False,
-                               disp = True,
-                               retall = True)
+    # Use unconstrained Polak & Ribiere conjugate gradient algorithm
+    # CosmoMC uses a constrained (Fletcher & Reeves) version of this 
+    #xopt, fopt, func_calls, grad_calls, warnflags, allvecs = op.fmin_cg(chi2_eff,
+    #                                                                    parameters,
+    #                                                                    #fprime = gradient_chi2_eff,
+    #                                                                    epsilon = stepsizes,
+    #                                                                    args = (cosmo,data),#bounds),
+    #                                                                    full_output = True,
+    #                                                                    disp = True,
+    #                                                                    retall = True)
+    # Use constrained Newton conjugate gradient algorithm
+    #x, nfeval, rc = op.fmin_tnc(chi2_eff,
+    #                            parameters,
+    #                            #fprime = gradient_chi2_eff,
+    #                            args = (cosmo,data),
+    #                            approx_grad = True,
+    #                            bounds = bounds,
+    #                            epsilon = stepsizes,
+    #                            disp = 5)
 
-    print minimum
-    print chi2
+    #result = op.minimize(chi2_eff,
+    #                     parameters,
+    #                     args = (cosmo,data),
+    #                     method='COBYLA',
+    #                     #method='SLSQP',
+    #                     constraints=cons,
+    #                     #bounds=bounds,
+    #                     tol=0.000001,
+    #                     options = {'disp': True,
+    #                                'rhobeg': stepsizes})
+    #                                #'eps': stepsizes})
+
+    result = op.minimize(chi2_eff,
+                         parameters,
+                         args = (cosmo,data),
+                         #method='trust-region-exact',
+                         method='BFGS',
+                         #constraints=cons,
+                         #bounds=bounds,
+                         tol=0.0001,
+                         options = {'disp': True})
+                                    #'initial_tr_radius': stepsizes,
+                                    #'max_tr_radius': stepsizes})
+
+
+    ##print minimum
+    ##print chi2
+    ##print success
+    #for index,elem in enumerate(parameter_names):
+    #    print elem, xopt[i]
+    #print 'chisq', fopt
+    #print 'funcion calls', func_calls
+    #print 'gradient calls', grad_calls
+    #print 'warning flags',warnflags
+    ##print allvecs
+    #for index,elem in enumerate(parameter_names):
+    #    print elem, x[i]
+    ##print x
+    #print 'nfeval',nfeval
+    #print 'rc',rc
+    print result
+    exit()
 
     return center
 
-def chi2_eff(params, cosmo, data):
+def chi2_eff(params, cosmo, data, bounds=False):
     parameter_names = data.get_mcmc_parameters(['varying'])
     for index, elem in enumerate(parameter_names):
         #print elem,params[index]
         data.mcmc_parameters[elem]['current'] = params[index]
+        if not type(bounds) == type(False):
+            if (params[index] < bounds[index,0]) or (params[index] > bounds[index,1]):
+                chi2 = 1e30
+                print elem+' exceeds bounds with value %f and bounds %f < x < %f' %(params[index],bounds[index,0],bounds[index,1])
+                return chi2
     # Update current parameters to the new parameters, only taking steps as requested
     data.update_cosmo_arguments()
     # Compute loglike value for the new parameters
@@ -391,10 +455,10 @@ def chi2_eff(params, cosmo, data):
     print chi2,' at ',params
     return chi2
 
-def gradient_chi2_eff(params, cosmo, data):
+def gradient_chi2_eff(params, cosmo, data, bounds=False):
     parameter_names = data.get_mcmc_parameters(['varying'])
     for index, elem in enumerate(parameter_names):
-        data.mcmc_parameters[elem]['current'] = params[elem]
+        data.mcmc_parameters[elem]['current'] = params[index]
     # Update current parameters to the new parameters, only taking steps as requested
     data.update_cosmo_arguments()
     # Compute loglike value for the new parameters
@@ -402,8 +466,9 @@ def gradient_chi2_eff(params, cosmo, data):
     # Initialise the gradient field
     gradient = np.zeros(len(parameter_names), 'float64')
     for index, elem in enumerate(parameter_names):
-        dx = 0.01*params[elem]
+        dx = 0.01*params[index]
         #
+
         data.mcmc_parameters[elem]['current'] += dx
         data.update_cosmo_arguments()
         chi2_plus = -2.*compute_lkl(cosmo, data)
@@ -670,9 +735,12 @@ def compute_lkl(cosmo, data):
         # output given the parameter values. This will be considered as a valid
         # point, but with minimum likelihood, so will be rejected, resulting in
         # the choice of a new point.
-        if 'tSZ' in data.cosmo_arguments['output']:#=='tSZ') or (data.cosmo_arguments['output']=='tSZ,tSZ_Trispectrum')):
+        if 'SZ' in data.cosmo_arguments['output']:
             try:
-                cosmo.compute(["szpowerspectrum"])    
+                if 'SZ_counts':
+                    cosmo.compute(["szcount"])
+                else:
+                    cosmo.compute(["szpowerspectrum"])
             except CosmoComputationError as failure_message:
                 sys.stderr.write(str(failure_message)+'\n')
                 sys.stderr.flush()
