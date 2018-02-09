@@ -328,6 +328,7 @@ def get_covariance_matrix(cosmo, data, command_line):
     return eigv, eigV, matrix
 
 def get_minimum(cosmo, data, command_line, covmat):
+#def get_minimum(cosmo, data, command_line):
 
     if not command_line.silent:
         warnings.warn("Minimization implementation is being tested")
@@ -363,18 +364,25 @@ def get_minimum(cosmo, data, command_line, covmat):
         parameters[index] = center[elem]
         #stepsizes[index] = center[elem]*0.0001
         stepsizes[index] = 0.1*covmat[index,index]**0.5
-        bounds[index,0] = center[elem] - 1*covmat[index,index]**0.5
-        bounds[index,1] = center[elem] + 1*covmat[index,index]**0.5
+        if data.mcmc_parameters[elem]['initial'][1] == None:
+            bounds[index,0] = center[elem] - 10.*covmat[index,index]**0.5
+        else:
+            bounds[index,0] = data.mcmc_parameters[elem]['initial'][1]
+        if data.mcmc_parameters[elem]['initial'][2] == None:
+            bounds[index,1] = center[elem] + 10.*covmat[index,index]**0.5
+        else:
+            bounds[index,1] = data.mcmc_parameters[elem]['initial'][2]
         cons += ({'type': 'ineq', 'fun': lambda x: x[index] - bounds[index,0]},
                  {'type': 'ineq', 'fun': lambda x: bounds[index,1] - x[index]},)
-        print bounds[index,0],bounds[index,1]
+        print 'bounds on ',elem,' : ',bounds[index,0],bounds[index,1]
 
-    print parameters
-    print stepsizes
+    print 'parameters: ',parameters
+    print 'stepsizes: ',stepsizes[0]
+    print 'bounds: ',bounds
 
     #minimum, chi2 = op.fmin_cg(chi2_eff,
     # Use unconstrained Polak & Ribiere conjugate gradient algorithm
-    # CosmoMC uses a constrained (Fletcher & Reeves) version of this 
+    # CosmoMC uses a constrained (Fletcher & Reeves) version of this
     #xopt, fopt, func_calls, grad_calls, warnflags, allvecs = op.fmin_cg(chi2_eff,
     #                                                                    parameters,
     #                                                                    #fprime = gradient_chi2_eff,
@@ -405,18 +413,24 @@ def get_minimum(cosmo, data, command_line, covmat):
     #                                'rhobeg': stepsizes})
     #                                #'eps': stepsizes})
 
+    # for HST with 1 param the best is TNC with 'eps':stepsizes, bounds, tol, although bounds make it smlower (but avoids htting unphysical region)
     result = op.minimize(chi2_eff,
                          parameters,
                          args = (cosmo,data),
                          #method='trust-region-exact',
-                         method='BFGS',
+                         #method='BFGS',
+                         #method='TNC',
+                         #method='L-BFGS-B',
+                         method='SLSQP',
+                         #options={'eps':stepsizes},
                          #constraints=cons,
-                         #bounds=bounds,
-                         tol=0.0001,
-                         options = {'disp': True})
+                         bounds=bounds,
+                         tol=0.001)
+                         #options = {'disp': True})
                                     #'initial_tr_radius': stepsizes,
                                     #'max_tr_radius': stepsizes})
 
+    print result.x
 
     ##print minimum
     ##print chi2
@@ -428,8 +442,8 @@ def get_minimum(cosmo, data, command_line, covmat):
     #print 'gradient calls', grad_calls
     #print 'warning flags',warnflags
     ##print allvecs
-    #for index,elem in enumerate(parameter_names):
-    #    print elem, x[i]
+    for index,elem in enumerate(parameter_names):
+        print elem, result.x[index]
     ##print x
     #print 'nfeval',nfeval
     #print 'rc',rc
@@ -452,7 +466,7 @@ def chi2_eff(params, cosmo, data, bounds=False):
     data.update_cosmo_arguments()
     # Compute loglike value for the new parameters
     chi2 = -2.*compute_lkl(cosmo, data)
-    print chi2,' at ',params
+    print 'In minimization: ',chi2,' at ',params
     return chi2
 
 def gradient_chi2_eff(params, cosmo, data, bounds=False):
@@ -735,6 +749,10 @@ def compute_lkl(cosmo, data):
         # output given the parameter values. This will be considered as a valid
         # point, but with minimum likelihood, so will be rejected, resulting in
         # the choice of a new point.
+        try:
+            data.cosmo_arguments['output']
+        except:
+            data.cosmo_arguments.update({'output': ''})
         if 'SZ' in data.cosmo_arguments['output']:
             try:
                 if 'SZ_counts':
@@ -985,7 +1003,7 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             diff_2[1] = diff_2[2]
         elif data.use_symmetric_step:
             diff_2[1] = diff_2[0]
-        
+
         # For Fisher mode 1 and 2 the stepsizes are more complicated.
         # We need to compute the magnitude of the array (A * x), where
         # A is the rotation matrix (i.e. the Cholesky decomposition or the
@@ -1143,7 +1161,7 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
             ##diff_1 = [[],[]]
             # DEBUG: For Cholesky step, diff_1 should be an array, not scalars.
             # DEBUG: However, instead of arrays we can make an approximation and use the same scheme
-            # DEBUG: as for fisher mode 3. Although more parameters are changed, it might be a good 
+            # DEBUG: as for fisher mode 3. Although more parameters are changed, it might be a good
             # DEBUG: approximation to take the rotated step left/right here as well.
             #diff_1[0] = abs(rotated_step_left[index])
             #diff_1[1] = abs(rotated_step_right[index])
