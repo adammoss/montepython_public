@@ -252,9 +252,7 @@ def create_output_files(command_line, data):
             if files.find(outname_base) != -1:
                 if int(files.split('__')[-1].split('.')[0]) > suffix:
                     suffix = int(files.split('__')[-1].split('.')[0])
-                    print 'suffix',suffix
         suffix += 1
-        print 'suffix2',suffix
         while trying:
             data.out = open(os.path.join(
                 command_line.folder, outname_base)+str(suffix)+'.txt', 'w')
