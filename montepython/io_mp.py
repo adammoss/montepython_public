@@ -252,7 +252,9 @@ def create_output_files(command_line, data):
             if files.find(outname_base) != -1:
                 if int(files.split('__')[-1].split('.')[0]) > suffix:
                     suffix = int(files.split('__')[-1].split('.')[0])
+                    print 'suffix',suffix
         suffix += 1
+        print 'suffix2',suffix
         while trying:
             data.out = open(os.path.join(
                 command_line.folder, outname_base)+str(suffix)+'.txt', 'w')
@@ -271,9 +273,27 @@ def create_output_files(command_line, data):
         print 'Creating %s\n' % data.out_name
     # in case of a restart, copying the whole thing in the new file
     if command_line.restart is not None:
-        for line in open(command_line.restart, 'r'):
-            data.out.write(line)
-
+        # Construct filename of old chain from input.
+        # Will only load files with chain file suffix equal to or greater than
+        # the one passed with -r flag, e.g. <path>/1969-10-05_100000__1.txt
+        # and four MPI processes will load files 1-4 with that chainbase.
+        filebase, sep1, filesuffix = command_line.restart.partition('__')
+        chainbase, sep2, fileext = filesuffix.partition('.')
+        if command_line.chain_number is None:
+            restartname = filebase + sep1 + str(int(chainbase)+suffix-1) + sep2 + fileext
+        else:
+            restartname = filebase + sep1 + command_line.chain_number + sep2 + fileext
+        # Copy old chain to the new chain. Return error if file doesn't exist.
+        try:
+            for line in open(restartname, 'r'):
+                data.out.write(line)
+        except:
+            raise ConfigurationError('Error loading chains files. '
+                                     'Ensure number of MPI processes =< number of chains to restart, '
+                                     'and chain filename passed with -r <path/filename> corresponds to '
+                                     'the full chain name of the lowest chain suffix to restart, e.g. '
+                                     '-r <path>/1969-10-05_100000__1.txt to restart from file 1 and '
+                                     'subsequent files corresponding to the number of MPI processes.')
 
 def get_tex_name(name, number=1):
     """
