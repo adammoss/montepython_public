@@ -490,6 +490,10 @@ def create_parser():
             Instead of starting the chains or centering the Fisher calculation on the model
             passed through the input parameter file or through the .bestfit file, find the
             minimum of the log likelihood up to some tolerance<++>
+        <**>--minimize-tol<**> : float
+            <++>Tolerance for minimize algorithm<++>.
+            Used by option --minimize (Default: 0.00001)
+            <++>
         <**>--fisher<**> : None
             <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
             The inverse Fisher matrix can be used as a proposal distribution covmat,
@@ -721,6 +725,9 @@ def create_parser():
     # -- minimize (OPTIONAL)
     runparser.add_argument('--minimize', help=helpdict['minimize'],
                            action='store_true')
+    # -- minimize argument, minimization tolerance (OPTIONAL)
+    runparser.add_argument('--minimize-tol', help=helpdict['minimize-tol'], type=float,
+                           dest='minimize_tol', default=0.00001)
     # -- fisher (OPTIONAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')

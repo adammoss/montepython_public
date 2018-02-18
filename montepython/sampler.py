@@ -425,7 +425,7 @@ def get_minimum(cosmo, data, command_line, covmat):
                          #options={'eps':stepsizes},
                          #constraints=cons,
                          bounds=bounds,
-                         tol=0.001)
+                         tol=command_line.minimize_tol) #0.001
                          #options = {'disp': True})
                                     #'initial_tr_radius': stepsizes,
                                     #'max_tr_radius': stepsizes})
@@ -443,14 +443,14 @@ def get_minimum(cosmo, data, command_line, covmat):
     #print 'warning flags',warnflags
     ##print allvecs
     for index,elem in enumerate(parameter_names):
-        print elem, result.x[index]
+        print elem, 'new:', result.x[index], ', old:', parameters[index]
     ##print x
     #print 'nfeval',nfeval
     #print 'rc',rc
     print result
-    exit()
+    #exit()
 
-    return center
+    return result.x
 
 def chi2_eff(params, cosmo, data, bounds=False):
     parameter_names = data.get_mcmc_parameters(['varying'])
@@ -496,7 +496,7 @@ def gradient_chi2_eff(params, cosmo, data, bounds=False):
         data.mcmc_parameters[elem]['current'] += dx
     return gradient
 
-def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
+def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     # Adapted by T. Brinckmann, T. Tram
     # We will work out the fisher matrix for all the parameters and
     # write it to a file
@@ -541,7 +541,10 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix):
     # information
     center = {}
     parameter_names = data.get_mcmc_parameters(['varying'])
-    if not command_line.bf:
+    if not type(minimum) == int:
+        for index, elem in enumerate(parameter_names):
+            center[elem] = minimum[index]
+    elif not command_line.bf:
         for elem in parameter_names:
             #temp_data.mcmc_parameters[elem]['current'] = (
             #    data.mcmc_parameters[elem]['initial'][0])
@@ -1193,6 +1196,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
     if two:
         name_2, diff_2 = two
 
+    # Save input parameters
     deltaloglkl_req = data.fisher_delta
     deltaloglkl_tol = data.fisher_tol
 
@@ -1331,7 +1335,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
 
             # Calculate Delta ln(L)
             Deltaloglike = loglike - loglike_min
-            #print ">>>> For %s[%d],Delta ln(L)=%e using min(ln(L))=%e"%(name_1,int(np.sign(diff_1[step_index_1])),loglike-loglike_min,loglike_min)
+            print ">>>> For %s[%d],Delta ln(L)=%e using min(ln(L))=%e"%(name_1,int(np.sign(diff_1[step_index_1])),loglike-loglike_min,loglike_min)
 
             # If -Delta ln(L) is larger than desired reduce stepsize
             if Deltaloglike < -(deltaloglkl_req + deltaloglkl_tol):
@@ -1339,8 +1343,13 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                     diff_1[2] -= np.sign(diff_1[2]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[2])
                 else:
                     diff_1[step_index_1] -= np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
-                #print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                 repeat = len(backup_step)
+                # If stepsize is not converging to the required tolerance within 10 steps
+                # relax tolerance recursively tolerance_i+1 = tolerance_i * (1 + N_step)/10,
+                # with the first tolerance_i given by the input delta loglkl tolerance.
+                if repeat > 10:
+                    deltaloglkl_tol *= (1. + repeat)/10.
 
             # If -Delta ln(L) is smaller than desired increase stepsize
             # ISSUE: what about boundaries when increasing stepsize?
@@ -1350,16 +1359,30 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                         diff_1[2] -= np.sign(diff_1[2]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[2])
                     else:
                         diff_1[step_index_1] += np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
-                    #print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                    print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                     repeat = len(backup_step)
+                    # If stepsize is not converging to the required tolerance within 10 steps
+                    # relax tolerance recursively tolerance_i+1 = tolerance_i * (1 + N_step)/10,
+                    # with the first tolerance_i given by the input delta loglkl tolerance.
+                    if repeat > 10:
+                        deltaloglkl_tol *= (1. + repeat)/10.
                 else:
                     if diff_1[2]:
                         diff_1[2] *= 2.
                     else:
                         diff_1[step_index_1] *= 2.
-                    #print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                    print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
                     repeat = -len(backup_step)
+                    # If stepsize is not converging to the required tolerance within 10 steps
+                    # relax tolerance recursively tolerance_i+1 = tolerance_i * (1 + N_step)/10,
+                    # with the first tolerance_i given by the input delta loglkl tolerance.
+                    if repeat > 10:
+                        deltaloglkl_tol *= (1. + repeat)/10.
             else:
+                if deltaloglkl_tol > data.fisher_tol:
+                    warnings.warn('Could not converge to the desired delta within the expected tolerance. '
+                                  'Adjusted tolerance from %f to %f. Final Delta ln(L) value was %f.'
+                                  % (data.fisher_tol,deltaloglkl_tol,Deltaloglike))
                 return loglike, diff_1, rotated_array
         elif not two:
             return loglike, diff_1, rotated_array

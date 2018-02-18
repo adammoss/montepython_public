@@ -312,17 +312,18 @@ def chain(cosmo, data, command_line):
     # of parameters is non-zero
     if (data.get_mcmc_parameters(['varying']) != []):
 
-        # if we want to compute the starting point by minimising lnL (instead of taking it from input file or bestfit file)
-        if command_line.minimize:
-            minimum = sampler.get_minimum(cosmo, data, command_line)
-            #TODO use minimum instead of bestfit
-
         # Read input covariance matrix
         sigma_eig, U, C = sampler.get_covariance_matrix(cosmo, data, command_line)
 
+        # if we want to compute the starting point by minimising lnL (instead of taking it from input file or bestfit file)
+        minimum = 0
+        if command_line.minimize:
+            minimum = sampler.get_minimum(cosmo, data, command_line, C)
+            #TODO use minimum instead of bestfit
+
         # if we want to compute Fisher matrix and then stop
         if command_line.fisher:
-            sampler.get_fisher_matrix(cosmo, data, command_line, C)
+            sampler.get_fisher_matrix(cosmo, data, command_line, C, minimum)
             return
 
         # warning if no jumps are requested
