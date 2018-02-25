@@ -412,6 +412,7 @@ def chain(cosmo, data, command_line):
 	parameter_names = data.get_mcmc_parameters(['varying'])
         updated_steps = 0
         stop_c = False
+        jumping_factor_rescale = 0
         c_array = np.zeros(20*fpm) # Allows computation of mean of jumping factor
         R_minus_one = np.array([100.,100.]) # 100 to make sure max(R-1) value is high if computation failed
         # Make sure update is enabled
@@ -561,13 +562,17 @@ def chain(cosmo, data, command_line):
                         c = data.jumping_factor**2/len(parameter_names)
                         # To avoid getting trapped in local minima, the jumping factor should
                         # not go below 0.1 (arbitrary) times the starting jumping factor.
-                        if (c + (np.mean(ar) - 0.25)/(k - updated_steps)) > (0.1*starting_jumping_factor)**2./len(parameter_names):
-                            c += (np.mean(ar) - 0.25)/(k - updated_steps)
+                        if (c + (np.mean(ar) - 0.26)/(k - updated_steps)) > (0.1*starting_jumping_factor)**2./len(parameter_names):
+                            c += (np.mean(ar) - 0.26)/(k - updated_steps)
                             data.jumping_factor = np.sqrt(len(parameter_names) * c)
 
                         if not (k-1) % 5:
-                            # Check if the jumping factor adaption should stop
-                            if (max(R_minus_one) < 0.4) and (abs(np.mean(ar) - 0.25) < 0.02) and (abs(np.mean(c_array)/c_array[(k-1) % (20*fpm)] - 1) < 0.01):
+                            # Check if the jumping factor adaptation should stop.
+                            # An acceptance rate of 25% balances the wish for more accepted
+                            # points, while ensuring the parameter space is properly sampled.
+                            # The convergence criterium is (26+/-1)%, so the adaptation will stop
+                            # when the code reaches an acceptance rate of at least 25%.
+                            if (max(R_minus_one) < 0.4) and (abs(np.mean(ar) - 0.26) < 0.01) and (abs(np.mean(c_array)/c_array[(k-1) % (20*fpm)] - 1) < 0.01):
                                 stop_c = True
                                 data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
                                 if not command_line.silent:
@@ -618,12 +623,19 @@ def chain(cosmo, data, command_line):
 				    stop_c = False
                                     cov_det = np.linalg.det(C)
                                     prev_cov_det = np.linalg.det(previous[2])
-                                    # Rescale jumping factor
-                                    new_jumping_factor = data.jumping_factor * (prev_cov_det/cov_det)**(1./(2 * len(parameter_names)))
-                                    data.out.write('# After %d accepted steps: rescaled jumping factor from %f to %f, due to updated covariance matrix \n' % (int(acc), data.jumping_factor, new_jumping_factor))
-                                    if not command_line.silent:
-                                        print 'After %d accepted steps: rescaled jumping factor from %f to %f, due to updated covariance matrix \n' % (int(acc), data.jumping_factor, new_jumping_factor)
-                                    data.jumping_factor = new_jumping_factor
+                                    # Rescale jumping factor in order to keep the magnitude of the jumps the same.
+                                    # Skip this update the first time the covmat is updated in order to prevent
+                                    # problems due to a poor initial covmat. Rescale the jumping factor after the
+                                    # first calculated covmat to the expected optimal one of 2.4.
+                                    if jumping_factor_rescale:
+                                        new_jumping_factor = data.jumping_factor * (prev_cov_det/cov_det)**(1./(2 * len(parameter_names)))
+                                        data.out.write('# After %d accepted steps: rescaled jumping factor from %f to %f, due to updated covariance matrix \n' % (int(acc), data.jumping_factor, new_jumping_factor))
+                                        if not command_line.silent:
+                                            print 'After %d accepted steps: rescaled jumping factor from %f to %f, due to updated covariance matrix \n' % (int(acc), data.jumping_factor, new_jumping_factor)
+                                        data.jumping_factor = new_jumping_factor
+                                    else:
+                                        data.jumping_factor = starting_jumping_factor
+                                    jumping_factor_rescale += 1
 
                                 # Write to chains file when the covmat was updated
                                 data.out.write('# After %d accepted steps: update proposal with max(R-1) = %f and jumping factor = %f \n' % (int(acc), max(R_minus_one), data.jumping_factor))
