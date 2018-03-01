@@ -492,30 +492,30 @@ def create_parser():
             minimum of the log likelihood up to some tolerance<++>
         <**>--minimize-tol<**> : float
             <++>Tolerance for minimize algorithm<++>.
-            Used by option --minimize (Default: 0.00001)
-            <++>
+            Used by option --minimize (Default: 0.00001)<++>
         <**>--fisher<**> : None
             <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
             The inverse Fisher matrix can be used as a proposal distribution covmat,
             or to make plots with Fisher ellipses.<++>
         <**>--fisher-it<**> : int
             <++>Number of iterations for Fisher matrix computation<++>,
-            used by option --fisher (Default: 1)
-            <++>
+            used by option --fisher (Default: 1) OBSOLETE<++>
         <**>--fisher-mode<**> : int
             <++>Fisher mode: 0 (recommended) <++>,
             1 (eigenvector rotation), 2 (Cholesky rotation), 3 (2d rotation for
             off diagonal elements). Modes 1, 2 and 3 are experimental. 
-            Used by option --fisher (Default: 0)
-            <++>
+            Used by option --fisher (Default: 0)<++>
+        <**>--fisher-step-it<**> : bool
+            <++>Have the Fisher matrix calculation iterate the step-size<++>.
+            Used by option --fisher (Default: False). The step-size will be
+            interated until reaching the desired delta log-likelihood specified
+            by --fisher-delta, within the tolerance given by --fisher-tol.<++>
         <**>--fisher-delta<**> : float
             <++>Target -deltaloglkl for fisher step iteration<++>.
-            Used by option --fisher (Default: 0.2)
-            <++>
+            Used by option --fisher (Default: 0.2)<++>
         <**>--fisher-tol<**> : float
             <++>Tolerance for -deltaloglkl for fisher step iteration<++>.
-            Used by option --fisher (Default: 0.05)
-            <++>
+            Used by option --fisher (Default: 0.05)<++>
         <**>--silent<**> : None
             <++>silence the standard output<++> (useful when running on
             clusters)<++>
@@ -648,6 +648,9 @@ def create_parser():
         <**>--use-fisher-it<**> : int
             <++>if set to N, Fisher ellipses based on file inv_fisherN.mat<++>,
             (Default: 1)<++>
+        <**>--center-fisher<**> : None
+            <++>Centers Fisher ellipse on bestfit of last set of chains,<++>,
+            instead of the center values of the log.param<++>
         <**>--constrained-parameter-name<**> : str
             <++>Use correct Jeffreys prior for a single constrained (bounded) parameter.<++>
             For a Gaussian posterior distribution at the boundary of parameter space we
@@ -737,6 +740,9 @@ def create_parser():
     # -- fisher mode (EXPERIMENTAL)
     runparser.add_argument('--fisher-mode', help=helpdict['fisher-mode'], type=int,
                            dest='fisher_mode', default=0)
+    # -- fisher step iteration (OPTIONAL)
+    runparser.add_argument('--fisher-step-it', help=helpdict['fisher-step-it'],
+                           dest='fisher_step_it', action='store_true')
     # -- fisher step iteration argument, -deltaloglkl target (OPTIONAL)
     runparser.add_argument('--fisher-delta', help=helpdict['fisher-delta'], type=float,
                            dest='fisher_delta', default=0.2)
@@ -915,6 +921,8 @@ def create_parser():
                            dest='plot_fisher',action='store_true')
     infoparser.add_argument('--use-fisher-it', help=helpdict['use-fisher-it'],
                             dest='use_fisher_it',type=int,default=1)
+    infoparser.add_argument('--center-fisher', help=helpdict['center-fisher'],
+                           dest='center_fisher',action='store_true')
 
     infoparser.add_argument('--posterior-smoothing', help=helpdict['posterior-smoothing'],
                             type=int, default=5)

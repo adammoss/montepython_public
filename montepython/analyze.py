@@ -133,6 +133,15 @@ def analyze(command_line):
         io_mp.write_bestfit_file(bestfit_line, info.backup_names,
                                  info.best_fit_path)
 
+    # Overwrite center of Fisher matrix from log.param with the bestfit
+    # from the last set of chains provided
+    # DEBUG: This doesn't plot the first parameter (omega_b), possibly
+    # because it's re-scaled (since it's the only one that is rescaled
+    # and the rest are plotted)?
+    if command_line.center_fisher:
+        for index, elem in enumerate(info.ref_names):
+            info.centers[index] = bestfit_line[index]
+
     if not command_line.minimal:
         # Computing 1,2 and 3-sigma errors, and plot. This will create the
         # triangle and 1d plot by default.
