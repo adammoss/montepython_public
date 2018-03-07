@@ -55,6 +55,11 @@ def run(cosmo, data, command_line):
     elif command_line.method == 'Der':
         import add_derived as der
         der.run(cosmo, data, command_line)
+    elif command_line.method == 'Fisher':
+        command_line.fisher = True
+        import mcmc
+        mcmc.chain(cosmo, data, command_line)
+        data.out.close()
     else:
         raise io_mp.ConfigurationError(
             "Sampling method %s not understood" % command_line.method)
@@ -431,9 +436,9 @@ def get_minimum(cosmo, data, command_line, covmat):
                                     #'initial_tr_radius': stepsizes,
                                     #'max_tr_radius': stepsizes})
 
-    result = op.differential_evolution(chi2_eff,
-                                       bounds,
-                                       args = (cosmo,data))
+    #result = op.differential_evolution(chi2_eff,
+    #                                   bounds,
+    #                                   args = (cosmo,data))
     print result.x
 
     ##print minimum
@@ -515,6 +520,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     # fisher_mode=2 use Cholesky decomposition to rotate parameter space
     # fisher_mode=1 use eigenvectors of covariance matrix to rotate parameter space
     # fisher_mode=0 use non-rotated parameter space (recommended)
+    #### CLEANUP
     data.fisher_mode = command_line.fisher_mode
     print 'delta, tol, mode =', data.fisher_delta, data.fisher_tol, command_line.fisher_mode
     if data.fisher_mode not in [0,1,2,3]:
@@ -625,19 +631,32 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
         except:
             print 'Fisher matrix computation failed - inverse not positive definite'
             #print 'Increasing fisher_it by 1, to %d, and adjusting fisher_tol and fisher_delta' %(command_line.fisher_it + 1)
-            print 'Increasing fisher_it by 1, to %d, and adjusting fisher_delta' %(command_line.fisher_it + 1)
-            fisher_status = 0
-            command_line.fisher_it += 1
-            if fisher_iteration == 20:
+            if data.fisher_step_it < 2:
                 raise io_mp.ConfigurationError(
-                    "Could not find Fisher matrix inverse after 20 attempts. Try with different "
+                    "Could not find Fisher matrix inverse and fisher step iteration is not enabled. Use flag "
+                    "--fisher-step-it or change the input sigmas (or covariance matrix) or the bestfit.")
+            if fisher_iteration == command_line.fisher_step_it:
+                raise io_mp.ConfigurationError(
+                    "Could not find Fisher matrix inverse after %d attempts. Try with different "
                     "fisher_tol, fisher_delta, input sigmas (or covmat), bestfit, or remove the "
-                    "option --fisher and run with Metropolis-Hastings or another sampling method.")
+                    "option --fisher and run with Metropolis-Hastings or another sampling method." %(data.fisher_step_it))
             #if data.fisher_delta > 1.5 * command_line.fisher_delta:
             #print 'Increasing fisher_delta from %f to %f and fisher_tol from %f to %f' %(data.fisher_delta,1.5*data.fisher_delta,data.fisher_tol,1.25*data.fisher_tol)
-            print 'Increasing fisher_delta from %f to %f' %(data.fisher_delta,1.5*data.fisher_delta)
+
+            print 'Increasing fisher_it by 1, to %d, and adjusting fisher_delta from %f to %f' %(command_line.fisher_it + 1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
+            fisher_status = 0
+            command_line.fisher_it += 1
+            data.fisher_delta += command_line.fisher_delta
+            #prev_fisher_delta = data.fisher_delta
             #data.fisher_tol *= 1.25
-            data.fisher_delta *= 1.5
+            #if fisher_iteration == 1:
+            #    data.fisher_delta /= 5.
+            #elif (data.fisher_delta + 0.1) == command_line.fisher_delta:
+            #    data.fisher_delta += 0.2
+            #else:
+            #    data.fisher_delta += 0.1
+            #print 'Increasing fisher_delta from %f to %f' %(prev_fisher_delta,data.fisher_delta)
+
             #else:
             #    print 'Increasing fisher_delta from %f to %f for fisher_tol %f' %(data.fisher_delta,1.5*data.fisher_delta,data.fisher_tol)
             #    data.fisher_tol *= 1.5
@@ -1296,8 +1315,8 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
             # boundary (so it would have had a sign opposite the sign of diff_2[2]),
             # then we want to flip the sign for *this* (not the other) parameter.
             if two:
-                signarray = ['-','+']
-                signarray2 = ['err','+','-']
+                #signarray = ['-','+']
+                #signarray2 = ['err','+','-']
                 #if diff_2[2] and diff_1[2]:
                 #    print 'step_index_1 =',step_index_1, 'step_index_2 =', step_index_2, 'step_1 =',np.sign(diff_1[step_index_1])*abs(diff_1[0]),'diff_2[2] =', diff_2[2]
                 #    print 'Without symmetry We should have:', signarray[step_index_1],signarray[step_index_2]
@@ -1309,7 +1328,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                 #    print 'We have:', signarray2[int(np.sign(step_array[index]))], signarray2[int(np.sign(diff_2[2]))]
                 #    print 'step_index_2 == 0 and diff_2[2] > 0)', (step_index_2 == 0 and diff_2[2] > 0),'step_index_2 == 1 and diff_2[2] < 0:', (step_index_2 == 1 and diff_2[2] < 0), 'both:', ((step_index_2 == 0 and diff_2[2] > 0) or (step_index_2 == 1 and diff_2[2] < 0))
                 if diff_1[2] and diff_2[2]:
-                    print 'BOTH PARAMETERS SYMMETRIC!'
+                    warnings.warn('BOTH PARAMETERS SYMMETRIC! Need one-sided derivative (not-implemented)')
                 elif (step_index_2 == 0 and diff_2[2] > 0) or (step_index_2 == 1 and diff_2[2] < 0):
                     step_array[index] = -step_array[index]
                     print 'changed step array from (%f,%f) to (%f,%f)' %(-step_array[index],diff_2[2],step_array[index],diff_2[2])
@@ -1362,7 +1381,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
             #    print 'We have:', signarray2[int(np.sign(diff_1[2]))],signarray2[int(np.sign(step_array[index]))]
             #    print 'step_index_1 == 0 and diff_1[2] > 0)', (step_index_1 == 0 and diff_1[2] > 0),'step_index_1 == 1 and diff_1[2] < 0:', (step_index_1 == 1 and diff_1[2] < 0), 'both:', ((step_index_1 == 0 and diff_1[2] > 0) or (step_index_1 == 1 and diff_1[2] < 0))
             if diff_1[2] and diff_2[2]:
-                print 'BOTH PARAMETERS SYMMETRIC!'
+                warnings.warn('BOTH PARAMETERS SYMMETRIC! Need one-sided derivative (not implemented)')
             elif (step_index_1 == 0 and diff_1[2] > 0) or (step_index_1 == 1 and diff_1[2] < 0):
                 step_array[index] = -step_array[index]
                 print 'changed step array from (%f,%f) to (%f,%f)' %(diff_1[2],-step_array[index],diff_1[2],step_array[index])
@@ -1485,7 +1504,7 @@ def adjust_fisher_bounds(data, center, step_size):
         param = data.mcmc_parameters[elem]['initial']
         print elem,'with center =',center[elem],', lower bound =',param[1],' and upper bound =',param[2]
         if elem == 'xi_sz_cib':
-            step_size[index,2] = param[3]#param[2] - center[elem]#step_size[index,1]
+            step_size[index,2] = param[2] - center[elem]#step_size[index,1]
             print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to +%f' %(elem,step_size[index,2])
             continue
             #if center[elem] + step_size[index,2] < param[2]:
@@ -1495,7 +1514,7 @@ def adjust_fisher_bounds(data, center, step_size):
             #    print 'New step for %s with center %f exceeded boundary %f, instead setting stepsize to +%f' %(elem,center[elem],param[2],step_size[index,2])
             #    pass
         elif elem == 'A_sz':
-            step_size[index,2] = -param[3]#param[1] - center[elem]#step_size[index,0]
+            step_size[index,2] = param[1] - center[elem]#step_size[index,0]
             print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
             continue
             #if center[elem] + step_size[index,2] > param[1]:
@@ -1505,7 +1524,7 @@ def adjust_fisher_bounds(data, center, step_size):
             #    print 'New step for %s with center %f exceeded boundary %f, instead setting stepsize to %f' %(elem,center[elem],param[1],step_size[index,2])
             #    continue
         elif elem == 'ksz_norm':
-            step_size[index,2] = -param[3]#param[1] - center[elem]#step_size[index,0]
+            step_size[index,2] = param[1] - center[elem]#step_size[index,0]
             print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
             continue
         #elif elem == 'M_tot':

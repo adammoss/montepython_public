@@ -505,9 +505,9 @@ def create_parser():
             1 (eigenvector rotation), 2 (Cholesky rotation), 3 (2d rotation for
             off diagonal elements). Modes 1, 2 and 3 are experimental. 
             Used by option --fisher (Default: 0)<++>
-        <**>--fisher-step-it<**> : bool
+        <**>--fisher-step-it<**> : int
             <++>Have the Fisher matrix calculation iterate the step-size<++>.
-            Used by option --fisher (Default: False). The step-size will be
+            Used by option --fisher (Default: 10). The step-size will be
             interated until reaching the desired delta log-likelihood specified
             by --fisher-delta, within the tolerance given by --fisher-tol.<++>
         <**>--fisher-delta<**> : float
@@ -705,7 +705,7 @@ def create_parser():
     # -- sampling method (OPTIONAL)
     runparser.add_argument('-m', '--method', help=helpdict['m'],
                            dest='method', default='MH',
-                           choices=['MH', 'NS', 'CH', 'IS', 'Der'])
+                           choices=['MH', 'NS', 'CH', 'IS', 'Der', 'Fisher'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
                            dest='update', default=50)
@@ -742,7 +742,7 @@ def create_parser():
                            dest='fisher_mode', default=0)
     # -- fisher step iteration (OPTIONAL)
     runparser.add_argument('--fisher-step-it', help=helpdict['fisher-step-it'],
-                           dest='fisher_step_it', action='store_true')
+                           dest='fisher_step_it', default=10)
     # -- fisher step iteration argument, -deltaloglkl target (OPTIONAL)
     runparser.add_argument('--fisher-delta', help=helpdict['fisher-delta'], type=float,
                            dest='fisher_delta', default=0.2)
@@ -870,7 +870,7 @@ def create_parser():
     # -- to set manually the number of plots per hoorizontal raw in 1d plot
     infoparser.add_argument('--num-columns-1d', help=helpdict['num-columns-1d'],
                             type=int, dest='num_columns_1d')
-    # -- only analyze the markovian part of the chains
+    # -- also analyze the non-markovian part of the chains
     infoparser.add_argument('--keep-non-markovian', help=helpdict['keep-non-markovian'],
                             dest='markovian', action='store_false')
     # -- fraction of chains to be analyzed after burn-in removal (defaulting to 1.0)
