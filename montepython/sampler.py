@@ -506,9 +506,11 @@ def gradient_chi2_eff(params, cosmo, data, bounds=False):
     return gradient
 
 def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
-    # Adapted by T. Brinckmann, T. Tram
+    # Fisher matrix method by T. Brinckmann
+    # Contributions from T. Tram, J. Lesgourgues
+
     # We will work out the fisher matrix for all the parameters and
-    # write it to a file
+    # write it and its inverse to a file
 
     # Pass input to data structure
     data.fisher_step_it = command_line.fisher_step_it
@@ -542,14 +544,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     if not command_line.silent:
         warnings.warn("Fisher implementation is being tested")
 
-    # Let us create a separate copy of data
-    #from copy import deepcopy
-    # Do not modify data, instead copy
-    #temp_data = deepcopy(data)
-    #done = False
-
-    # Create the center dictionary, which will hold the center point
-    # information
+    # Create the center dictionary, which will hold the center point information
     center = {}
     parameter_names = data.get_mcmc_parameters(['varying'])
     if not type(minimum) == int:
@@ -557,16 +552,10 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
             center[elem] = minimum[index]
     elif not command_line.bf:
         for elem in parameter_names:
-            #temp_data.mcmc_parameters[elem]['current'] = (
-            #    data.mcmc_parameters[elem]['initial'][0])
             center[elem] = data.mcmc_parameters[elem]['initial'][0]
     else:
-        #read_args_from_bestfit(temp_data, command_line.bf)
         read_args_from_bestfit(data, command_line.bf)
         for elem in parameter_names:
-            #temp_data.mcmc_parameters[elem]['current'] = (
-            #    temp_data.mcmc_parameters[elem]['last_accepted'])
-            #center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
             center[elem] = data.mcmc_parameters[elem]['last_accepted']
 
     scales = np.zeros((len(parameter_names)))
@@ -586,11 +575,11 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     # Adjust stepsize in case step exceeds boundary
     stepsize = adjust_fisher_bounds(data,center,stepsize)
 
+    #### CLEANUP
     fisher_iteration = 0
     while fisher_iteration < command_line.fisher_it:
         fisher_iteration += 1
-        # Compute the Fisher matrix and the gradient array at the center
-        # point.
+        # Compute the Fisher matrix and the gradient array at the center point.
         print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,command_line.fisher_it))
         for index in range(len(parameter_names)):
             #print "%s : left %e, right %e" % (parameter_names[index],stepsize[index,0],stepsize[index,1])
@@ -630,7 +619,6 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
             la.cholesky(inv_fisher_matrix).T
         except:
             print 'Fisher matrix computation failed - inverse not positive definite'
-            #print 'Increasing fisher_it by 1, to %d, and adjusting fisher_tol and fisher_delta' %(command_line.fisher_it + 1)
             if data.fisher_step_it < 2:
                 raise io_mp.ConfigurationError(
                     "Could not find Fisher matrix inverse and fisher step iteration is not enabled. Use flag "
@@ -640,36 +628,18 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
                     "Could not find Fisher matrix inverse after %d attempts. Try with different "
                     "fisher_tol, fisher_delta, input sigmas (or covmat), bestfit, or remove the "
                     "option --fisher and run with Metropolis-Hastings or another sampling method." %(data.fisher_step_it))
-            #if data.fisher_delta > 1.5 * command_line.fisher_delta:
-            #print 'Increasing fisher_delta from %f to %f and fisher_tol from %f to %f' %(data.fisher_delta,1.5*data.fisher_delta,data.fisher_tol,1.25*data.fisher_tol)
 
+            # If the inverse Fisher matrix is not positive definite we want to
+            # iterate on the target fisher delta (--fisher-delta), increasing
+            # it incrementally by an amount equal to the original fisher delta.
             print 'Increasing fisher_it by 1, to %d, and adjusting fisher_delta from %f to %f' %(command_line.fisher_it + 1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
             fisher_status = 0
             command_line.fisher_it += 1
             data.fisher_delta += command_line.fisher_delta
-            #prev_fisher_delta = data.fisher_delta
-            #data.fisher_tol *= 1.25
-            #if fisher_iteration == 1:
-            #    data.fisher_delta /= 5.
-            #elif (data.fisher_delta + 0.1) == command_line.fisher_delta:
-            #    data.fisher_delta += 0.2
-            #else:
-            #    data.fisher_delta += 0.1
-            #print 'Increasing fisher_delta from %f to %f' %(prev_fisher_delta,data.fisher_delta)
-
-            #else:
-            #    print 'Increasing fisher_delta from %f to %f for fisher_tol %f' %(data.fisher_delta,1.5*data.fisher_delta,data.fisher_tol)
-            #    data.fisher_tol *= 1.5
-            #if data.fisher_tol < 0.25 * command_line.fisher_tol:
-            #    print 'Resetting fisher_tol to %f and changing fisher_delta from %f to %f' %(command_line.fisher_tol,data.fisher_delta,0.5*data.fisher_delta)
-            #    data.fisher_tol = command_line.fisher_tol
-            #    data.fisher_delta *= 0.5
-            #else:
-            #    print 'Reducing fisher_tol from %f to %f for fisher_delta %f' %(data.fisher_tol,0.5*data.fisher_tol,data.fisher_delta)
-            #    data.fisher_tol *= 0.5
-
 
         # Update stepsize for the next iteration after successful fisher matrix computation
+        # Note: this is now obsolete, as we iterate the step size directly instead,
+        # but leaving in place in case of future development of the method.
         if fisher_status:
             stepsize = np.zeros([len(parameter_names),3])
             for index in range(len(parameter_names)):
@@ -852,7 +822,7 @@ def compute_lkl(cosmo, data):
         if value == 1j:
             flag_wrote_fiducial += 1
     if data.command_line.display_each_chi2:
-            print "-> Total:  loglkl=",loglike,",  chi2eff=",-2.*loglike
+        print "-> Total:  loglkl=",loglike,",  chi2eff=",-2.*loglike
 
     # Compute the derived parameters if relevant
     if data.get_mcmc_parameters(['derived']) != []:
@@ -895,7 +865,9 @@ def compute_lkl(cosmo, data):
 
 
 def compute_fisher(data, cosmo, center, step_size, step_matrix):
-    # Adapted by T. Brinckmann
+    # Function used by Fisher matrix method by T. Brinckmann
+
+    # Initialise
     parameter_names = data.get_mcmc_parameters(['varying'])
     fisher_matrix = np.zeros(
         (len(parameter_names), len(parameter_names)), 'float64')
@@ -959,6 +931,8 @@ def compute_fisher(data, cosmo, center, step_size, step_matrix):
     return fisher_matrix, gradient
 
 def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_index_1, one, two=None):
+    # Function used by Fisher matrix method by T. Brinckmann
+
     # Unwrap
     name_1, diff_1 = one
     if two:
@@ -1237,6 +1211,9 @@ def compute_fisher_element(data, cosmo, center, step_matrix, loglike_min, step_i
 
 
 def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two, step_index_1, step_index_2):
+    # Function used by Fisher matrix method by T. Brinckmann
+
+    # Unwrap
     name_1, diff_1 = one
     if two:
         name_2, diff_2 = two
@@ -1498,6 +1475,8 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
 
 
 def adjust_fisher_bounds(data, center, step_size):
+    # Function used by Fisher matrix method by T. Brinckmann
+
     # For the Fisher approach we may need to adjust the step size if the step
     # exceed the bounds on the parameter given in the param file. We Loop through
     # all parameters, adjusting the step size of any parameter where that step
@@ -1598,6 +1577,7 @@ def adjust_fisher_bounds(data, center, step_size):
 
 
 def vectorize_dictionary(data, center, one, two, step_index_1, step_index_2):
+    # Function used by Fisher matrix method by T. Brinckmann
     name_1, diff_1 = one
     if two:
         name_2, diff_2 = two
