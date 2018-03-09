@@ -1330,6 +1330,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
                 if diff_1[2] and diff_2[2]:
                     warnings.warn('BOTH PARAMETERS SYMMETRIC! Need one-sided derivative (not-implemented)')
                 elif (step_index_2 == 0 and diff_2[2] > 0) or (step_index_2 == 1 and diff_2[2] < 0):
+                    #print 'step_index_2 =',step_index_2,'diff_2 =',diff_2
                     step_array[index] = -step_array[index]
                     print 'changed step array from (%f,%f) to (%f,%f)' %(-step_array[index],diff_2[2],step_array[index],diff_2[2])
 
@@ -1383,6 +1384,7 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
             if diff_1[2] and diff_2[2]:
                 warnings.warn('BOTH PARAMETERS SYMMETRIC! Need one-sided derivative (not implemented)')
             elif (step_index_1 == 0 and diff_1[2] > 0) or (step_index_1 == 1 and diff_1[2] < 0):
+                #print 'step_index_1 =',step_index_1,'diff_1 =',diff_1
                 step_array[index] = -step_array[index]
                 print 'changed step array from (%f,%f) to (%f,%f)' %(diff_1[2],-step_array[index],diff_1[2],step_array[index])
 
@@ -1503,30 +1505,30 @@ def adjust_fisher_bounds(data, center, step_size):
     for index, elem in enumerate(data.get_mcmc_parameters(['varying'])):
         param = data.mcmc_parameters[elem]['initial']
         print elem,'with center =',center[elem],', lower bound =',param[1],' and upper bound =',param[2]
-        if elem == 'xi_sz_cib':
-            step_size[index,2] = param[2] - center[elem]#step_size[index,1]
-            print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to +%f' %(elem,step_size[index,2])
-            continue
+        #if elem == 'xi_sz_cib':
+        #    step_size[index,2] = param[2] - center[elem]#step_size[index,1]
+        #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to +%f' %(elem,step_size[index,2])
+        #    continue
             #if center[elem] + step_size[index,2] < param[2]:
             #    continue
             #else:
             #    step_size[index,2] = param[2] - center[elem]
             #    print 'New step for %s with center %f exceeded boundary %f, instead setting stepsize to +%f' %(elem,center[elem],param[2],step_size[index,2])
             #    pass
-        elif elem == 'A_sz':
-            step_size[index,2] = param[1] - center[elem]#step_size[index,0]
-            print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
-            continue
+        #elif elem == 'A_sz':
+        #    step_size[index,2] = param[1] - center[elem]#step_size[index,0]
+        #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
+        #    continue
             #if center[elem] + step_size[index,2] > param[1]:
             #    continue
             #else:
             #    step_size[index,2] = param[1] - center[elem]
             #    print 'New step for %s with center %f exceeded boundary %f, instead setting stepsize to %f' %(elem,center[elem],param[1],step_size[index,2])
             #    continue
-        elif elem == 'ksz_norm':
-            step_size[index,2] = param[1] - center[elem]#step_size[index,0]
-            print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
-            continue
+        #elif elem == 'ksz_norm':
+        #    step_size[index,2] = param[1] - center[elem]#step_size[index,0]
+        #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
+        #    continue
         #elif elem == 'M_tot':
         #    step_size[index,2] = step_size[index,1]
         #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
