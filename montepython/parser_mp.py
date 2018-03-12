@@ -505,6 +505,10 @@ def create_parser():
             1 (eigenvector rotation), 2 (Cholesky rotation), 3 (2d rotation for
             off diagonal elements). Modes 1, 2 and 3 are experimental. 
             Used by option --fisher (Default: 0)<++>
+        <**>--fisher-asymmetric<**> : bool
+            <++>Use asymmetric steps for Fisher matrix computation<++>,
+            used by option --fisher (Default: False). Slows down computation.
+            May help in cases where the parameter space boundary is reached.<++>
         <**>--fisher-step-it<**> : int
             <++>Have the Fisher matrix calculation iterate the step-size<++>.
             Used by option --fisher (Default: 10). The step-size will be
@@ -740,6 +744,9 @@ def create_parser():
     # -- fisher mode (EXPERIMENTAL)
     runparser.add_argument('--fisher-mode', help=helpdict['fisher-mode'], type=int,
                            dest='fisher_mode', default=0)
+    # -- fisher argument (OPTIONAL)
+    runparser.add_argument('--fisher-asymmetric', help=helpdict['fisher-asymmetric'],
+                           dest='fisher_asymmetric',action='store_true')
     # -- fisher step iteration (OPTIONAL)
     runparser.add_argument('--fisher-step-it', help=helpdict['fisher-step-it'],
                            dest='fisher_step_it', default=10)

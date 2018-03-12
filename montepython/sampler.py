@@ -536,8 +536,11 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     data.use_cholesky_step = False
     if data.fisher_mode == 2:
         data.use_cholesky_step = True
-    # Force step to always be symmetric (recommended)
+    # Whether to use symmetric step. Symmetric step is recommended, as it makes the
+    # computation faster and in most cases is sufficient.
     data.use_symmetric_step = True
+    if command_line.fisher_asymmetric:
+        data.use_symmetric_step = False
     # Rotate back to cosmological parameter basis
     data.rotate_back = False
 
@@ -1521,7 +1524,8 @@ def adjust_fisher_bounds(data, center, step_size):
             if center[elem] + 0.1*step_size[index,0] > param[1] > center[elem] + step_size[index,0]:
                 print 'For %s encountered lower boundary %f with center value %f, changing stepsize from %f and +%f' %(elem,param[1],center[elem],step_size[index,0],step_size[index,1])
                 step_size[index,0] = -(center[elem] - param[1])
-                step_size[index,1] = center[elem] - param[1]
+                if data.use_symmetric_step:
+                    step_size[index,1] = center[elem] - param[1]
                 print 'to %f and +%f' %(step_size[index,0],step_size[index,1])
                 boundary_flag = 1
             # Otherwise assumme symmetric likelihood and use positive step
@@ -1545,7 +1549,8 @@ def adjust_fisher_bounds(data, center, step_size):
                 # If both boundaries are smaller than the stepsize, set stepsize to the
                 # smaller of the two.
                 if not boundary_flag or (boundary_flag == 1 and abs(step_size[index,0]) > abs((param[2] - center[elem]))):
-                    step_size[index,0] = -(param[2] - center[elem])
+                    if data.use_symmetric_step:
+                        step_size[index,0] = -(param[2] - center[elem])
                     step_size[index,1] = param[2] - center[elem]
                     print 'to %f and +%f' %(step_size[index,0],step_size[index,1])
                 else:
