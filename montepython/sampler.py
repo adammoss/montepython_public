@@ -1529,7 +1529,7 @@ def adjust_fisher_bounds(data, center, step_size):
                 print 'to %f and +%f' %(step_size[index,0],step_size[index,1])
                 boundary_flag = 1
             # Otherwise assumme symmetric likelihood and use positive step
-            elif param[1] > center[elem] + 0.1*step_size[index,0]:
+            elif param[1] >= center[elem] + 0.1*step_size[index,0]:
                 print 'For %s encountered lower boundary %f with center value %f and step_size %f, this is closer to the central value than 0.1*step_size' %(elem,param[1],center[elem],step_size[index,0])
                 boundary_flag = 2
                 if param[2] == None or param[2] > center[elem] + step_size[index,1]:
@@ -1556,7 +1556,7 @@ def adjust_fisher_bounds(data, center, step_size):
                 else:
                     print 'Lower boundary nearer center than the upper boundary, will use previously adjusted step_size %f and %f' %(step_size[index,0],step_size[index,1])
             # Otherwise assumme symmetric likelihood and use negative step
-            elif param[2] < center[elem] + step_size[index,1]:
+            elif param[2] <= center[elem] + step_size[index,1]:
                 print 'For %s encountered upper boundary %f with center value %f and step_size %f, this is closer to the central value than 0.1*step_size' %(elem,param[2],center[elem],step_size[index,1])
                 # Check if the lower bound poses a problem for symmetric step
                 if boundary_flag < 2:

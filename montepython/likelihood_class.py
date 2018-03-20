@@ -1546,7 +1546,7 @@ class Likelihood_mpk(Likelihood):
         if self.use_halofit:
             self.need_cosmo_arguments(data, {'non linear': 'halofit'})
 
-        # sdssDR7 adapted from A. Cuesta by T. Brinckmann
+        # sdssDR7 by T. Brinckmann
         # Based on Reid et al. 2010 arXiv:0907.1659 - Note: arXiv version not updated
         try:
             self.use_sdssDR7
