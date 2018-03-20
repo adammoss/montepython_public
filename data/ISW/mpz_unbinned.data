@@ -1,0 +1,19 @@
+mpz_unbinned.data_directory = os.path.join(data.path['data'], 'ISW')
+
+mpz_unbinned.cl_cross_file='mpz/cross/cl_unbinned.txt'
+mpz_unbinned.cov_cross_file='mpz/cross/cov_unbinned.txt'
+mpz_unbinned.cl_auto_file='mpz/auto/cl_unbinned.txt'
+mpz_unbinned.cov_auto_file='mpz/auto/cov_unbinned.txt'
+
+mpz_unbinned.dndz_file='mpz/dndz_mpz.txt'
+
+mpz_unbinned.z_min=0.01
+mpz_unbinned.z_max=0.3
+
+mpz_unbinned.l_min_cross=4
+mpz_unbinned.l_max_cross=100
+mpz_unbinned.n_bins_cross=4
+
+mpz_unbinned.l_min_auto=10
+mpz_unbinned.l_max_auto=60
+mpz_unbinned.n_bins_auto=4

@@ -1,0 +1,19 @@
+wisc_unbinned.data_directory = os.path.join(data.path['data'], 'ISW')
+
+wisc_unbinned.cl_cross_file='wisc/cross/cl_unbinned.txt'
+wisc_unbinned.cov_cross_file='wisc/cross/cov_unbinned.txt'
+wisc_unbinned.cl_auto_file='wisc/auto/cl_unbinned.txt'
+wisc_unbinned.cov_auto_file='wisc/auto/cov_unbinned.txt'
+
+wisc_unbinned.dndz_file='wisc/dndz_wisc.txt'
+
+wisc_unbinned.z_min=0.01
+wisc_unbinned.z_max=0.6
+
+wisc_unbinned.l_min_cross=4
+wisc_unbinned.l_max_cross=100
+wisc_unbinned.n_bins_cross=4
+
+wisc_unbinned.l_min_auto=10
+wisc_unbinned.l_max_auto=50
+wisc_unbinned.n_bins_auto=4
