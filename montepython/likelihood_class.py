@@ -1140,6 +1140,16 @@ class Likelihood_mock_cmb(Likelihood):
                 # plug a noise level of 100 muK**2, equivalent to no detection at all of polarisation
                 self.noise_P[l] = 100.
 
+        # trick to remove any information from temperature above l_max_TT
+        try:
+            self.l_max_TT
+        except:
+            self.l_max_TT = False
+
+        if self.l_max_TT:
+            for l in range(self.l_max_TT+1,l_max+1):
+                # plug a noise level of 100 muK**2, equivalent to no detection at all of temperature
+                self.noise_T[l] = 100.
 
         # impose that the cosmological code computes Cl's up to maximum l
         # needed by the window function
@@ -2458,7 +2468,7 @@ class Likelihood_clocks(Likelihood):
 
 ###################################
 # ISW-Likelihood
-# by B. Stölzner
+# by B. Stoelzner
 ###################################
 class Likelihood_isw(Likelihood):
     def __init__(self, path, data, command_line):
