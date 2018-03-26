@@ -1090,7 +1090,16 @@ class Likelihood_mock_cmb(Likelihood):
                 for l in range(self.l_min, self.l_max+1):
                     ll = int(float(line.split()[0]))
                     if l != ll:
-                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
+                        # if l_min is larger than the first l in the noise file we can skip lines
+                        # until we are at the correct l. Otherwise raise error
+                        while l > ll:
+                            try:
+                                line = fid_file.readline()
+                                ll = int(float(line.split()[0]))
+                            except:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
+                        if l < ll:
+                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
                     # read noise for C_l in muK**2
                     self.noise_T[l] = float(line.split()[1])
                     self.noise_P[l] = float(line.split()[2])
@@ -1221,7 +1230,16 @@ class Likelihood_mock_cmb(Likelihood):
                 for l in range(self.l_min, self.l_max+1):
                     ll = int(float(line.split()[0]))
                     if l != ll:
-                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        # if l_min is larger than the first l in the delensing file we can skip lines
+                        # until we are at the correct l. Otherwise raise error
+                        while l > ll:
+                            try:
+                                line = fid_file.readline()
+                                ll = int(float(line.split()[0]))
+                            except:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        if l < ll:
+                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
                     self.noise_delensing[ll] = float(line.split()[2])/(ll*(ll+1)/2./math.pi)
                     # change 3 to 4 in the above line for CMBxCIB delensing
                     line = delensing_file.readline()
@@ -1276,7 +1294,16 @@ class Likelihood_mock_cmb(Likelihood):
                     for l in range(self.l_min, self.l_max+1):
                         ll = int(float(line.split()[0]))
                         if l != ll:
-                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                            # if l_min is larger than the first l in the delensing file we can skip lines
+                            # until we are at the correct l. Otherwise raise error
+                            while l > ll:
+                                try:
+                                    line = fid_file.readline()
+                                    ll = int(float(line.split()[0]))
+                                except:
+                                    raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                            if l < ll:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
                         # this lines assumes that Nldd is stored in the
                         # 4th column (can be customised)
                         self.Nldd[ll] = float(line.split()[3])/(l*(l+1.)/2./math.pi)
