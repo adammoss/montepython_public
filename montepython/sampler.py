@@ -553,7 +553,8 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
 
     #### CLEANUP
     fisher_iteration = 0
-    while fisher_iteration < command_line.fisher_it:
+    #while fisher_iteration < command_line.fisher_it:
+    while not fisher_iteration:
         fisher_iteration += 1
         # Compute the Fisher matrix and the gradient array at the center point.
         print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,command_line.fisher_it))
@@ -610,38 +611,42 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
             # it incrementally by an amount equal to the original fisher delta.
             print 'Increasing fisher_it by 1, to %d, and adjusting fisher_delta from %f to %f' %(command_line.fisher_it + 1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
             fisher_status = 0
-            command_line.fisher_it += 1
+            fisher_iteration -= 1
+            #command_line.fisher_it += 1
             data.fisher_delta += command_line.fisher_delta
 
         # Update stepsize for the next iteration after successful fisher matrix computation
         # Note: this is now obsolete, as we iterate the step size directly instead,
         # but leaving in place in case of future development of the method.
-        if fisher_status:
-            stepsize = np.zeros([len(parameter_names),3])
-            for index in range(len(parameter_names)):
-                stepsize[index,0] = -(inv_fisher_matrix[index,index])**0.5
-                stepsize[index,1] = (inv_fisher_matrix[index,index])**0.5
-            # Adjust stepsize in case step exceeds boundary
-            stepsize = adjust_fisher_bounds(data,center,stepsize)
+        #if fisher_status:
+        #    stepsize = np.zeros([len(parameter_names),3])
+        #    for index in range(len(parameter_names)):
+        #        stepsize[index,0] = -(inv_fisher_matrix[index,index])**0.5
+        #        stepsize[index,1] = (inv_fisher_matrix[index,index])**0.5
+        #    # Adjust stepsize in case step exceeds boundary
+        #    stepsize = adjust_fisher_bounds(data,center,stepsize)
 
         # Take scalings into account and write the matrices in files
-        fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
-        io_mp.write_covariance_matrix(
-            fisher_matrix, parameter_names,
-            os.path.join(command_line.folder, 'fisher'+str(fisher_iteration)+'.mat'))
+        if fisher_iteration:
+            fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
+            io_mp.write_covariance_matrix(
+                fisher_matrix, parameter_names,
+                os.path.join(command_line.folder, 'fisher.mat'))
+                #os.path.join(command_line.folder, 'fisher'+str(fisher_iteration)+'.mat'))
 
-        inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
-        io_mp.write_covariance_matrix(
-            inv_fisher_matrix, parameter_names,
-            os.path.join(command_line.folder, 'inv_fisher'+str(fisher_iteration)+'.mat'))
+            inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
+            io_mp.write_covariance_matrix(
+                inv_fisher_matrix, parameter_names,
+                os.path.join(command_line.folder, 'inv_fisher.mat'))
+                #os.path.join(command_line.folder, 'inv_fisher'+str(fisher_iteration)+'.mat'))
 
     # Removing scale factors in order to store true parameter covariance
     #inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
 
     # Write the last inverse Fisher matrix as the new covariance matrix
-    io_mp.write_covariance_matrix(
-        inv_fisher_matrix, parameter_names,
-        os.path.join(command_line.folder, 'covariance_fisher.covmat'))
+    #io_mp.write_covariance_matrix(
+    #    inv_fisher_matrix, parameter_names,
+    #    os.path.join(command_line.folder, 'covariance_fisher.covmat'))
 
     # Load the covmat from computed fisher matrix as the new starting covariance matrix
     # eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)

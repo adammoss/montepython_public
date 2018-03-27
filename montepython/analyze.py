@@ -140,7 +140,7 @@ def analyze(command_line):
     # and the rest are plotted)?
     if command_line.center_fisher:
         for index, elem in enumerate(info.ref_names):
-            info.centers[index] = bestfit_line[index]
+            info.centers[index] = bestfit_line[index]/info.scales[index, index]
 
     if not command_line.minimal:
         # Computing 1,2 and 3-sigma errors, and plot. This will create the
@@ -438,7 +438,8 @@ def compute_posterior(information_instances):
     if info.plot_fisher:
         try:
             # read inv_fisher file
-            file_name = os.path.join(info.folder, 'inv_fisher%d.mat' % info.use_fisher_it)
+            #file_name = os.path.join(info.folder, 'inv_fisher%d.mat' % info.use_fisher_it)
+            file_name = os.path.join(info.folder, 'inv_fisher.mat')
             n=0
             with open(file_name, 'r') as f:
                 inv_fisher = np.zeros((len(info.ref_names), len(info.ref_names)), 'float64')
