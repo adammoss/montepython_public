@@ -553,7 +553,6 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
 
     #### CLEANUP
     fisher_iteration = 0
-    #while fisher_iteration < command_line.fisher_it:
     while not fisher_iteration:
         fisher_iteration += 1
         # Compute the Fisher matrix and the gradient array at the center point.
@@ -612,7 +611,6 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
             print 'Increasing fisher_it by 1, to %d, and adjusting fisher_delta from %f to %f' %(command_line.fisher_it + 1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
             fisher_status = 0
             fisher_iteration -= 1
-            #command_line.fisher_it += 1
             data.fisher_delta += command_line.fisher_delta
 
         # Update stepsize for the next iteration after successful fisher matrix computation
@@ -626,30 +624,19 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
         #    # Adjust stepsize in case step exceeds boundary
         #    stepsize = adjust_fisher_bounds(data,center,stepsize)
 
-        # Take scalings into account and write the matrices in files
+        # When inverse Fisher matrix was successfully computed, take
+        # scalings into account and write the matrices in files. The scale
+        # factors are removed in order to store true parameter covariance
         if fisher_iteration:
             fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
             io_mp.write_covariance_matrix(
                 fisher_matrix, parameter_names,
                 os.path.join(command_line.folder, 'fisher.mat'))
-                #os.path.join(command_line.folder, 'fisher'+str(fisher_iteration)+'.mat'))
 
             inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
             io_mp.write_covariance_matrix(
                 inv_fisher_matrix, parameter_names,
                 os.path.join(command_line.folder, 'inv_fisher.mat'))
-                #os.path.join(command_line.folder, 'inv_fisher'+str(fisher_iteration)+'.mat'))
-
-    # Removing scale factors in order to store true parameter covariance
-    #inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
-
-    # Write the last inverse Fisher matrix as the new covariance matrix
-    #io_mp.write_covariance_matrix(
-    #    inv_fisher_matrix, parameter_names,
-    #    os.path.join(command_line.folder, 'covariance_fisher.covmat'))
-
-    # Load the covmat from computed fisher matrix as the new starting covariance matrix
-    # eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)
 
     return inv_fisher_matrix
 

@@ -497,9 +497,6 @@ def create_parser():
             <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
             The inverse Fisher matrix can be used as a proposal distribution covmat,
             or to make plots with Fisher ellipses.<++>
-        <**>--fisher-it<**> : int
-            <++>Number of iterations for Fisher matrix computation<++>,
-            used by option --fisher (Default: 1) OBSOLETE<++>
         <**>--fisher-mode<**> : int
             <++>Fisher mode: 0 (recommended) <++>,
             1 (eigenvector rotation), 2 (Cholesky rotation), 3 (2d rotation for
@@ -649,9 +646,6 @@ def create_parser():
         <**>--plot-fisher<**> : None
             <++>Tries to add Fisher ellipses to contour plots<++>,
             if a previous run has produced a Fisher matrix and stored it.<++>
-        <**>--use-fisher-it<**> : int
-            <++>if set to N, Fisher ellipses based on file inv_fisherN.mat<++>,
-            (Default: 1)<++>
         <**>--center-fisher<**> : None
             <++>Centers Fisher ellipse on bestfit of last set of chains,<++>,
             instead of the center values of the log.param<++>
@@ -738,9 +732,6 @@ def create_parser():
     # -- fisher (OPTIONAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
-    # -- iterative fisher argument (OPTIONAL)
-    runparser.add_argument('--fisher-it', help=helpdict['fisher-it'], type=int,
-                           dest='fisher_it', default=1)
     # -- fisher mode (EXPERIMENTAL)
     runparser.add_argument('--fisher-mode', help=helpdict['fisher-mode'], type=int,
                            dest='fisher_mode', default=0)
@@ -926,8 +917,6 @@ def create_parser():
     # -- plot Fisher ellipses
     infoparser.add_argument('--plot-fisher', help=helpdict['plot-fisher'],
                            dest='plot_fisher',action='store_true')
-    infoparser.add_argument('--use-fisher-it', help=helpdict['use-fisher-it'],
-                            dest='use_fisher_it',type=int,default=1)
     infoparser.add_argument('--center-fisher', help=helpdict['center-fisher'],
                            dest='center_fisher',action='store_true')
 
