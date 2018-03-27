@@ -7,7 +7,8 @@
 # in combination with temperature and polarization, or for delensing
 # the temperature and polarization spectra (e.g. if both lensing and
 # B-mode polarization is desired).
-# by T. Brinckmann and S. Clesse
+# likelihood by T. Brinckmann and S. Clesse
+# and noise file by D.C. Hooper, T. Brinckmann.
 
 # where to read/write fiducial model:
 
@@ -34,11 +35,11 @@ core_m5.sigma_P = [5.5, 5.1, 5.2, 5.1, 4.9, 5.4]
 # do you want to include Bmodes (Gaussian approximation)?
 core_m5.Bmodes = False
 core_m5.delensing = False
-core_m5.delensing_file = 'delensing_core_m5.dat'
+core_m5.delensing_file = 'noise_core_m5.dat'
 
 # do you want to include lensing extraction?
 core_m5.LensingExtraction = True
-core_m5.temporary_Nldd_file = 'delensing_core_m5.dat'
+core_m5.temporary_Nldd_file = 'noise_core_m5.dat'
 core_m5.neglect_TD = True
 core_m5.unlensed_clTTTEEE = False
 core_m5.ExcludeTTTEEE = False
