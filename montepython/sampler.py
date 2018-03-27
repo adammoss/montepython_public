@@ -333,7 +333,6 @@ def get_covariance_matrix(cosmo, data, command_line):
     return eigv, eigV, matrix
 
 def get_minimum(cosmo, data, command_line, covmat):
-#def get_minimum(cosmo, data, command_line):
 
     if not command_line.silent:
         warnings.warn("Minimization implementation is being tested")
@@ -345,21 +344,11 @@ def get_minimum(cosmo, data, command_line, covmat):
 
     if not command_line.bf:
         for elem in parameter_names:
-            #temp_data.mcmc_parameters[elem]['current'] = (
-            #    data.mcmc_parameters[elem]['initial'][0])
             center[elem] = data.mcmc_parameters[elem]['initial'][0]
     else:
-        #read_args_from_bestfit(temp_data, command_line.bf)
         read_args_from_bestfit(data, command_line.bf)
         for elem in parameter_names:
-            #temp_data.mcmc_parameters[elem]['current'] = (
-            #    temp_data.mcmc_parameters[elem]['last_accepted'])
-            #center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
             center[elem] = data.mcmc_parameters[elem]['last_accepted']
-
-    print center
-    #print chi2_eff(center, cosmo, data)
-    #print gradient_chi2_eff(center, cosmo, data)
 
     stepsizes = np.zeros(len(parameter_names), 'float64')
     parameters = np.zeros(len(parameter_names), 'float64')
@@ -367,14 +356,13 @@ def get_minimum(cosmo, data, command_line, covmat):
     cons = ()
     for index, elem in enumerate(parameter_names):
         parameters[index] = center[elem]
-        #stepsizes[index] = center[elem]*0.0001
         stepsizes[index] = 0.1*covmat[index,index]**0.5
         if data.mcmc_parameters[elem]['initial'][1] == None:
-            bounds[index,0] = center[elem] - 1.*covmat[index,index]**0.5#10.*covmat[index,index]**0.5
+            bounds[index,0] = center[elem] - 1.*covmat[index,index]**0.5
         else:
             bounds[index,0] = data.mcmc_parameters[elem]['initial'][1]
         if data.mcmc_parameters[elem]['initial'][2] == None:
-            bounds[index,1] = center[elem] + 1.*covmat[index,index]**0.5#10.*covmat[index,index]**0.5
+            bounds[index,1] = center[elem] + 1.*covmat[index,index]**0.5
         else:
             bounds[index,1] = data.mcmc_parameters[elem]['initial'][2]
         cons += ({'type': 'ineq', 'fun': lambda x: x[index] - bounds[index,0]},
@@ -420,18 +408,18 @@ def get_minimum(cosmo, data, command_line, covmat):
 
     # For HST with 1 param the best is TNC with 'eps':stepsizes, bounds, tol, although bounds make it smlower (but avoids htting unphysical region)
     # For forecasts or Planck lite SLSQP with tol=0.00001 works well, but does not work for full Planck TTTEEE highl
-    #result = op.minimize(chi2_eff,
-    #                     parameters,
-    #                     args = (cosmo,data),
+    result = op.minimize(chi2_eff,
+                         parameters,
+                         args = (cosmo,data),
                          #method='trust-region-exact',
                          #method='BFGS',
                          #method='TNC',
                          #method='L-BFGS-B',
-    #                     method='SLSQP',
+                         method='SLSQP',
                          #options={'eps':stepsizes},
                          #constraints=cons,
-    #                     bounds=bounds,
-    #                     tol=command_line.minimize_tol)
+                         bounds=bounds,
+                         tol=command_line.minimize_tol)
                          #options = {'disp': True})
                                     #'initial_tr_radius': stepsizes,
                                     #'max_tr_radius': stepsizes})
@@ -439,25 +427,10 @@ def get_minimum(cosmo, data, command_line, covmat):
     #result = op.differential_evolution(chi2_eff,
     #                                   bounds,
     #                                   args = (cosmo,data))
-    print result.x
 
-    ##print minimum
-    ##print chi2
-    ##print success
-    #for index,elem in enumerate(parameter_names):
-    #    print elem, xopt[i]
-    #print 'chisq', fopt
-    #print 'funcion calls', func_calls
-    #print 'gradient calls', grad_calls
-    #print 'warning flags',warnflags
-    ##print allvecs
+    print 'Final output of minimize'
     for index,elem in enumerate(parameter_names):
         print elem, 'new:', result.x[index], ', old:', parameters[index]
-    ##print x
-    #print 'nfeval',nfeval
-    #print 'rc',rc
-    print result
-    #exit()
 
     return result.x
 
