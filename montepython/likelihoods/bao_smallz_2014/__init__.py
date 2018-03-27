@@ -5,7 +5,7 @@ import montepython.io_mp as io_mp
 import warnings
 
 
-class bao_smallz_boss_2014(Likelihood):
+class bao_smallz_2014(Likelihood):
 
     # initialization routine
 
