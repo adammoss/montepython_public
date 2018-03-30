@@ -551,14 +551,23 @@ def chain(cosmo, data, command_line):
                         if not command_line.silent:
                             print 'Step ',k,' chain ', rank,': Failed to calculate covariance matrix'
                         pass
-
+                elif not (k+10) % command_line.update/5 and k > 10 and command_line.superupdate:
+                    # Compute (only, i.e. no covmat) R-1 more often when using superupdate
+                    try:
+                        info_command_line = parse(
+                            'info %s --minimal --noplot --keep-fraction 0.5 --keep-non-markovian' % command_line.folder)
+                        R_minus_one = analyze(info_command_line)
+                    except:
+                        pass
                 if command_line.superupdate:
                     # Start of superupdate routine
                     # By B. Schroer and T. Brinckmann
 
                     c_array[(k-1)%(20*fpm)] = data.jumping_factor
                     # Start adapting the jumping factor after command_line.superupdate steps if R-1 < 10
-                    if (k > updated_steps + command_line.superupdate) and (max(R_minus_one) < 10) and not stop_c:
+                    # The lower R-1 criterium is an arbitrary choice to keep from updating when the R-1
+                    # calculation fails (i.e. returns only zeros).
+                    if (k > updated_steps + command_line.superupdate) and 0.01 < (max(R_minus_one) < 10) and not stop_c:
                         c = data.jumping_factor**2/len(parameter_names)
                         # To avoid getting trapped in local minima, the jumping factor should
                         # not go below 0.1 (arbitrary) times the starting jumping factor.
@@ -703,7 +712,7 @@ def chain(cosmo, data, command_line):
                 # End of slave superupdate routine
 
                 # Start of slave update routine
-                if not (k-1) % command_line.update/3:
+                if not (k-1) % command_line.update/10:
                     try:
                         sigma_eig, U, C = sampler.get_covariance_matrix(
                             cosmo, data, command_line)
