@@ -486,7 +486,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     # write it and its inverse to a file
 
     # Pass input to data structure
-    data.fisher_step_it = command_line.fisher_step_it
+    data.fisher_step_it = int(command_line.fisher_step_it)
     data.fisher_delta = command_line.fisher_delta
     data.fisher_tol = command_line.fisher_tol
 
@@ -554,10 +554,10 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     #### CLEANUP
     fisher_iteration = 0
     fisher_status = 0
-    while fisher_iteration < command_line.fisher_step_it and not fisher_status:
+    while fisher_iteration < data.fisher_step_it and not fisher_status:
         fisher_iteration += 1
         # Compute the Fisher matrix and the gradient array at the center point.
-        print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,command_line.fisher_step_it+1))
+        print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,data.fisher_step_it))
         for index in range(len(parameter_names)):
             #print "%s : left %e, right %e" % (parameter_names[index],stepsize[index,0],stepsize[index,1])
             print "%s : diagonal element = %e" % (parameter_names[index],inv_fisher_matrix[index,index])
@@ -579,7 +579,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
         if (data.fisher_mode == 1 or data.fisher_mode == 2) and data.rotate_back:
             fisher_matrix = step_matrix.T * fisher_matrix * step_matrix
         if not command_line.silent:
-            print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,command_line.fisher_step_it+1))
+            print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,data.fisher_step_it))
 
         # Compute inverse of the fisher matrix, catch LinAlgError exception
         try:
@@ -601,7 +601,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
                 raise io_mp.ConfigurationError(
                     "Could not find Fisher matrix inverse and fisher step iteration is not enabled. Use flag "
                     "--fisher-step-it or change the input sigmas (or covariance matrix) or the bestfit.")
-            if fisher_iteration == command_line.fisher_step_it:
+            if fisher_iteration == data.fisher_step_it:
                 raise io_mp.ConfigurationError(
                     "Could not find Fisher matrix inverse after %d attempts. Try with different "
                     "fisher_tol, fisher_delta, input sigmas (or covmat), bestfit, or remove the "
@@ -610,7 +610,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
             # If the inverse Fisher matrix is not positive definite we want to
             # iterate on the target fisher delta (--fisher-delta), increasing
             # it incrementally by an amount equal to the original fisher delta.
-            print 'Increasing fisher_iteration by 1, to %d, and adjusting fisher_delta from %f to %f' %(command_line.fisher_step_it + 1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
+            print 'Increasing fisher_iteration by 1, to %d, and adjusting fisher_delta from %f to %f' %(fisher_iteration+1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
             data.fisher_delta += command_line.fisher_delta
             fisher_status = 0
 
