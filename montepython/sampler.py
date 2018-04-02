@@ -584,7 +584,6 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
         # Compute inverse of the fisher matrix, catch LinAlgError exception
         try:
             inv_fisher_matrix = np.linalg.inv(fisher_matrix)
-            print ("Inverse Fisher matrix computation successful! Saving Fisher and inverse Fisher matrices.")
         except np.linalg.LinAlgError:
             raise io_mp.ConfigurationError(
                 "Could not find Fisher matrix inverse. Try with different "
@@ -595,6 +594,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
         try:
             la.cholesky(inv_fisher_matrix).T
             fisher_status = 1
+            print ("Inverse Fisher matrix computation successful! Saving Fisher and inverse Fisher matrices.")
         except:
             print 'Fisher matrix computation failed - inverse not positive definite'
             if data.fisher_step_it < 2:
