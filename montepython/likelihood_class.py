@@ -17,6 +17,7 @@ import re
 import scipy.constants as const
 import scipy.integrate
 import scipy.interpolate
+import scipy.misc
 
 import io_mp
 
@@ -2527,8 +2528,8 @@ class Likelihood_isw(Likelihood):
 
         # Read the redshift distribution of objects in the survey, perform an interpolation of dN/dz(z), and calculate the normalization in this redshift bin
         zz,dndz=np.loadtxt(os.path.join(self.data_directory,self.dndz_file),unpack=True,usecols=(0,1))
-        self.dndz=interpolate.interp1d(zz,dndz,kind='cubic')
-        self.norm=integrate.quad(self.dndz,self.z_min,self.z_max)[0]
+        self.dndz=scipy.interpolate.interp1d(zz,dndz,kind='cubic')
+        self.norm=scipy.integrate.quad(self.dndz,self.z_min,self.z_max)[0]
 
     def bin_cl(self,l,cl,bins,cov=None):
         # This function bins l,C_l, and the covariance matrix in given bins in l
@@ -2555,7 +2556,7 @@ class Likelihood_isw(Likelihood):
         H0=cosmo.h()*100
         Om=cosmo.Omega0_m()
         k=lambda z:(l+0.5)/(cosmo.angular_distance(z)*(1+z))
-        return (3*Om*H0**2)/((c**2)*(l+0.5)**2)*self.dndz(z)*cosmo.Hubble(z)*cosmo.scale_independent_growth_factor(z)*misc.derivative(lambda z:cosmo.scale_independent_growth_factor(z)*(1+z),x0=z,dx=1e-4)*cosmo.pk(k(z),0)/self.norm
+        return (3*Om*H0**2)/((c**2)*(l+0.5)**2)*self.dndz(z)*cosmo.Hubble(z)*cosmo.scale_independent_growth_factor(z)*scipy.misc.derivative(lambda z:cosmo.scale_independent_growth_factor(z)*(1+z),x0=z,dx=1e-4)*cosmo.pk(k(z),0)/self.norm
 
     def integrand_auto(self,z,cosmo,l):
         # This function will be integrated to calculate the expected autocorrelation of the survey
@@ -2569,8 +2570,8 @@ class Likelihood_isw(Likelihood):
         A=data.mcmc_parameters['A_ISW']['current']*data.mcmc_parameters['A_ISW']['scale']
 
         # Calculate the expected auto- and crosscorrelation by integrating over the redshift.
-        cl_binned_cross_theory=np.array([(integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll]))[0]+integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll+1]))[0]+integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.l_binned_cross[ll]))[0])/3 for ll in range(self.n_bins_cross)])
-        cl_binned_auto_theory=np.array([integrate.quad(self.integrand_auto,self.z_min,self.z_max,args=(cosmo,ll),epsrel=1e-8)[0] for ll in self.l_binned_auto])
+        cl_binned_cross_theory=np.array([(scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll]))[0]+scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll+1]))[0]+scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.l_binned_cross[ll]))[0])/3 for ll in range(self.n_bins_cross)])
+        cl_binned_auto_theory=np.array([scipy.integrate.quad(self.integrand_auto,self.z_min,self.z_max,args=(cosmo,ll),epsrel=1e-8)[0] for ll in self.l_binned_auto])
 
         # Calculate the chi-square of auto- and crosscorrelation
         chi2_cross=np.asscalar(np.dot(self.cl_binned_cross-A*b*cl_binned_cross_theory,np.dot(np.linalg.inv(self.cov_binned_cross),self.cl_binned_cross-A*b*cl_binned_cross_theory)))
