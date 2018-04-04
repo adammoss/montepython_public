@@ -1,0 +1,41 @@
+# LiteBIRD likelihood following approach of the CORE-M5 papers
+# for the M5 ESA proposal: Di Valentino et al. 1612.00021 and
+# Finelli et al. 1612.08270. Updated settings and noise spectra
+# from LiteBIRD mission paper Suzuki et al. 1801.06987
+# by T. Brinckmann and D.C. Hooper
+
+# where to read/write fiducial model:
+litebird.data_directory     = data.path['data']
+litebird.fiducial_file      = 'litebird_fiducial.dat'
+
+# experimental sensitivity:
+litebird.l_min              = 2
+litebird.l_max              = 1350
+litebird.f_sky              = 0.70
+litebird.num_channels       = 1
+
+# angular resolution
+# theta_fwhm must be in in arcmin
+# LiteBIRD mission paper indicated one channel in GHz [140]
+# FWHM taken from LiteBIRD settings in CORE-M5 papers
+# (1612.00021 and 1612.08270) for this channel
+litebird.theta_fwhm = [31.0]
+
+# resolution for Temperature and Polarisation
+# sigma's must be in muK.arcmin
+# LiteBIRD mission paper settings (1801.06987)
+litebird.sigma_T = [4.1]
+litebird.sigma_P = [4.1*2.**0.5]
+
+# do you want to include Bmodes (Gaussian approximation)?
+# setup for CORE-M5 papers used Bmodes and no lensing extraction
+litebird.Bmodes = False
+litebird.delensing = False
+litebird.delensing_file = 'noise_litebird.dat'
+
+# do you want to include lensing extraction?
+litebird.LensingExtraction = True
+litebird.temporary_Nldd_file = 'noise_litebird.dat'
+litebird.neglect_TD = True
+litebird.unlensed_clTTTEEE = False
+litebird.ExcludeTTTEEE = False

@@ -1,0 +1,19 @@
+mpz_bin1.data_directory = os.path.join(data.path['data'], 'ISW')
+
+mpz_bin1.cl_cross_file='mpz/cross/cl1.txt'
+mpz_bin1.cov_cross_file='mpz/cross/cov1.txt'
+mpz_bin1.cl_auto_file='mpz/auto/cl1.txt'
+mpz_bin1.cov_auto_file='mpz/auto/cov1.txt'
+
+mpz_bin1.dndz_file='mpz/dndz_mpz.txt'
+
+mpz_bin1.z_min=0.105
+mpz_bin1.z_max=0.195
+
+mpz_bin1.l_min_cross=4
+mpz_bin1.l_max_cross=100
+mpz_bin1.n_bins_cross=4
+
+mpz_bin1.l_min_auto=10
+mpz_bin1.l_max_auto=60
+mpz_bin1.n_bins_auto=4

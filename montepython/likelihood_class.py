@@ -17,6 +17,7 @@ import re
 import scipy.constants as const
 import scipy.integrate
 import scipy.interpolate
+import scipy.misc
 
 import io_mp
 
@@ -1090,7 +1091,16 @@ class Likelihood_mock_cmb(Likelihood):
                 for l in range(self.l_min, self.l_max+1):
                     ll = int(float(line.split()[0]))
                     if l != ll:
-                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
+                        # if l_min is larger than the first l in the noise file we can skip lines
+                        # until we are at the correct l. Otherwise raise error
+                        while l > ll:
+                            try:
+                                line = fid_file.readline()
+                                ll = int(float(line.split()[0]))
+                            except:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
+                        if l < ll:
+                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
                     # read noise for C_l in muK**2
                     self.noise_T[l] = float(line.split()[1])
                     self.noise_P[l] = float(line.split()[2])
@@ -1140,6 +1150,16 @@ class Likelihood_mock_cmb(Likelihood):
                 # plug a noise level of 100 muK**2, equivalent to no detection at all of polarisation
                 self.noise_P[l] = 100.
 
+        # trick to remove any information from temperature above l_max_TT
+        try:
+            self.l_max_TT
+        except:
+            self.l_max_TT = False
+
+        if self.l_max_TT:
+            for l in range(self.l_max_TT+1,l_max+1):
+                # plug a noise level of 100 muK**2, equivalent to no detection at all of temperature
+                self.noise_T[l] = 100.
 
         # impose that the cosmological code computes Cl's up to maximum l
         # needed by the window function
@@ -1211,7 +1231,16 @@ class Likelihood_mock_cmb(Likelihood):
                 for l in range(self.l_min, self.l_max+1):
                     ll = int(float(line.split()[0]))
                     if l != ll:
-                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        # if l_min is larger than the first l in the delensing file we can skip lines
+                        # until we are at the correct l. Otherwise raise error
+                        while l > ll:
+                            try:
+                                line = fid_file.readline()
+                                ll = int(float(line.split()[0]))
+                            except:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        if l < ll:
+                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
                     self.noise_delensing[ll] = float(line.split()[2])/(ll*(ll+1)/2./math.pi)
                     # change 3 to 4 in the above line for CMBxCIB delensing
                     line = delensing_file.readline()
@@ -1266,7 +1295,16 @@ class Likelihood_mock_cmb(Likelihood):
                     for l in range(self.l_min, self.l_max+1):
                         ll = int(float(line.split()[0]))
                         if l != ll:
-                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                            # if l_min is larger than the first l in the delensing file we can skip lines
+                            # until we are at the correct l. Otherwise raise error
+                            while l > ll:
+                                try:
+                                    line = fid_file.readline()
+                                    ll = int(float(line.split()[0]))
+                                except:
+                                    raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                            if l < ll:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
                         # this lines assumes that Nldd is stored in the
                         # 4th column (can be customised)
                         self.Nldd[ll] = float(line.split()[3])/(l*(l+1.)/2./math.pi)
@@ -1546,7 +1584,7 @@ class Likelihood_mpk(Likelihood):
         if self.use_halofit:
             self.need_cosmo_arguments(data, {'non linear': 'halofit'})
 
-        # sdssDR7 adapted from A. Cuesta by T. Brinckmann
+        # sdssDR7 by T. Brinckmann
         # Based on Reid et al. 2010 arXiv:0907.1659 - Note: arXiv version not updated
         try:
             self.use_sdssDR7
@@ -2455,3 +2493,87 @@ class Likelihood_clocks(Likelihood):
             chi2 += (self.Hz[index]-H_cosmo)**2/self.err[index]**2
 
         return -0.5 * chi2
+
+###################################
+# ISW-Likelihood
+# by B. Stoelzner
+###################################
+class Likelihood_isw(Likelihood):
+    def __init__(self, path, data, command_line):
+        # Initialize
+        Likelihood.__init__(self, path, data, command_line)
+        self.need_cosmo_arguments(data, {'output': 'mPk','P_k_max_h/Mpc' : 300,'z_max_pk' : 5.1})
+
+        # Read l,C_l, and the covariance matrix of the autocorrelation of the survey and the crosscorrelation of the survey with the CMB
+        self.l_cross,cl_cross=np.loadtxt(os.path.join(self.data_directory,self.cl_cross_file),unpack=True,usecols=(0,1))
+        self.l_auto,cl_auto=np.loadtxt(os.path.join(self.data_directory,self.cl_auto_file),unpack=True,usecols=(0,1))
+        cov_cross=np.loadtxt(os.path.join(self.data_directory,self.cov_cross_file))
+        cov_auto=np.loadtxt(os.path.join(self.data_directory,self.cov_auto_file))
+
+        # Extract data in the specified range in l.
+        self.l_cross=self.l_cross[self.l_min_cross:self.l_max_cross+1]
+        cl_cross=cl_cross[self.l_min_cross:self.l_max_cross+1]
+        self.l_auto=self.l_auto[self.l_min_auto:self.l_max_auto+1]
+        cl_auto=cl_auto[self.l_min_auto:self.l_max_auto+1]
+        cov_cross=cov_cross[self.l_min_cross:self.l_max_cross+1,self.l_min_cross:self.l_max_cross+1]
+        cov_auto=cov_auto[self.l_min_auto:self.l_max_auto+1,self.l_min_auto:self.l_max_auto+1]
+
+        # Create logarithically spaced bins in l.
+        self.bins_cross=np.ceil(np.logspace(np.log10(self.l_min_cross),np.log10(self.l_max_cross),self.n_bins_cross+1))
+        self.bins_auto=np.ceil(np.logspace(np.log10(self.l_min_auto),np.log10(self.l_max_auto),self.n_bins_auto+1))
+
+        # Bin l,C_l, and covariance matrix in the previously defined bins
+        self.l_binned_cross,self.cl_binned_cross,self.cov_binned_cross=self.bin_cl(self.l_cross,cl_cross,self.bins_cross,cov_cross)
+        self.l_binned_auto,self.cl_binned_auto,self.cov_binned_auto=self.bin_cl(self.l_auto,cl_auto,self.bins_auto,cov_auto)
+
+        # Read the redshift distribution of objects in the survey, perform an interpolation of dN/dz(z), and calculate the normalization in this redshift bin
+        zz,dndz=np.loadtxt(os.path.join(self.data_directory,self.dndz_file),unpack=True,usecols=(0,1))
+        self.dndz=scipy.interpolate.interp1d(zz,dndz,kind='cubic')
+        self.norm=scipy.integrate.quad(self.dndz,self.z_min,self.z_max)[0]
+
+    def bin_cl(self,l,cl,bins,cov=None):
+        # This function bins l,C_l, and the covariance matrix in given bins in l
+        B=[]
+        for i in range(1,len(bins)):
+            if i!=len(bins)-1:
+                a=np.where((l<bins[i])&(l>=bins[i-1]))[0]
+            else:
+                a=np.where((l<=bins[i])&(l>=bins[i-1]))[0]
+            c=np.zeros(len(l))
+            c[a]=1/len(a)
+            B.append(c)
+        l_binned=np.dot(B,l)
+        cl_binned=np.dot(B,cl)
+        if cov is not None:
+            cov_binned=np.dot(B,np.dot(cov,np.transpose(B)))
+            return l_binned,cl_binned,cov_binned
+        else:
+            return l_binned,cl_binned
+
+    def integrand_cross(self,z,cosmo,l):
+        # This function will be integrated to calculate the exspected crosscorrelation between the survey and the CMB
+        c= const.c/1000.
+        H0=cosmo.h()*100
+        Om=cosmo.Omega0_m()
+        k=lambda z:(l+0.5)/(cosmo.angular_distance(z)*(1+z))
+        return (3*Om*H0**2)/((c**2)*(l+0.5)**2)*self.dndz(z)*cosmo.Hubble(z)*cosmo.scale_independent_growth_factor(z)*scipy.misc.derivative(lambda z:cosmo.scale_independent_growth_factor(z)*(1+z),x0=z,dx=1e-4)*cosmo.pk(k(z),0)/self.norm
+
+    def integrand_auto(self,z,cosmo,l):
+        # This function will be integrated to calculate the expected autocorrelation of the survey
+        c= const.c/1000.
+        H0=cosmo.h()*100
+        k=lambda z:(l+0.5)/(cosmo.angular_distance(z)*(1+z))
+        return (self.dndz(z))**2*(cosmo.scale_independent_growth_factor(z))**2*cosmo.pk(k(z),0)*cosmo.Hubble(z)/(cosmo.angular_distance(z)*(1+z))**2/self.norm**2
+
+    def compute_loglkl(self, cosmo, data,b):
+        # Retrieve sampled parameter
+        A=data.mcmc_parameters['A_ISW']['current']*data.mcmc_parameters['A_ISW']['scale']
+
+        # Calculate the expected auto- and crosscorrelation by integrating over the redshift.
+        cl_binned_cross_theory=np.array([(scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll]))[0]+scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll+1]))[0]+scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.l_binned_cross[ll]))[0])/3 for ll in range(self.n_bins_cross)])
+        cl_binned_auto_theory=np.array([scipy.integrate.quad(self.integrand_auto,self.z_min,self.z_max,args=(cosmo,ll),epsrel=1e-8)[0] for ll in self.l_binned_auto])
+
+        # Calculate the chi-square of auto- and crosscorrelation
+        chi2_cross=np.asscalar(np.dot(self.cl_binned_cross-A*b*cl_binned_cross_theory,np.dot(np.linalg.inv(self.cov_binned_cross),self.cl_binned_cross-A*b*cl_binned_cross_theory)))
+        chi2_auto=np.asscalar(np.dot(self.cl_binned_auto-b**2*cl_binned_auto_theory,np.dot(np.linalg.inv(self.cov_binned_auto),self.cl_binned_auto-b**2*cl_binned_auto_theory)))
+        return -0.5*(chi2_cross+chi2_auto)

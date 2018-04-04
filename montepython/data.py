@@ -810,7 +810,7 @@ class Data(object):
                 self.cosmo_arguments['n_cdi'] = self.cosmo_arguments['n_s']
             elif elem == 'beta':
                 self.cosmo_arguments['alpha'] = 2.*self.cosmo_arguments['beta']
-            elif elem == 'M_tot_NH':
+            elif elem == 'M_tot_NH' or elem == '{\sum}m_nu_NH':
                 # By T. Brinckmann
                 # Normal hierarchy massive neutrinos. Calculates the individual
                 # neutrino masses from M_tot_NH and deletes M_tot_NH
@@ -823,7 +823,7 @@ class Data(object):
                 delta_m_squared_sol=7.50e-5 #7.50e-5
                 #m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
                 m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot - m1 - (d_m_sq_sol + m1**2.)**0.5 - (d_m_sq_atm + m1**2.)**0.5
-                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments['M_tot_NH']/3.,(self.cosmo_arguments['M_tot_NH'],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
+                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments[elem]/3.,(self.cosmo_arguments[elem],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
                 if not success == 1:
                     raise ValueError(
                         "Failed to estimate m1. Reason: "+output_message+
@@ -832,13 +832,13 @@ class Data(object):
                 m2 = (delta_m_squared_sol + m1**2.)**0.5
                 #m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
                 m3 = (delta_m_squared_atm + m1**2.)**0.5
-                if m1+m2+m3 > self.cosmo_arguments['M_tot_NH']+0.001*self.cosmo_arguments['M_tot_NH']:
+                if m1+m2+m3 > self.cosmo_arguments[elem]+0.001*self.cosmo_arguments[elem]:
                     raise ValueError(
                         "Failed to estimate m1 resulting in sum(m_i) > M_tot."
                         " Exiting run.")
                 self.cosmo_arguments['m_ncdm'] = r'%g, %g, %g' % (m1,m2,m3)
                 del self.cosmo_arguments[elem]
-            elif elem == 'M_tot_IH':
+            elif elem == 'M_tot_IH'or elem == '{\sum}m_nu_IH':
                 # By T. Brinckmann
                 # Inverted hierarchy massive neutrinos. Calculates the individual
                 # neutrino masses from M_tot_IH and deletes M_tot_IH
@@ -851,7 +851,7 @@ class Data(object):
                 delta_m_squared_sol=7.50e-5 #7.50e-5
                 #m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot**2. + 0.5*d_m_sq_sol - d_m_sq_atm + m1**2. - 2.*M_tot*m1 - 2.*M_tot*(d_m_sq_sol+m1**2.)**0.5 + 2.*m1*(d_m_sq_sol+m1**2.)**0.5
                 m1_func = lambda m1, M_tot, d_m_sq_atm, d_m_sq_sol: M_tot - m1 - (d_m_sq_sol + m1**2.)**0.5 - (abs(d_m_sq_atm + d_m_sq_sol + m1**2.))**0.5
-                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments['M_tot_IH']/2.,(self.cosmo_arguments['M_tot_IH'],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
+                m1,opt_output,success,output_message = fsolve(m1_func,self.cosmo_arguments[elem]/2.,(self.cosmo_arguments[elem],delta_m_squared_atm,delta_m_squared_sol),full_output=True)
                 if not success == 1:
                     raise ValueError(
                         "Failed to estimate m1. Reason: "+output_message+
@@ -860,7 +860,7 @@ class Data(object):
                 m2 = (delta_m_squared_sol + m1**2.)**0.5
                 #m3 = (delta_m_squared_atm + 0.5*(m2**2. + m1**2.))**0.5
                 m3 = (delta_m_squared_atm + m2**2.)**0.5
-                if m1+m2+m3 > self.cosmo_arguments['M_tot_IH']+0.001*self.cosmo_arguments['M_tot_IH']:
+                if m1+m2+m3 > self.cosmo_arguments[elem]+0.001*self.cosmo_arguments[elem]:
                     raise ValueError(
                         "Failed to estimate m1 resulting in sum(m_i) > M_tot."
                         "Exiting run.")
@@ -870,7 +870,7 @@ class Data(object):
                         "but m1^2 should always be greater than this value." % (m1**2.,- delta_m_squared_sol - delta_m_squared_atm))
                 self.cosmo_arguments['m_ncdm'] = r'%g, %g, %g' % (m1,m2,m3)
                 del self.cosmo_arguments[elem]
-            elif elem == 'M_tot':
+            elif elem == 'M_tot' or elem == '{\sum}m_nu':
                 # By T. Brinckmann
                 # Massive neutrinos with identical non-zero mass. Calculates the
                 # individual neutrino masses from M_tot and deletes M_tot
@@ -878,7 +878,7 @@ class Data(object):
                     raise ValueError(
                         "N_ncdm is not equal to 1."
                         " This value should be exactly 1.")
-                self.cosmo_arguments['m_ncdm'] = self.cosmo_arguments['M_tot']/self.cosmo_arguments['deg_ncdm']
+                self.cosmo_arguments['m_ncdm'] = self.cosmo_arguments[elem]/self.cosmo_arguments['deg_ncdm']
                 del self.cosmo_arguments[elem]
             elif elem == 'm_s_eff':
                 # By T. Brinckmann

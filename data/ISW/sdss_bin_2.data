@@ -1,0 +1,19 @@
+sdss_bin2.data_directory = os.path.join(data.path['data'], 'ISW')
+
+sdss_bin2.cl_cross_file='sdss/cross/cl2.txt'
+sdss_bin2.cov_cross_file='sdss/cross/cov2.txt'
+sdss_bin2.cl_auto_file='sdss/auto/cl2.txt'
+sdss_bin2.cov_auto_file='sdss/auto/cov2.txt'
+
+sdss_bin2.dndz_file='sdss/dndz_sdss.txt'
+
+sdss_bin2.z_min=0.4
+sdss_bin2.z_max=0.5
+
+sdss_bin2.l_min_cross=4
+sdss_bin2.l_max_cross=100
+sdss_bin2.n_bins_cross=4
+
+sdss_bin2.l_min_auto=10
+sdss_bin2.l_max_auto=70
+sdss_bin2.n_bins_auto=5

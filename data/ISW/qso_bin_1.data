@@ -1,0 +1,19 @@
+qso_bin1.data_directory = os.path.join(data.path['data'], 'ISW')
+
+qso_bin1.cl_cross_file='qso/cross/cl1.txt'
+qso_bin1.cov_cross_file='qso/cross/cov1.txt'
+qso_bin1.cl_auto_file='qso/auto/cl1.txt'
+qso_bin1.cov_auto_file='qso/auto/cov1.txt'
+
+qso_bin1.dndz_file='qso/dndz_qso.txt'
+
+qso_bin1.z_min=1
+qso_bin1.z_max=2
+
+qso_bin1.l_min_cross=4
+qso_bin1.l_max_cross=100
+qso_bin1.n_bins_cross=4
+
+qso_bin1.l_min_auto=10
+qso_bin1.l_max_auto=70
+qso_bin1.n_bins_auto=5

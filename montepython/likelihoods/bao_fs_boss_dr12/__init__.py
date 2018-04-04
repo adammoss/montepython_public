@@ -93,7 +93,7 @@ class bao_fs_boss_dr12(Likelihood):
 
         # compute chi squared
         inv_cov_data = np.linalg.inv(self.cov_data)
-        chi2 = np.log(np.dot(np.dot(data_array,self.inv_cov_data),data_array))
+        chi2 = np.log(np.dot(np.dot(data_array,inv_cov_data),data_array))
 
         # return ln(L)
         loglkl = - 0.5 * chi2

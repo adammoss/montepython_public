@@ -333,7 +333,6 @@ def get_covariance_matrix(cosmo, data, command_line):
     return eigv, eigV, matrix
 
 def get_minimum(cosmo, data, command_line, covmat):
-#def get_minimum(cosmo, data, command_line):
 
     if not command_line.silent:
         warnings.warn("Minimization implementation is being tested")
@@ -345,21 +344,11 @@ def get_minimum(cosmo, data, command_line, covmat):
 
     if not command_line.bf:
         for elem in parameter_names:
-            #temp_data.mcmc_parameters[elem]['current'] = (
-            #    data.mcmc_parameters[elem]['initial'][0])
             center[elem] = data.mcmc_parameters[elem]['initial'][0]
     else:
-        #read_args_from_bestfit(temp_data, command_line.bf)
         read_args_from_bestfit(data, command_line.bf)
         for elem in parameter_names:
-            #temp_data.mcmc_parameters[elem]['current'] = (
-            #    temp_data.mcmc_parameters[elem]['last_accepted'])
-            #center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
             center[elem] = data.mcmc_parameters[elem]['last_accepted']
-
-    print center
-    #print chi2_eff(center, cosmo, data)
-    #print gradient_chi2_eff(center, cosmo, data)
 
     stepsizes = np.zeros(len(parameter_names), 'float64')
     parameters = np.zeros(len(parameter_names), 'float64')
@@ -367,14 +356,13 @@ def get_minimum(cosmo, data, command_line, covmat):
     cons = ()
     for index, elem in enumerate(parameter_names):
         parameters[index] = center[elem]
-        #stepsizes[index] = center[elem]*0.0001
         stepsizes[index] = 0.1*covmat[index,index]**0.5
         if data.mcmc_parameters[elem]['initial'][1] == None:
-            bounds[index,0] = center[elem] - 1.*covmat[index,index]**0.5#10.*covmat[index,index]**0.5
+            bounds[index,0] = center[elem] - 1.*covmat[index,index]**0.5
         else:
             bounds[index,0] = data.mcmc_parameters[elem]['initial'][1]
         if data.mcmc_parameters[elem]['initial'][2] == None:
-            bounds[index,1] = center[elem] + 1.*covmat[index,index]**0.5#10.*covmat[index,index]**0.5
+            bounds[index,1] = center[elem] + 1.*covmat[index,index]**0.5
         else:
             bounds[index,1] = data.mcmc_parameters[elem]['initial'][2]
         cons += ({'type': 'ineq', 'fun': lambda x: x[index] - bounds[index,0]},
@@ -420,18 +408,18 @@ def get_minimum(cosmo, data, command_line, covmat):
 
     # For HST with 1 param the best is TNC with 'eps':stepsizes, bounds, tol, although bounds make it smlower (but avoids htting unphysical region)
     # For forecasts or Planck lite SLSQP with tol=0.00001 works well, but does not work for full Planck TTTEEE highl
-    #result = op.minimize(chi2_eff,
-    #                     parameters,
-    #                     args = (cosmo,data),
+    result = op.minimize(chi2_eff,
+                         parameters,
+                         args = (cosmo,data),
                          #method='trust-region-exact',
                          #method='BFGS',
                          #method='TNC',
                          #method='L-BFGS-B',
-    #                     method='SLSQP',
+                         method='SLSQP',
                          #options={'eps':stepsizes},
                          #constraints=cons,
-    #                     bounds=bounds,
-    #                     tol=command_line.minimize_tol)
+                         bounds=bounds,
+                         tol=command_line.minimize_tol)
                          #options = {'disp': True})
                                     #'initial_tr_radius': stepsizes,
                                     #'max_tr_radius': stepsizes})
@@ -439,25 +427,10 @@ def get_minimum(cosmo, data, command_line, covmat):
     #result = op.differential_evolution(chi2_eff,
     #                                   bounds,
     #                                   args = (cosmo,data))
-    print result.x
 
-    ##print minimum
-    ##print chi2
-    ##print success
-    #for index,elem in enumerate(parameter_names):
-    #    print elem, xopt[i]
-    #print 'chisq', fopt
-    #print 'funcion calls', func_calls
-    #print 'gradient calls', grad_calls
-    #print 'warning flags',warnflags
-    ##print allvecs
+    print 'Final output of minimize'
     for index,elem in enumerate(parameter_names):
         print elem, 'new:', result.x[index], ', old:', parameters[index]
-    ##print x
-    #print 'nfeval',nfeval
-    #print 'rc',rc
-    print result
-    #exit()
 
     return result.x
 
@@ -513,7 +486,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     # write it and its inverse to a file
 
     # Pass input to data structure
-    data.fisher_step_it = command_line.fisher_step_it
+    data.fisher_step_it = int(command_line.fisher_step_it)
     data.fisher_delta = command_line.fisher_delta
     data.fisher_tol = command_line.fisher_tol
 
@@ -580,10 +553,11 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
 
     #### CLEANUP
     fisher_iteration = 0
-    while fisher_iteration < command_line.fisher_it:
+    fisher_status = 0
+    while fisher_iteration < data.fisher_step_it and not fisher_status:
         fisher_iteration += 1
         # Compute the Fisher matrix and the gradient array at the center point.
-        print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,command_line.fisher_it))
+        print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,data.fisher_step_it))
         for index in range(len(parameter_names)):
             #print "%s : left %e, right %e" % (parameter_names[index],stepsize[index,0],stepsize[index,1])
             print "%s : diagonal element = %e" % (parameter_names[index],inv_fisher_matrix[index,index])
@@ -605,7 +579,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
         if (data.fisher_mode == 1 or data.fisher_mode == 2) and data.rotate_back:
             fisher_matrix = step_matrix.T * fisher_matrix * step_matrix
         if not command_line.silent:
-            print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,command_line.fisher_it))
+            print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,data.fisher_step_it))
 
         # Compute inverse of the fisher matrix, catch LinAlgError exception
         try:
@@ -617,16 +591,17 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
                 "option --fisher and run with Metropolis-Hastings or another sampling method.")
 
         # Check if the inverse fisher matrix is positive definite
-        fisher_status = 1
         try:
             la.cholesky(inv_fisher_matrix).T
+            fisher_status = 1
+            print ("Inverse Fisher matrix computation successful! Saving Fisher and inverse Fisher matrices.")
         except:
             print 'Fisher matrix computation failed - inverse not positive definite'
             if data.fisher_step_it < 2:
                 raise io_mp.ConfigurationError(
                     "Could not find Fisher matrix inverse and fisher step iteration is not enabled. Use flag "
                     "--fisher-step-it or change the input sigmas (or covariance matrix) or the bestfit.")
-            if fisher_iteration == command_line.fisher_step_it:
+            if fisher_iteration == data.fisher_step_it:
                 raise io_mp.ConfigurationError(
                     "Could not find Fisher matrix inverse after %d attempts. Try with different "
                     "fisher_tol, fisher_delta, input sigmas (or covmat), bestfit, or remove the "
@@ -635,43 +610,34 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
             # If the inverse Fisher matrix is not positive definite we want to
             # iterate on the target fisher delta (--fisher-delta), increasing
             # it incrementally by an amount equal to the original fisher delta.
-            print 'Increasing fisher_it by 1, to %d, and adjusting fisher_delta from %f to %f' %(command_line.fisher_it + 1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
-            fisher_status = 0
-            command_line.fisher_it += 1
+            print 'Increasing fisher_iteration by 1, to %d, and adjusting fisher_delta from %f to %f' %(fisher_iteration+1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
             data.fisher_delta += command_line.fisher_delta
+            fisher_status = 0
 
         # Update stepsize for the next iteration after successful fisher matrix computation
         # Note: this is now obsolete, as we iterate the step size directly instead,
         # but leaving in place in case of future development of the method.
+        #if fisher_status:
+        #    stepsize = np.zeros([len(parameter_names),3])
+        #    for index in range(len(parameter_names)):
+        #        stepsize[index,0] = -(inv_fisher_matrix[index,index])**0.5
+        #        stepsize[index,1] = (inv_fisher_matrix[index,index])**0.5
+        #    # Adjust stepsize in case step exceeds boundary
+        #    stepsize = adjust_fisher_bounds(data,center,stepsize)
+
+        # When inverse Fisher matrix was successfully computed, take
+        # scalings into account and write the matrices in files. The scale
+        # factors are removed in order to store true parameter covariance
         if fisher_status:
-            stepsize = np.zeros([len(parameter_names),3])
-            for index in range(len(parameter_names)):
-                stepsize[index,0] = -(inv_fisher_matrix[index,index])**0.5
-                stepsize[index,1] = (inv_fisher_matrix[index,index])**0.5
-            # Adjust stepsize in case step exceeds boundary
-            stepsize = adjust_fisher_bounds(data,center,stepsize)
+            fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
+            io_mp.write_covariance_matrix(
+                fisher_matrix, parameter_names,
+                os.path.join(command_line.folder, 'fisher.mat'))
 
-        # Take scalings into account and write the matrices in files
-        fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
-        io_mp.write_covariance_matrix(
-            fisher_matrix, parameter_names,
-            os.path.join(command_line.folder, 'fisher'+str(fisher_iteration)+'.mat'))
-
-        inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
-        io_mp.write_covariance_matrix(
-            inv_fisher_matrix, parameter_names,
-            os.path.join(command_line.folder, 'inv_fisher'+str(fisher_iteration)+'.mat'))
-
-    # Removing scale factors in order to store true parameter covariance
-    #inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
-
-    # Write the last inverse Fisher matrix as the new covariance matrix
-    io_mp.write_covariance_matrix(
-        inv_fisher_matrix, parameter_names,
-        os.path.join(command_line.folder, 'covariance_fisher.covmat'))
-
-    # Load the covmat from computed fisher matrix as the new starting covariance matrix
-    # eigv, eigV, matrix = get_covariance_matrix(cosmo, data, command_line)
+            inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
+            io_mp.write_covariance_matrix(
+                inv_fisher_matrix, parameter_names,
+                os.path.join(command_line.folder, 'inv_fisher.mat'))
 
     return inv_fisher_matrix
 
@@ -1529,7 +1495,7 @@ def adjust_fisher_bounds(data, center, step_size):
                 print 'to %f and +%f' %(step_size[index,0],step_size[index,1])
                 boundary_flag = 1
             # Otherwise assumme symmetric likelihood and use positive step
-            elif param[1] > center[elem] + 0.1*step_size[index,0]:
+            elif param[1] >= center[elem] + 0.1*step_size[index,0]:
                 print 'For %s encountered lower boundary %f with center value %f and step_size %f, this is closer to the central value than 0.1*step_size' %(elem,param[1],center[elem],step_size[index,0])
                 boundary_flag = 2
                 if param[2] == None or param[2] > center[elem] + step_size[index,1]:
@@ -1556,7 +1522,7 @@ def adjust_fisher_bounds(data, center, step_size):
                 else:
                     print 'Lower boundary nearer center than the upper boundary, will use previously adjusted step_size %f and %f' %(step_size[index,0],step_size[index,1])
             # Otherwise assumme symmetric likelihood and use negative step
-            elif param[2] < center[elem] + step_size[index,1]:
+            elif param[2] <= center[elem] + step_size[index,1]:
                 print 'For %s encountered upper boundary %f with center value %f and step_size %f, this is closer to the central value than 0.1*step_size' %(elem,param[2],center[elem],step_size[index,1])
                 # Check if the lower bound poses a problem for symmetric step
                 if boundary_flag < 2:

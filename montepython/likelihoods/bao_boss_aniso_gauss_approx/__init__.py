@@ -49,10 +49,10 @@ class bao_boss_aniso_gauss_approx(Likelihood):
                         self.rd_fid_in_Mpc, float(this_line[7]))
 
                     # is the cross correlation coefficient valid
-                    if self.cross_corr[i] < -1.0 or self.cross_corr[i] > 1.0:
-                        raise io_mp.LikelihoodError(
-                            "invalid cross correlation coefficient in entry "
-                            "%d: %f" % (i, self.cross_corr[i]))
+                    #if self.cross_corr[i] < -1.0 or self.cross_corr[i] > 1.0:
+                    #    raise io_mp.LikelihoodError(
+                    #        "invalid cross correlation coefficient in entry "
+                    #        "%d: %f" % (i, self.cross_corr[i]))
 
         # number of data points
         self.num_points = np.shape(self.z)[0]
@@ -80,6 +80,7 @@ class bao_boss_aniso_gauss_approx(Likelihood):
 
             chi2 += ((theo_DA_rdfid_by_rd_in_Mpc - self.DA_rdfid_by_rd_in_Mpc[i]) / self.DA_error[i]) ** 2
             chi2 += ((theo_H_rd_by_rdfid - self.H_rd_by_rdfid_in_km_per_s_per_Mpc[i]) / self.H_error[i]) ** 2
+
             # account for cross correlation
             chi2 -= 2 * self.cross_corr[i] \
                 * (theo_DA_rdfid_by_rd_in_Mpc - self.DA_rdfid_by_rd_in_Mpc[i]) \
