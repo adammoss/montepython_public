@@ -2540,7 +2540,7 @@ class Likelihood_isw(Likelihood):
             else:
                 a=np.where((l<=bins[i])&(l>=bins[i-1]))[0]
             c=np.zeros(len(l))
-            c[a]=1/len(a)
+            c[a]=1./len(a)
             B.append(c)
         l_binned=np.dot(B,l)
         cl_binned=np.dot(B,cl)
