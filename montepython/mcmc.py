@@ -540,25 +540,28 @@ def chain(cosmo, data, command_line):
                     if input_covmat != None:
 			info_command_line.want_covmat = False
 
+                compute_R_minus_one = False
+                if command_line.superupdate:
+                    if not (k+10) % command_line.superupdate:
+                        compute_R_minus_one = True
                 # the +10 below is here to ensure that the first master update will take place before the first slave updates,
                 # but this is a detail, the code is robust against situations where updating is not possible, so +10 could be omitted
-                if not (k+10) % command_line.update and k > 10:
+                if (not (k+10) % command_line.update or compute_R_minus_one) and k > 10:
                     # Try to launch an analyze (computing a new covmat if successful)
                     try:
-                        from analyze import analyze
-                        R_minus_one = analyze(info_command_line)
+                        if not (k+10) % command_line.update:
+                            from analyze import analyze
+                            R_minus_one = analyze(info_command_line)
+                        elif command_line.superupdate:
+                            # Compute (only, i.e. no covmat) R-1 more often when using superupdate
+                            info_command_line = parse(
+                                'info %s --minimal --noplot --keep-fraction 0.5 --keep-non-markovian' % command_line.folder)
+                            info_command_line.update = command_line.update
+                            R_minus_one = analyze(info_command_line)
                     except:
                         if not command_line.silent:
                             print 'Step ',k,' chain ', rank,': Failed to calculate covariance matrix'
-                        pass
-                elif not (k+10) % command_line.update/5 and k > 10 and command_line.superupdate:
-                    # Compute (only, i.e. no covmat) R-1 more often when using superupdate
-                    try:
-                        info_command_line = parse(
-                            'info %s --minimal --noplot --keep-fraction 0.5 --keep-non-markovian' % command_line.folder)
-                        R_minus_one = analyze(info_command_line)
-                    except:
-                        pass
+
                 if command_line.superupdate:
                     # Start of superupdate routine
                     # By B. Schroer and T. Brinckmann
@@ -602,7 +605,7 @@ def chain(cosmo, data, command_line):
                         jump_file.close()
                     # End of main part of superupdate routine
 
-                if not (k-1) % command_line.update/3:
+                if not (k-1) % (command_line.update/3):
                     try:
                         # Read the covmat
                         sigma_eig, U, C = sampler.get_covariance_matrix(
@@ -712,7 +715,7 @@ def chain(cosmo, data, command_line):
                 # End of slave superupdate routine
 
                 # Start of slave update routine
-                if not (k-1) % command_line.update/10:
+                if not (k-1) % (command_line.update/10):
                     try:
                         sigma_eig, U, C = sampler.get_covariance_matrix(
                             cosmo, data, command_line)
