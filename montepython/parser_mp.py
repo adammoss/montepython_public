@@ -418,12 +418,21 @@ def create_parser():
 
             Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
             Adapting jumping factor stops when above criteria is not fulfilled, plus
-            the acceptance rate of (25 +/- 2) percent is achieved, and the jumping factor
+            the acceptance rate of (26 +/- 1) percent is achieved, and the jumping factor
             changed by less than 1 percent compared to the mean of the last superupdate
             times cycle length (N_slow + f_fast * N_fast) steps.
 
+            The target acceptance rate and tolerance for that criterium can be
+            customized with --superupdate-ar and --superupdate-ar-tol.
+
             Note: the covmat saved to the folder is the last updated one.
             Use this covmat for restarting chains (*OPT*).<++>
+        <**>--superupdate-ar<**> : float
+            <++>For use with --superupdate. Target acceptance rate.<++>
+            For customizing superupdate (Default: 0.26) (*OPT*).<++>
+        <**>--superupdate-ar-tol<**> : float
+            <++>For use with --superupdate. Tolerance for target acceptance rate.<++>
+            For customizing superupdate (Default: 0.01) (*OPT*).<++>
         <**>--adaptive<**> : int
             <++>Disabled by default. Method for continuous adaptation of covariance matrix
             and jumping factor. Input: Starting step for adaptive Metropolis Hastings.<++>
@@ -710,6 +719,12 @@ def create_parser():
     # -- update Metropolis Hastings with an adaptive jumping factor (OPTIONAL)
     runparser.add_argument('--superupdate', help=helpdict['superupdate'], type=int,
                            dest='superupdate', default=0)
+    # -- superupdate acceptance rate argument (OPTIONAL)
+    runparser.add_argument('--superupdate-ar', help=helpdict['superupdate-ar'], type=float,
+                           dest='superupdate_ar', default=0.26)
+    # -- superupdate acceptance rate tolerance argument (OPTIONAL)
+    runparser.add_argument('--superupdate-ar-tol', help=helpdict['superupdate-ar-tol'], type=float,
+                           dest='superupdate_ar_tol', default=0.01)
     # -- adaptive jumping factor Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--adaptive', help=helpdict['adaptive'], type=int,
                            dest='adaptive', default=0)

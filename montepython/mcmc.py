@@ -373,8 +373,8 @@ def chain(cosmo, data, command_line):
         command_line.update *= fpm
         previous = (sigma_eig, U, C, Cholesky)
 
-    # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
-    ar = np.zeros(20*fpm)
+    # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+    ar = np.zeros(command_line.superupdate*fpm)
     # Initialise adaptive
     if command_line.adaptive:
         if not command_line.silent:
@@ -413,7 +413,7 @@ def chain(cosmo, data, command_line):
         updated_steps = 0
         stop_c = False
         jumping_factor_rescale = 0
-        c_array = np.zeros(20*fpm) # Allows computation of mean of jumping factor
+        c_array = np.zeros(command_line.superupdate) # Allows computation of mean of jumping factor
         R_minus_one = np.array([100.,100.]) # 100 to make sure max(R-1) value is high if computation failed
         # Make sure update is enabled
         if command_line.update == 0:
@@ -566,7 +566,7 @@ def chain(cosmo, data, command_line):
                     # Start of superupdate routine
                     # By B. Schroer and T. Brinckmann
 
-                    c_array[(k-1)%(20*fpm)] = data.jumping_factor
+                    c_array[(k-1)%(command_line.superupdate)] = data.jumping_factor
                     # Start adapting the jumping factor after command_line.superupdate steps if R-1 < 10
                     # The lower R-1 criterium is an arbitrary choice to keep from updating when the R-1
                     # calculation fails (i.e. returns only zeros).
@@ -574,17 +574,17 @@ def chain(cosmo, data, command_line):
                         c = data.jumping_factor**2/len(parameter_names)
                         # To avoid getting trapped in local minima, the jumping factor should
                         # not go below 0.1 (arbitrary) times the starting jumping factor.
-                        if (c + (np.mean(ar) - 0.26)/(k - updated_steps)) > (0.1*starting_jumping_factor)**2./len(parameter_names):
-                            c += (np.mean(ar) - 0.26)/(k - updated_steps)
+                        if (c + (np.mean(ar) - command_line.superupdate_ar)/(k - updated_steps)) > (0.1*starting_jumping_factor)**2./len(parameter_names):
+                            c += (np.mean(ar) - command_line.superupdate_ar)/(k - updated_steps)
                             data.jumping_factor = np.sqrt(len(parameter_names) * c)
 
                         if not (k-1) % 5:
                             # Check if the jumping factor adaptation should stop.
                             # An acceptance rate of 25% balances the wish for more accepted
                             # points, while ensuring the parameter space is properly sampled.
-                            # The convergence criterium is (26+/-1)%, so the adaptation will stop
-                            # when the code reaches an acceptance rate of at least 25%.
-                            if (max(R_minus_one) < 0.4) and (abs(np.mean(ar) - 0.26) < 0.01) and (abs(np.mean(c_array)/c_array[(k-1) % (20*fpm)] - 1) < 0.01):
+                            # The convergence criterium is by default (26+/-1)%, so the adaptation
+                            # will stop when the code reaches an acceptance rate of at least 25%.
+                            if (max(R_minus_one) < 0.4) and (abs(np.mean(ar) - command_line.superupdate_ar) < command_line.superupdate_ar_tol) and (abs(np.mean(c_array)/c_array[(k-1) % (command_line.superupdate)] - 1) < 0.01):
                                 stop_c = True
                                 data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
                                 if not command_line.silent:
@@ -598,9 +598,9 @@ def chain(cosmo, data, command_line):
                                 jump_file.close()
 
                     # Write the evolution of the jumping factor to a file
-                    if not k % (20*fpm):
+                    if not k % (command_line.superupdate):
                         jump_file = open(command_line.folder + '/jumping_factors.txt','a')
-                        for i in xrange(20*fpm):
+                        for i in xrange(command_line.superupdate):
                             jump_file.write(str(c_array[i])+'\n')
                         jump_file.close()
                     # End of main part of superupdate routine
@@ -752,7 +752,7 @@ def chain(cosmo, data, command_line):
             newloglike = sampler.compute_lkl(cosmo, data)
         else:  # reject step
             rej += 1
-	    ar[k%(20*fpm)] = 0 # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
+	    ar[k%(command_line.superupdate)] = 0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
             N += 1
             k += 1
             continue
@@ -782,11 +782,11 @@ def chain(cosmo, data, command_line):
                 max_loglike = loglike
             acc += 1.0
             N = 1  # Reset the multiplicity
-	    ar[k%(20*fpm)]=1 # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
+	    ar[k%(command_line.superupdate)]=1 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
         else:  # reject step
             rej += 1.0
             N += 1  # Increase multiplicity of last accepted point
-	    ar[k%(20*fpm)]=0 # Local acceptance rate of last 20*(N_slow + f_fast * N_fast) steps
+	    ar[k%(command_line.superupdate)]=0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
 
         # Regularly (option to set in parameter file), close and reopen the
         # buffer to force to write on file.
