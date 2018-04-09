@@ -1,0 +1,12 @@
+# Updated cosmic clocks likelihood with H(z) measurements
+# from Table 4 of Moresco et al. 1601.01701,
+# by T. Brinckmann and S. Vagnozzi.
+
+# Because of an overlap in measurements, this likelihood
+# should not be used with any of the older likelihoods.
+# See Readme for details: <montepython directory>/data/cosmic_clocks/Readme.txt
+
+cosmic_clocks_2016.data_directory = os.path.join(data.path['data'], 'cosmic_clocks')
+cosmic_clocks_2016.data_file = 'Hz_2016.dat'
+
+cosmic_clocks_2016.conflicting_experiments = ['cosmic_clocks_BC03', 'cosmic_clocks_BC03_all', 'cosmic_clocks_MaStro']
