@@ -513,7 +513,7 @@ def create_parser():
             by --fisher-delta, within the tolerance given by --fisher-tol.<++>
         <**>--fisher-delta<**> : float
             <++>Target -deltaloglkl for fisher step iteration<++>.
-            Used by option --fisher (Default: 0.2)<++>
+            Used by option --fisher (Default: 0.1)<++>
         <**>--fisher-tol<**> : float
             <++>Tolerance for -deltaloglkl for fisher step iteration<++>.
             Used by option --fisher (Default: 0.05)<++>
@@ -625,23 +625,23 @@ def create_parser():
             `top`.<++>
         <**>--keep-non-markovian<**> : bool
             <++>Use this flag to keep the non-markovian part of the chains produced
-            at the beginning of runs with --update mode<++>
+            at the beginning of runs with --update mode (default: False)<++>
             This option is only relevant when the chains were produced with --update (*OPT*) (flag)<++>
         <**>--keep-fraction<**> : float
-            <++>after burn-in removal, analyze only last fraction of each chain.<++>
+            <++>after burn-in removal, analyze only last fraction of each chain. (default: 1)<++>
             (between 0 and 1). Normally one would not use this for runs with --update mode,
             unless --keep-non-markovian is switched on (*OPT*)<++>
         <**>--want-covmat<**> : bool
-            <++>calculate the covariant matrix when analyzing the chains.<++>
+            <++>calculate the covariant matrix when analyzing the chains. (default: False)<++>
             Warning: this will interfere with ongoing runs utilizing update mode (*OPT*) (flag)<++>
         <**>--gaussian-smoothing<**> : float
-            <++>width of gaussian smoothing for plotting posteriors<++>,
+            <++>width of gaussian smoothing for plotting posteriors (default: 0.5)<++>,
             in units of bin size, increase for smoother data<++>
         <**>--interpolation-smoothing<**> : float
-            <++>interpolation factor for plotting posteriors<++>,
+            <++>interpolation factor for plotting posteriors (default: 4)<++>,
             1 means no interpolation, increase for smoother curves<++>
         <**>--posterior-smoothing<**> : int
-            <++>smoothing scheme for 1d posteriors<++>,
+            <++>smoothing scheme for 1d posteriors (default: 5)<++>,
             0 means no smoothing, 1 means cubic interpolation, higher means fitting ln(L) with polynomial of order n<++>
         <**>--plot-fisher<**> : None
             <++>Tries to add Fisher ellipses to contour plots<++>,
@@ -743,7 +743,7 @@ def create_parser():
                            dest='fisher_step_it', default=10)
     # -- fisher step iteration argument, -deltaloglkl target (OPTIONAL)
     runparser.add_argument('--fisher-delta', help=helpdict['fisher-delta'], type=float,
-                           dest='fisher_delta', default=0.2)
+                           dest='fisher_delta', default=0.1)
     # -- fisher step iteration argument, -deltaloglkl tolerance (OPTIONAL)
     runparser.add_argument('--fisher-tol', help=helpdict['fisher-tol'], type=float,
                            dest='fisher_tol', default=0.05)
