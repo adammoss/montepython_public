@@ -337,24 +337,6 @@ def convergence(info):
     # put together. This will serve for the plotting.
     info.chain = np.vstack(spam)
 
-    # Use correct Jeffreys prior for constrained parameter space
-    if info.constrained_parameter_name:
-        print '--> Adjusting weights for constrained parameter space'
-        for i in xrange(len(spam)):
-            spam[i][:,0] *= Jprior(info,spam[i])
-        print total[0]
-        # Re-compute mean for each chain (usd for plotting)
-        for j in xrange(len(spam)):
-            total[j+1] = spam[j][:, 0].sum()
-        total[0] = total[1:].sum()
-        print total[0]
-        print mean[0]
-        print '--> Re-computing mean values'
-        compute_mean(mean, spam, total)
-        info.mean = mean[0]
-        print mean[0]
-        info.chain = np.vstack(spam)
-
 def compute_posterior(information_instances):
     """
     computes the marginalized posterior distributions, and optionnally plots
@@ -1998,73 +1980,6 @@ def iscomment(s):
     Define what we call a comment in MontePython chain files
     """
     return s.startswith('#')
-
-
-def Jprior(info,spam):
-    # Following the approach of Hannestad & Tram 1710.08899 compute
-    # the correct Jeffreys prior for a constrained parameter space
-
-    # First compute the covariance matrix
-    info.covar = compute_covariance_matrix(info)
-
-    #### I don't think I need to rescale if I apply before rescaling in spam
-    # Then adjust the scales between stored parameters and the ones used
-    # in mcmc
-    scales = info.scales
-
-    # Compute the inverse matrix, and assert that the computation was
-    # precise enough, by comparing the product to the identity matrix.
-    invscales = np.linalg.inv(scales)
-    np.testing.assert_array_almost_equal(
-        np.dot(scales, invscales), np.eye(np.shape(scales)[0]),
-        decimal=5)
-
-    # Apply the newly computed scales to the input matrix
-    C = np.dot(invscales.T, np.dot(info.covar, invscales))
-    ####
-
-    # Compute Fisher matrix as the inverse of the covariance matrix
-    M = la.inv(C)
-
-    # Loop through parameter names to find interesting parameter:
-    parameter_names = info.ref_names#info.backup_names
-    foundparam = False
-    for index_name, name in enumerate(parameter_names):
-        if name == info.constrained_parameter_name:
-            foundparam=True
-            break
-    if foundparam==False:
-        print 'Did not find parameter'+info.constrained_parameter_name+'!'
-
-    if len(parameter_names)>1:
-        # Construct minor matrix W0 and the "coupling" vector V:
-        def minor(arr, i, j):
-            # ith column, jth row removed
-            return arr[np.array(range(i)+range(i+1, arr.shape[0]))[:,np.newaxis],
-                       np.array(range(j)+range(j+1,arr.shape[1]))]
-        W0 = minor(M,index_name,index_name)
-        U0 = M[index_name,index_name]
-        V = np.delete(M[index_name,:], index_name)
-        W0inv = la.inv(W0)
-        U = U0+np.dot(np.dot(V.T,W0inv),V)
-    else:
-        U = np.squeeze(M)
-
-    x = np.sqrt(0.5*U)*spam[:,index_name]
-    Z = np.exp(-x*x)/(1.+scipy.special.erf(x))
-
-    Jprior_correction = np.sqrt(1.-2./np.pi*(Z*Z+np.sqrt(np.pi)*x*Z))
-    a = 0
-    b = 0
-    for i in Jprior_correction:
-        if not Jprior_correction[i] == 1.:
-            print Jprior_correction[i]
-            a+=1
-        else:
-            b+=1
-    print a,b
-    exit()
-    return Jprior_correction
 
 class Information(object):
     """

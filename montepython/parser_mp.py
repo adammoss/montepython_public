@@ -506,11 +506,6 @@ def create_parser():
             <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
             The inverse Fisher matrix can be used as a proposal distribution covmat,
             or to make plots with Fisher ellipses.<++>
-        <**>--fisher-mode<**> : int
-            <++>Fisher mode: 0 (recommended) <++>,
-            1 (eigenvector rotation), 2 (Cholesky rotation), 3 (2d rotation for
-            off diagonal elements). Modes 1, 2 and 3 are experimental. 
-            Used by option --fisher (Default: 0)<++>
         <**>--fisher-asymmetric<**> : bool
             <++>Use asymmetric steps for Fisher matrix computation<++>,
             used by option --fisher (Default: False). Slows down computation.
@@ -671,11 +666,6 @@ def create_parser():
         <**>--center-fisher<**> : None
             <++>Centers Fisher ellipse on bestfit of last set of chains,<++>,
             instead of the center values of the log.param<++>
-        <**>--constrained-parameter-name<**> : str
-            <++>Use correct Jeffreys prior for a single constrained (bounded) parameter.<++>
-            For a Gaussian posterior distribution at the boundary of parameter space we
-            can a posteriori change the prior, as if we had included this information
-            in the MCMC run. Follows the approach of arXiv:1710.08899.<++>
 
     Returns
     -------
@@ -760,9 +750,6 @@ def create_parser():
     # -- fisher (OPTIONAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
-    # -- fisher mode (EXPERIMENTAL)
-    runparser.add_argument('--fisher-mode', help=helpdict['fisher-mode'], type=int,
-                           dest='fisher_mode', default=0)
     # -- fisher argument (OPTIONAL)
     runparser.add_argument('--fisher-asymmetric', help=helpdict['fisher-asymmetric'],
                            dest='fisher_asymmetric',action='store_true')
@@ -908,10 +895,6 @@ def create_parser():
     # -- calculate the covariant matrix when analyzing the chains
     infoparser.add_argument('--want-covmat', help=helpdict['want-covmat'],
                             dest='want_covmat', action='store_true')
-    # -- use correct Jeffreys prior for a single constrained (bounded) parameter
-    infoparser.add_argument('--constrained-parameter-name',
-                            help=helpdict['constrained-parameter-name'], type=str,
-                            dest='constrained_parameter_name', default=False)
     # -------------------------------------
     # Further customization
     # -- fontsize of plots (defaulting to 16)
