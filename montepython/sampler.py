@@ -489,6 +489,7 @@ def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
     data.fisher_step_it = int(command_line.fisher_step_it)
     data.fisher_delta = command_line.fisher_delta
     data.fisher_tol = command_line.fisher_tol
+    data.fisher_sym_lkl = command_line.fisher_sym_lkl
 
     # Fisher method options (1,2, and 3 are experimental)
     # fisher_mode=3 use covariance matrix in 2-d for off-diagonal elements
@@ -1446,13 +1447,49 @@ def compute_fisher_step(data, cosmo, center, step_matrix, loglike_min, one, two,
 def adjust_fisher_bounds(data, center, step_size):
     # Function used by Fisher matrix method by T. Brinckmann
 
-    # For the Fisher approach we may need to adjust the step size if the step
-    # exceed the bounds on the parameter given in the param file. We Loop through
-    # all parameters, adjusting the step size of any parameter where that step
-    # exceeded the bounds.
+    # For the Fisher approach we may need to adjust the step size
+    # if the step exceed the bounds on the parameter given in the
+    # param file. We Loop through all parameters, adjusting the
+    # step size of any parameter where that step exceeded the bounds.
+
+    # If the distance between the boundary and the center value
+    # is larger than the threshold value (default: 0.1*sigma)
+    # the initial step size is given by the distance between
+    # the center and the boundary.
+
+    # However, if the distance is less than the threshold,
+    # the code will switch to using the symmetric likelihood
+    # assumption and only do likelihood evaluations in one
+    # direction of parameter space (e.g. positive) and mirror
+    # the likelihood value for the other direction. This is
+    # useful for parameters where the best fit of the likelihood
+    # is close to a boundary.
+
+    # This behavior is controlled via --fisher-sym-lkl, which
+    # defines the threshold for when to switch to the symmetric
+    # likelihood assumption.
+
+    # WARNING: causes problems if multiple parameters use the
+    # symmetric likelihood assumption. In this case we need to
+    # switch to a one-sided derivative computation (instead of
+    # two-sided with mirroring), which has not been implemented.
+
     for index, elem in enumerate(data.get_mcmc_parameters(['varying'])):
         param = data.mcmc_parameters[elem]['initial']
         print elem,'with center =',center[elem],', lower bound =',param[1],' and upper bound =',param[2]
+
+        # Non-Gaussian parameters are intrinsically problematic and
+        # may need to be handled separately by the advanced user.
+        # In this case, the resulting Fisher matrix will never be
+        # very accurate, but may still serve as a useful input
+        # covariance matrix for an MCMC run. Some trial and error
+        # will be necessary in order to successfully compute a
+        # positive definite inverse Fisher matrix.
+        # Alternately, consider fixing problematic parameters and
+        # only computing the Fisher matrix for Gaussian parameters.
+        # The inverse Fisher matrix can then be used for MCMC runs
+        # along with best guess sigma values from the param file
+
         #if elem == 'xi_sz_cib':
         #    step_size[index,2] = param[2] - center[elem]#step_size[index,1]
         #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to +%f' %(elem,step_size[index,2])
@@ -1481,13 +1518,14 @@ def adjust_fisher_bounds(data, center, step_size):
         #    step_size[index,2] = step_size[index,1]
         #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
         #    continue
+
         boundary_flag = 0
         if param[1] != None:
             if param[1] > center[elem]:
                 raise io_mp.ConfigurationError("Error in parameter ranges: left edge %e bigger than central value %e for %s.\n"
                                                %(param[1],center[elem],elem))
             # When encountering a boundary, set stepsize to boundary limit if reasonable
-            if center[elem] + 0.1*step_size[index,0] > param[1] > center[elem] + step_size[index,0]:
+            if center[elem] + data.fisher_sym_lkl*step_size[index,0] > param[1] > center[elem] + step_size[index,0]:
                 print 'For %s encountered lower boundary %f with center value %f, changing stepsize from %f and +%f' %(elem,param[1],center[elem],step_size[index,0],step_size[index,1])
                 step_size[index,0] = -(center[elem] - param[1])
                 if data.use_symmetric_step:
@@ -1495,8 +1533,8 @@ def adjust_fisher_bounds(data, center, step_size):
                 print 'to %f and +%f' %(step_size[index,0],step_size[index,1])
                 boundary_flag = 1
             # Otherwise assumme symmetric likelihood and use positive step
-            elif param[1] >= center[elem] + 0.1*step_size[index,0]:
-                print 'For %s encountered lower boundary %f with center value %f and step_size %f, this is closer to the central value than 0.1*step_size' %(elem,param[1],center[elem],step_size[index,0])
+            elif param[1] >= center[elem] + data.fisher_sym_lkl*step_size[index,0]:
+                print 'For %s encountered lower boundary %f with center value %f and step_size %f, this is closer to the central value than %f*step_size' %(elem,param[1],center[elem],step_size[index,0],data.fisher_sym_lkl)
                 boundary_flag = 2
                 if param[2] == None or param[2] > center[elem] + step_size[index,1]:
                     print 'Upper boundary not a problem, so assuming symmetry and only computing the positive step'
@@ -1510,7 +1548,7 @@ def adjust_fisher_bounds(data, center, step_size):
                 raise io_mp.ConfigurationError("Error in parameter ranges: right edge %e smaller than central value %e for %s.\n"
                                                %(param[2],center[elem],elem))
             # When encountering a boundary, set stepsize to boundary limit if reasonable.
-            if center[elem] + 0.1*step_size[index,1] < param[2] < center[elem] + step_size[index,1] and boundary_flag < 2:
+            if center[elem] + data.fisher_sym_lkl*step_size[index,1] < param[2] < center[elem] + step_size[index,1] and boundary_flag < 2:
                 print 'For %s encountered upper boundary %f with center value %f, changing stepsize from %f and +%f' %(elem,param[2],center[elem],step_size[index,0],step_size[index,1])
                 # If both boundaries are smaller than the stepsize, set stepsize to the
                 # smaller of the two.
@@ -1523,7 +1561,7 @@ def adjust_fisher_bounds(data, center, step_size):
                     print 'Lower boundary nearer center than the upper boundary, will use previously adjusted step_size %f and %f' %(step_size[index,0],step_size[index,1])
             # Otherwise assumme symmetric likelihood and use negative step
             elif param[2] <= center[elem] + step_size[index,1]:
-                print 'For %s encountered upper boundary %f with center value %f and step_size %f, this is closer to the central value than 0.1*step_size' %(elem,param[2],center[elem],step_size[index,1])
+                print 'For %s encountered upper boundary %f with center value %f and step_size %f, this is closer to the central value than %f*step_size' %(elem,param[2],center[elem],step_size[index,1],data.fisher_sym_lkl)
                 # Check if the lower bound poses a problem for symmetric step
                 if boundary_flag < 2:
                     step_size[index,2] = step_size[index,0]

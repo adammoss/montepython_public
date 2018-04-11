@@ -526,6 +526,19 @@ def create_parser():
         <**>--fisher-tol<**> : float
             <++>Tolerance for -deltaloglkl for fisher step iteration<++>.
             Used by option --fisher (Default: 0.05)<++>
+        <**>--fisher-sym-lkl<**> : float
+            <++>Threshold for when to assume a symmetric likelihood<++>.
+            Used by option --fisher (Default: 0.1). Sets the threshold
+            (in units of sigma) for when to switch to the symmetric
+            likelihood assumption, i.e. do likelihood evaluations in
+            one direction of parameter space (e.g. positive) and mirror
+            the value for the other direction. Useful for parameters
+            where the best fit of the likelihood is close to a boundary.
+
+            WARNING: causes problems if multiple parameters use the
+            symmetric likelihood assumption. In this case we need to
+            switch to a one-sided derivative computation (instead of
+            two-sided with mirroring), which has not been implemented.<++>
         <**>--silent<**> : None
             <++>silence the standard output<++> (useful when running on
             clusters)<++>
@@ -762,6 +775,9 @@ def create_parser():
     # -- fisher step iteration argument, -deltaloglkl tolerance (OPTIONAL)
     runparser.add_argument('--fisher-tol', help=helpdict['fisher-tol'], type=float,
                            dest='fisher_tol', default=0.05)
+    # -- fisher symmetric likelihood assumption threshold (OPTIONAL)
+    runparser.add_argument('--fisher-sym-lkl', help=helpdict['fisher-sym-lkl'], type=float,
+                           dest='fisher_sym_lkl', default=0.1)
     # -- configuration file (OPTIONAL)
     runparser.add_argument('--conf', help=helpdict['conf'],
                            type=str, dest='config_file',
