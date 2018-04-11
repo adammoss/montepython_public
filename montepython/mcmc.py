@@ -165,54 +165,6 @@ def get_new_position(data, eigv, U, k, Cholesky, Rotation):
                 vector_new[i] > value[2]):
             flag += 1  # same
 
-    # SZ angular power spectrum by B. Boillet
-    # Here we implement the rejection criterion: at each multipole,
-    # we compute A_FG(ell), the total amplitude of the foregrounds (CIB+IR+RS+CN).
-    # if A_FG(ell) is larger than (C_ell^(y2+fg)-ymap_clusters)(ell) the flag is
-    # incremented and the function return False to sample a
-    # new point in the parameter space.
-    if 'Planck_SZ_spectrum' in data.experiments:
-        #collect the amplitude of the foregrounds
-        #uncomment if no-nuisance
-        A_cib = 0.
-        A_rs = 0.
-        A_ir = 0.
-        for i, elem in enumerate(parameter_names):
-            #print elem
-            #print vector_new[i]
-            if (elem == 'A_CIB'):
-                A_cib = vector_new[i]
-            elif (elem == 'A_RS'):
-                A_rs = vector_new[i]
-            elif (elem == 'A_IR'):
-                A_ir = vector_new[i]
-        A_cn = 0.9033
-    
-        #path to data file
-        datafile = os.path.join(data.path['data'],'Planck_SZ_spectrum/ymap_diff.txt')
-        #read the datafile
-        MAX = np.array([], 'float64')
-        CIB = np.array([], 'float64')
-        RS = np.array([], 'float64')
-        IR = np.array([], 'float64')
-        CN = np.array([], 'float64')
-
-        for line in open(datafile, 'r'):
-            if (line.find('#') == -1):
-                MAX = np.append(MAX, float(line.split()[1]))
-                CIB = np.append(CIB, float(line.split()[2]))
-                RS = np.append(RS, float(line.split()[3]))
-                IR = np.append(IR, float(line.split()[4]))
-                CN = np.append(CN, float(line.split()[5]))
-        #collect number of multipole bins
-        number_of_bins = len(MAX)
-        #loop over multipole bin:
-        for ell in range(number_of_bins):
-            # Reject points where foreground are too large, see Boris et al. 1712.00788
-            if (MAX[ell]<(A_cib*CIB[ell]+A_ir*IR[ell]+A_rs*RS[ell]+A_cn*CN[ell])):
-                flag += 1
-                break
-
     # At this point, if a boundary condition is not fullfilled, ie, if flag is
     # different from zero, return False
     if flag != 0:
@@ -628,6 +580,7 @@ def chain(cosmo, data, command_line):
                                             'If no starting covmat is desired, please delete previous covmat.'
                                             % command_line.cov)
                             else:
+                                # Start of second part of superupdate routine
 				if command_line.superupdate:
                                     # Adaptation of jumping factor should start again after the covmat is updated
                                     # Save the step number after it updated for superupdate and start adaption of c again
@@ -648,6 +601,7 @@ def chain(cosmo, data, command_line):
                                     else:
                                         data.jumping_factor = starting_jumping_factor
                                     jumping_factor_rescale += 1
+                                # End of second part of superupdate routine
 
                                 # Write to chains file when the covmat was updated
                                 data.out.write('# After %d accepted steps: update proposal with max(R-1) = %f and jumping factor = %f \n' % (int(acc), max(R_minus_one), data.jumping_factor))
@@ -677,12 +631,6 @@ def chain(cosmo, data, command_line):
 			# Set the mean for the recursion formula to the last accepted point
                         for elem in parameter_names:
                             mean[parameter_names.index(elem)] = data.mcmc_parameters[elem]['last_accepted']
-
-                        # Save the jumping factor to file
-                        # For a possible MPI implementation
-                        #jump_file = open(command_line.folder + '/jumping_factor.txt','w')
-                        #jump_file.write(str(data.jumping_factor))
-                        #jump_file.close()
                     # End of second part of adaptive routine
 
             # slave chain behavior
