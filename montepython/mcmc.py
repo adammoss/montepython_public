@@ -271,7 +271,9 @@ def chain(cosmo, data, command_line):
         minimum = 0
         if command_line.minimize:
             minimum = sampler.get_minimum(cosmo, data, command_line, C)
-            #TODO use minimum instead of bestfit
+            parameter_names = data.get_mcmc_parameters(['last_accepted'])
+            for index,elem in parameter_names:
+                data.mcmc_parameters[elem]['last_accepted'] = minimum[index]
 
         # if we want to compute Fisher matrix and then stop
         if command_line.fisher:
@@ -357,6 +359,9 @@ def chain(cosmo, data, command_line):
     if command_line.superupdate:
         if not rank and not command_line.silent:
             print 'Superupdate routine is enabled with value %d (recommended: 20)' % command_line.superupdate
+            if command_line.superupdate < 20:
+                warnings.warn('Superupdate value lower than the recommended value. This '
+                              'may increase the risk of poorly converged acceptance rate')
             print 'This number is rescaled by cycle length %d (N_slow + f_fast * N_fast) to %d' % (fpm,fpm*command_line.superupdate)
         # Rescale superupdate number by cycle length N_slow + f_fast * N_fast to account for fast parameters
         command_line.superupdate *= fpm
@@ -380,7 +385,7 @@ def chain(cosmo, data, command_line):
 
     # If restart from best fit file, read first point (overwrite settings of
     # read_args_from_chain)
-    if command_line.bf is not None:
+    if command_line.bf is not None and not command_line.minimize:
         sampler.read_args_from_bestfit(data, command_line.bf)
 
     # Pick a position (from last accepted point if restart, from the mean value
