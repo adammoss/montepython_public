@@ -1,0 +1,13 @@
+# Angular BAO likelihood
+# by Rodrigo von Martens
+
+# The data was obtained using a model-independent approach to measure
+# just the transversal BAO mode through the BAO signal position in the
+# 2PACF (arXiv:1006.3226).
+# Uses data from SDSS DR7 and BOSS DR10, DR11 and DR12Q:
+# Carvalho et al. 1507.08972, Alcaniz et al. 1611.08458,
+# de Carvalho et al. 1709.00113 and Carvalho et al. 1709.00271
+
+bao_angular.data_directory   = data.path['data']
+bao_angular.file             = 'bao_angular.txt'
+bao_angular.exclude          = []
