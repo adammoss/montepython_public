@@ -328,17 +328,25 @@ def chain(cosmo, data, command_line):
         previous = (sigma_eig, U, C, Cholesky)
 
     # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
-    ar = np.zeros(command_line.superupdate*fpm)
+
     # Initialise adaptive
     if command_line.adaptive:
         if not command_line.silent:
             print 'Adaptive routine is enabled with value %d (recommended: 10*dimension)' % command_line.adaptive
             print 'and adaptive_ts = %d (recommended: 100*dimension)' % command_line.adaptive_ts
-            print 'Please note: current implementation not suitable for MPI'
+            print 'Please note: current implementation not suitable for multiple chains'
+        if rank > 0:
+            raise io_mp.ConfigurationError('Adaptive routine not compatible with MPI')
+        if command_line.update:
+            warnings.warn('Adaptive routine not compatible with update, overwriting input update value')
+        if command_line.superupdate:
+            warnings.warn('Adaptive routine not compatible with superupdate, deactivating superupdate')
+            command_line.superupdate = 0
         # Define needed parameters
         parameter_names = data.get_mcmc_parameters(['varying'])
         mean = np.zeros(len(parameter_names))
         last_accepted = np.zeros(len(parameter_names),'float64')
+        ar = np.zeros(100)
         if command_line.cov == None:
             # If no input covmat was given, the starting jumping factor
             # should be very small until a covmat is obtained and the
@@ -372,6 +380,7 @@ def chain(cosmo, data, command_line):
         jumping_factor_rescale = 0
         c_array = np.zeros(command_line.superupdate) # Allows computation of mean of jumping factor
         R_minus_one = np.array([100.,100.]) # 100 to make sure max(R-1) value is high if computation failed
+        ar = np.zeros(command_line.superupdate*fpm)
         # Make sure update is enabled
         if command_line.update == 0:
             if not rank and not command_line.silent:
@@ -707,6 +716,8 @@ def chain(cosmo, data, command_line):
             rej += 1
             if command_line.superupdate:
 	        ar[k%(command_line.superupdate)] = 0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+            elif command_line.adaptive:
+                ar[k%100] = 0 # Local acceptance rate of last 100 steps
             N += 1
             k += 1
             continue
@@ -738,11 +749,15 @@ def chain(cosmo, data, command_line):
             N = 1  # Reset the multiplicity
             if command_line.superupdate:
 	        ar[k%(command_line.superupdate)]=1 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+            elif command_line.adaptive:
+                ar[k%100] = 0 # Local acceptance rate of last 100 steps
         else:  # reject step
             rej += 1.0
             N += 1  # Increase multiplicity of last accepted point
             if command_line.superupdate:
 	        ar[k%(command_line.superupdate)]=0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+            elif command_line.adaptive:
+                ar[k%100] = 0 # Local acceptance rate of last 100 steps
 
         # Regularly (option to set in parameter file), close and reopen the
         # buffer to force to write on file.
