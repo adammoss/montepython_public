@@ -1,28 +1,28 @@
 #!/usr/bin/env python
 # encoding: UTF8
 #
-#######################################################################
-# likelihood for the KiDS-450 WL power spectrum (quadratic estimator) #
-#######################################################################
+########################################################################
+# likelihood for the KiDS-450 WL power spectrum (quadratic estimator)  #
+########################################################################
 #
 # Developed by F. Koehlinger based on and by largely adapting
 # Benjamin Audren's Monte Python likelihood euclid_lensing
 #
-# To be used with data from F. Koehlinger et al. 2017 (MNRAS;
+# To be used with data from F. Koehlinger et al. 2017 (MNRAS, 471, 4412;
 # arXiv:1706.02892) which can be downloaded from:
 #
 # http://kids.strw.leidenuniv.nl/sciencedata.php
 #
-#######################################################################
+########################################################################
 
 from montepython.likelihood_class import Likelihood
+import io_mp
+import parser_mp
 import os
 import numpy as np
 import scipy.interpolate as itp
 from scipy.linalg import cholesky, solve_triangular
 import time
-import io_mp
-import parser_mp
 
 class kids450_qe_likelihood_public(Likelihood):
 
@@ -30,10 +30,6 @@ class kids450_qe_likelihood_public(Likelihood):
         # I should already take care of using only GRF mocks or data here (because of different folder-structures etc...)
         # or for now just write it for GRFs for tests and worry about it later...
         Likelihood.__init__(self, path, data, command_line)
-
-        # TODO: this is also CFHTLenS legacy...
-        # only relevant for GRFs!
-        #dict_BWM = {'W1': 'G10_', 'W2': 'G126_', 'W3': 'G162_', 'W4': 'G84_'}
 
         # Check if the data can be found
         try:
@@ -46,6 +42,10 @@ class kids450_qe_likelihood_public(Likelihood):
                                            'kids450_qe_likelihood_public.data_directory in '
                                            'the .data file. See README in likelihood folder '
                                            'for further instructions.')
+
+        # TODO: this is also CFHTLenS legacy...
+        # only relevant for GRFs!
+        #dict_BWM = {'W1': 'G10_', 'W2': 'G126_', 'W3': 'G162_', 'W4': 'G84_'}
 
         self.need_cosmo_arguments(data, {'output':'mPk'})
 
@@ -166,38 +166,80 @@ class kids450_qe_likelihood_public(Likelihood):
         self.band_offset_EE = len(extracted_band_powers_EE)
         self.band_offset_BB = len(extracted_band_powers_BB)
 
-        # load all the p_z data here and only once per loop-iteration
-        self.pz = np.zeros((self.nzmax, self.nzbins), 'float64')
-        self.pz_norm = np.zeros(self.nzbins, 'float64')
-
+        # Check if any of the n(z) needs to be shifted in loglkl by D_z{1...n}:
+        self.shift_n_z_by_D_z = np.zeros(self.nzbins, 'bool')
         for zbin in xrange(self.nzbins):
+            param_name = 'D_z{:}'.format(zbin + 1)
+            if param_name in data.mcmc_parameters:
+                self.shift_n_z_by_D_z[zbin] = True
 
+        # Read fiducial dn_dz from window files:
+        # TODO: the hardcoded z_min and z_max correspond to the lower and upper
+        # endpoints of the shifted left-border histogram!
+        z_samples = []
+        hist_samples = []
+        for zbin in xrange(self.nzbins):
             redshift_bin = self.redshift_bins[zbin]
-            fname = os.path.join(self.data_directory, '{:}/n_z_avg_{:}.hist'.format(self.photoz_method, redshift_bin))
-            # z-range is always the same!
-            # Modified to new n(z) histogram input so that integration is consistent!!!
-            z_hist, n_z_hist = np.loadtxt(fname, unpack=True)
-            #spline_pz = itp.splrep(z_sample, pz_sample)
-            # this has to go into loglkl-function in order to implement photo-z bias!
-            # TODO: I can't just define a global self.redshifts...
-            shift_to_midpoint = np.diff(z_hist)[0] / 2.
-            # ATTENTION: I assume that all photo-z have the same z_min, z_max!!!
-            # ATTENTION: integrations should be performed over midpoints of histogram, hence we shift it here!
-            # also: z[0] != 0 now!
-            self.redshifts = z_hist + shift_to_midpoint
-            self.pz[:, zbin] = n_z_hist  #itp.splev(self.redshifts, spline_pz) #p_z_intp(self.z)
+            window_file_path = os.path.join(
+                self.data_directory, '{:}/n_z_avg_{:}.hist'.format(self.photoz_method, redshift_bin))
+            if os.path.exists(window_file_path):
+                zptemp, hist_pz = np.loadtxt(window_file_path, usecols=[0, 1], unpack=True)
+                shift_to_midpoint = np.diff(zptemp)[0] / 2.
+                if zbin > 0:
+                    zpcheck = zptemp
+                    if np.sum((zptemp - zpcheck)**2) > 1e-6:
+                        raise io_mp.LikelihoodError('The redshift values for the window files at different bins do not match.')
+                print 'Loaded n(zbin{:}) from: \n'.format(zbin + 1), window_file_path
+                # we add a zero as first element because we want to integrate down to z = 0!
+                z_samples += [np.concatenate((np.zeros(1), zptemp + shift_to_midpoint))]
+                hist_samples += [np.concatenate((np.zeros(1), hist_pz))]
+            else:
+                raise io_mp.LikelihoodError("File not found:\n %s"%window_file_path)
 
-            # integrate p(z) over z (in view of normalizing it to one)
-            dz = self.redshifts[1:] - self.redshifts[:-1]
-            self.pz_norm[zbin] = np.sum(0.5 * (self.pz[1:, zbin] + self.pz[:-1, zbin]) * dz)
+        z_samples = np.asarray(z_samples)
+        hist_samples = np.asarray(hist_samples)
+
+        # prevent undersampling of histograms!
+        if self.nzmax < len(zptemp):
+            print "You're trying to integrate at lower resolution than supplied by the n(z) histograms. \n Increase nzmax! Aborting now..."
+            exit()
+        # if that's the case, we want to integrate at histogram resolution and need to account for
+        # the extra zero entry added
+        elif self.nzmax == len(zptemp):
+            self.nzmax = z_samples.shape[1]
+            # requires that z-spacing is always the same for all bins...
+            self.redshifts = z_samples[0, :]
+            print 'Integrations performed at resolution of histogram!'
+        # if we interpolate anyway at arbitrary resolution the extra 0 doesn't matter
+        else:
+            self.nzmax += 1
+            self.redshifts = np.linspace(z_samples.min(), z_samples.max(), self.nzmax)
+            print 'Integration performed at set nzmax resolution!'
+
+        self.pz = np.zeros((self.nzmax, self.nzbins))
+        self.pz_norm = np.zeros(self.nzbins, 'float64')
+        for zbin in xrange(self.nzbins):
+                # we assume that the histograms loaded are given as left-border histograms
+                # and that the z-spacing is the same for each histogram
+                spline_pz = itp.splrep(z_samples[zbin, :], hist_samples[zbin, :])
+
+                #z_mod = self.z_p
+                mask_min = self.redshifts >= z_samples[zbin, :].min()
+                mask_max = self.redshifts <= z_samples[zbin, :].max()
+                mask = mask_min & mask_max
+                # points outside the z-range of the histograms are set to 0!
+                self.pz[mask, zbin] = itp.splev(self.redshifts[mask], spline_pz)
+                # Normalize selection functions
+                dz = self.redshifts[1:] - self.redshifts[:-1]
+                self.pz_norm[zbin] = np.sum(0.5 * (self.pz[1:, zbin] + self.pz[:-1, zbin]) * dz)
 
         self.z_max = self.redshifts.max()
 
         # k_max is arbitrary at the moment, since cosmology module is not calculated yet...TODO
         if self.mode == 'halofit':
-            self.need_cosmo_arguments(data, {'z_max_pk': self.z_max, 'output': 'mPk', 'non linear': self.mode, 'P_k_max_1/Mpc': self.k_max})
+            self.need_cosmo_arguments(data, {'z_max_pk': self.z_max, 'output': 'mPk', 'non linear': self.mode, 'P_k_max_h/Mpc': self.k_max_h_by_Mpc})
         else:
-            self.need_cosmo_arguments(data, {'z_max_pk': self.z_max, 'output': 'mPk', 'P_k_max_1/Mpc': self.k_max})
+            self.need_cosmo_arguments(data, {'z_max_pk': self.z_max, 'output': 'mPk', 'P_k_max_h/Mpc': self.k_max_h_by_Mpc})
 
         print 'Time for loading all data files:', time.time() - start_load
 
@@ -370,24 +412,25 @@ class kids450_qe_likelihood_public(Likelihood):
         # Get power spectrum P(k=l/r,z(r)) from cosmological module
         # this doesn't really have to go into the loop over fields!
         pk = np.zeros((self.nellsmax, self.nzmax),'float64')
+        k_max_in_inv_Mpc = self.k_max_h_by_Mpc * self.small_h
         for index_ells in xrange(self.nellsmax):
-            for index_z in xrange(self.nzmax):
+            for index_z in xrange(1, self.nzmax):
                 # standard Limber approximation:
                 #k = ells[index_ells] / r[index_z]
                 # extended Limber approximation (cf. LoVerde & Afshordi 2008):
-                k = (ells[index_ells] + 0.5) / r[index_z]
-                if k > self.k_max:
+                k_in_inv_Mpc = (ells[index_ells] + 0.5) / r[index_z]
+                if k_in_inv_Mpc > k_max_in_inv_Mpc:
                     pk_dm = 0.
                 else:
-                    pk_dm = cosmo.pk(k, self.redshifts[index_z])
+                    pk_dm = cosmo.pk(k_in_inv_Mpc, self.redshifts[index_z])
                 #pk[index_ells,index_z] = cosmo.pk(ells[index_ells]/r[index_z], self.redshifts[index_z])
                 if self.baryon_feedback:
                     if 'A_bary' in data.mcmc_parameters:
                         A_bary = data.mcmc_parameters['A_bary']['current'] * data.mcmc_parameters['A_bary']['scale']
                         #print 'A_bary={:.4f}'.format(A_bary)
-                        pk[index_ells, index_z] = pk_dm * self.baryon_feedback_bias_sqr(k, self.redshifts[index_z], A_bary=A_bary)
+                        pk[index_ells, index_z] = pk_dm * self.baryon_feedback_bias_sqr(k_in_inv_Mpc / self.small_h, self.redshifts[index_z], A_bary=A_bary)
                     else:
-                        pk[index_ells, index_z] = pk_dm * self.baryon_feedback_bias_sqr(k, self.redshifts[index_z])
+                        pk[index_ells, index_z] = pk_dm * self.baryon_feedback_bias_sqr(k_in_inv_Mpc / self.small_h, self.redshifts[index_z])
                 else:
                     pk[index_ells, index_z] = pk_dm
 
@@ -398,7 +441,6 @@ class kids450_qe_likelihood_public(Likelihood):
             #print 'Bootstrap index:', random_index_bootstrap
             pz = np.zeros((self.nzmax, self.nzbins), 'float64')
             pz_norm = np.zeros(self.nzbins, 'float64')
-            dz = self.redshifts[1:] - self.redshifts[:-1]
             for zbin in xrange(self.nzbins):
 
                 redshift_bin = self.redshift_bins[zbin]
@@ -406,10 +448,54 @@ class kids450_qe_likelihood_public(Likelihood):
                 #index can be recycled since bootstraps for tomographic bins are independent!
                 fname = os.path.join(self.data_directory, '{:}/bootstraps/{:}/n_z_avg_bootstrap{:}.hist'.format(self.photoz_method, redshift_bin, random_index_bootstrap))
                 z_hist, n_z_hist = np.loadtxt(fname, unpack=True)
-                pz[:, zbin] = n_z_hist
+
+                param_name = 'D_z{:}'.format(zbin + 1)
+                if param_name in data.mcmc_parameters:
+                    z_mod = self.redshifts + data.mcmc_parameters[param_name]['current'] * data.mcmc_parameters[param_name]['scale']
+                else:
+                    z_mod = self.redshifts
+
+                shift_to_midpoint = np.diff(z_hist)[0] / 2.
+                spline_pz = itp.splrep(z_hist + shift_to_midpoint, n_z_hist)
+                mask_min = z_mod >= z_hist.min() + shift_to_midpoint
+                mask_max = z_mod <= z_hist.max() + shift_to_midpoint
+                mask = mask_min & mask_max
+                # points outside the z-range of the histograms are set to 0!
+                pz[mask, zbin] = itp.splev(z_mod[mask], spline_pz)
+
+                dz = self.redshifts[1:] - self.redshifts[:-1]
                 pz_norm[zbin] = np.sum(0.5 * (pz[1:, zbin] + pz[:-1, zbin]) * dz)
 
             pr = pz * (dzdr[:, np.newaxis] / pz_norm)
+
+        elif (not self.bootstrap_photoz_errors) and (self.shift_n_z_by_D_z.any()):
+
+            pz = np.zeros((self.nzmax, self.nzbins), 'float64')
+            pz_norm = np.zeros(self.nzbins, 'float64')
+            for zbin in xrange(self.nzbins):
+
+                param_name = 'D_z{:}'.format(zbin + 1)
+                if param_name in data.mcmc_parameters:
+                    z_mod = self.redshifts + data.mcmc_parameters[param_name]['current'] * data.mcmc_parameters[param_name]['scale']
+                else:
+                    z_mod = self.redshifts
+                # Load n(z) again:
+                redshift_bin = self.redshift_bins[zbin]
+                fname = os.path.join(self.data_directory, '{:}/n_z_avg_{:}.hist'.format(self.photoz_method, redshift_bin))
+                z_hist, n_z_hist = np.loadtxt(fname, usecols=(0, 1), unpack=True)
+                shift_to_midpoint = np.diff(z_hist)[0] / 2.
+                spline_pz = itp.splrep(z_hist + shift_to_midpoint, n_z_hist)
+                mask_min = z_mod >= z_hist.min() + shift_to_midpoint
+                mask_max = z_mod <= z_hist.max() + shift_to_midpoint
+                mask = mask_min & mask_max
+                # points outside the z-range of the histograms are set to 0!
+                pz[mask, zbin] = itp.splev(z_mod[mask], spline_pz)
+                # Normalize selection functions
+                dz = self.redshifts[1:] - self.redshifts[:-1]
+                pz_norm[zbin] = np.sum(0.5 * (pz[1:, zbin] + pz[:-1, zbin]) * dz)
+
+            pr = pz * (dzdr[:, np.newaxis] / pz_norm)
+
         else:
             pr = self.pz * (dzdr[:, np.newaxis] / self.pz_norm)
 
@@ -418,8 +504,8 @@ class kids450_qe_likelihood_public(Likelihood):
         g = np.zeros((self.nzmax, self.nzbins), 'float64')
         for zbin in xrange(self.nzbins):
             # assumes that z[0] = 0
-            #for nr in xrange(1, self.nzmax - 1):
-            for nr in xrange(self.nzmax - 1):
+            for nr in xrange(1, self.nzmax - 1):
+            #for nr in xrange(self.nzmax - 1):
                 fun = pr[nr:, zbin] * (r[nr:] - r[nr]) / r[nr:]
                 g[nr, zbin] = np.sum(0.5 * (fun[1:] + fun[:-1]) * (r[nr + 1:] - r[nr:-1]))
                 g[nr, zbin] *= 2. * r[nr] * (1. + self.redshifts[nr])
@@ -442,14 +528,14 @@ class kids450_qe_likelihood_public(Likelihood):
             # find Cl_integrand = (g(r) / r)**2 * P(l/r,z(r))
             for zbin1 in xrange(self.nzbins):
                 for zbin2 in xrange(zbin1 + 1): #self.nzbins):
-                    Cl_GG_integrand[:, zbin1, zbin2] = g[:, zbin1] * g[:, zbin2] / r**2 * pk[index_ell, :]
+                    Cl_GG_integrand[1:, zbin1, zbin2] = g[1:, zbin1] * g[1:, zbin2] / r[1:]**2 * pk[index_ell, 1:]
 
                     if intrinsic_alignment:
-                        factor_IA = self.get_factor_IA(self.redshifts[:], linear_growth_rate[:], amp_IA, exp_IA) #/ self.dzdr[1:]
+                        factor_IA = self.get_factor_IA(self.redshifts[1:], linear_growth_rate[1:], amp_IA, exp_IA) #/ self.dzdr[1:]
                         #print F_of_x
                         #print self.eta_r[1:, zbin1].shape
-                        Cl_II_integrand[:, zbin1, zbin2] = pr[:, zbin1] * pr[:, zbin2] * factor_IA**2 / r**2 * pk[index_ell, :]
-                        Cl_GI_integrand[:, zbin1, zbin2] = (g[:, zbin1] * pr[:, zbin2] + g[:, zbin2] * pr[:, zbin1]) * factor_IA / r**2 * pk[index_ell, :]
+                        Cl_II_integrand[1:, zbin1, zbin2] = pr[1:, zbin1] * pr[1:, zbin2] * factor_IA**2 / r[1:]**2 * pk[index_ell, 1:]
+                        Cl_GI_integrand[1:, zbin1, zbin2] = (g[1:, zbin1] * pr[1:, zbin2] + g[1:, zbin2] * pr[1:, zbin1]) * factor_IA / r[1:]**2 * pk[index_ell, 1:]
 
             # Integrate over r to get C_l^shear_ij = P_ij(l)
             # C_l^shear_ii = 9/4 Omega0_m^2 H_0^4 \sum_0^rmax dr (g_i(r) g_j(r) /r**2) P(k=l/r,z(r))

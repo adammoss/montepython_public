@@ -1,7 +1,7 @@
 #######################################################################
 # Data and precision parameters for the KiDS-450 shear power spectrum #
 # likelihood for data measured with a quadratic estimator as given in #
-# Koehlinger et al. 2017 (MNRAS; arXiv:1706.02892)                    #
+# Koehlinger et al. 2017 (MNRAS, 471, 4412; arXiv:1706.02892)         #
 # Data available at: http://kids.strw.leidenuniv.nl/sciencedata.php   #
 #######################################################################
 
@@ -12,31 +12,33 @@
 # set to "True" if you want to correct for the resetting bias:
 # default: "True"
 kids450_qe_likelihood_public.correct_resetting_bias = True
-                                          
+
 # choose photo-z calibration method:
 default: 'Nz_DIR'
 kids450_qe_likelihood_public.photoz_method = 'Nz_DIR'
 
 # set flag if you want to marginalize over bootstrap errors of n(z)
-# default: True 
+# default: True
 # but: large impact on runtime less though on errorbars
 kids450_qe_likelihood_public.bootstrap_photoz_errors = True
 
-# if above flag is set to True, then specify lowest and highest index of bootstrap realizations 
+# if above flag is set to True, then specify lowest and highest index of bootstrap realizations
 # from which one bootstrap is drawn randomly per evaluation step
 # default: *_low = 0 and * _high = 999
 kids450_qe_likelihood_public.index_bootstrap_low = 0
 kids450_qe_likelihood_public.index_bootstrap_high = 999
 
-# k_max in 1/Mpc (i.e. l_max/D_M(z_min):
-# default: k_max = 40 1/Mpc  
-kids450_qe_likelihood_public.k_max = 40.
+# k_max in h/Mpc (i.e. l_max/D_M(z_min):
+# NOTE: in original analysis this was set to k_max = 40. /Mpc (no small h)
+# default: k_max_h_by_Mpc = 50 h/Mpc
+kids450_qe_likelihood_public.k_max_h_by_Mpc = 50.
 
-# this is now exactly the number of entries in the n(z)-file (.hist):
-# default: 72
+# the number of nodes for the spline-interpolation of the n(z) histograms:
+# (this also sets the resolution for all redshift integrations)
+# default: integrate at histogram resolution and set nzmax = 72
 kids450_qe_likelihood_public.nzmax = 72
 
-# number of ell values used to compute nodes for theoretical C_l: 
+# number of ell values used to compute nodes for theoretical C_l:
 # default: 39 (following the "euclid_lensing" likelihood)
 kids450_qe_likelihood_public.nellsmax = 39
 
@@ -58,6 +60,10 @@ kids450_qe_likelihood_public.zbin_max = [0.30, 0.60, 0.90]
 kids450_qe_likelihood_public.bands_EE_to_use = [0, 1, 1, 1, 1, 0, 0]
 # B-modes are one band less than EE (first band omitted)
 kids450_qe_likelihood_public.bands_BB_to_use = [1, 1, 1, 1, 0, 0]
+
+# nuisance parameters for marginalizing over a constant shift in any of the n(z):
+# NOTE: these were not used in the original analysis!
+#kids450_qe_likelihood_public.use_nuisance = ['D_z1', 'D_z2','D_z3']
 
 # set this flag if only cross-correlation bins should be used for fitting:
 # default: False
@@ -90,7 +96,7 @@ kids450_qe_likelihood_public.baryon_model = 'AGN'
 #kids450_qe_likelihood_public.use_nuisance = ['A_noise_z1', 'A_noise_z2', 'A_noise_z3']
 
 # this allows to include IA:
-# if only 'amp_IA' is passed, 'exp_IA' = 0 (i.e. redshift-scaling is turned off!) 
+# if only 'amp_IA' is passed, 'exp_IA' = 0 (i.e. redshift-scaling is turned off!)
 # default: only 'A_IA' added to list (i.e. exp_IA = 0)
 #kids450_qe_likelihood_public.use_nuisance = ['A_IA', 'exp_IA']
 #kids450_qe_likelihood_public.use_nuisance = ['A_IA']
