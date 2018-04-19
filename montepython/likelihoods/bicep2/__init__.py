@@ -69,7 +69,7 @@ class bicep2(Likelihood):
         # 3: BB
         # 6: ET, and the rest to 0 (must be an array of width 9)
         # Warnings: BICEP2 expects l*(l+1)*Cl/(2*pi) in units of uK^2
-        cosmo_Cls = np.zeros((self.l_max+1, 9))
+        cosmo_Cls = np.zeros((int(self.l_max+1), 9))
         ell = np.arange(self.l_max+1)
 
         cosmo_Cls[:, 0] = ell*(ell+1)*dict_Cls['tt']/(2*math.pi)

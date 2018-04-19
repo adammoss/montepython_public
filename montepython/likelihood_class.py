@@ -186,7 +186,7 @@ class Likelihood(object):
 
         """
         # get C_l^XX from the cosmological code
-        cl = cosmo.lensed_cl(l_max)
+        cl = cosmo.lensed_cl(int(l_max))
 
         # convert dimensionless C_l's to C_l in muK**2
         T = cosmo.T_cmb()
