@@ -59,7 +59,10 @@ def run(cosmo, data, command_line):
         command_line.fisher = True
         import mcmc
         mcmc.chain(cosmo, data, command_line)
-        data.out.close()
+        try:
+            data.out.close()
+        except AttributeError:
+            pass
     else:
         raise io_mp.ConfigurationError(
             "Sampling method %s not understood" % command_line.method)
