@@ -30,7 +30,7 @@ class bao_boss_aniso(Likelihood):
         prob = np.loadtxt(
             filepath, delimiter=None,
             comments='#', skiprows=0, dtype=prob_dtype)
-        size = np.sqrt(len(prob))
+        size = int(np.sqrt(len(prob)))
         x = prob['alpha_perp'].reshape(size, size)[:,0]
         y = prob['alpha_para'].reshape(size, size)[0,:]
         Z = prob['prob'].reshape(size, size)

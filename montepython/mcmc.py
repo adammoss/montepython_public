@@ -705,7 +705,8 @@ def chain(cosmo, data, command_line):
             newloglike = sampler.compute_lkl(cosmo, data)
         else:  # reject step
             rej += 1
-	    ar[k%(command_line.superupdate)] = 0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+            if command_line.superupdate:
+	        ar[k%(command_line.superupdate)] = 0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
             N += 1
             k += 1
             continue
@@ -735,11 +736,13 @@ def chain(cosmo, data, command_line):
                 max_loglike = loglike
             acc += 1.0
             N = 1  # Reset the multiplicity
-	    ar[k%(command_line.superupdate)]=1 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+            if command_line.superupdate:
+	        ar[k%(command_line.superupdate)]=1 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
         else:  # reject step
             rej += 1.0
             N += 1  # Increase multiplicity of last accepted point
-	    ar[k%(command_line.superupdate)]=0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+            if command_line.superupdate:
+	        ar[k%(command_line.superupdate)]=0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
 
         # Regularly (option to set in parameter file), close and reopen the
         # buffer to force to write on file.
