@@ -2,15 +2,24 @@
 Monte Python, a Monte Carlo Markov Chain code (with Class!)
 ===========================================================
 
+:Main developer: Thejs Brinckmann <brinckmann@physik.rwth-aachen.de>
 :Author: Benjamin Audren <benjamin.audren@epfl.ch>
 :License: MIT
 
 
+The code is under the MIT license. As an additional clause, when using the code
+in a scientific publication you are also required to cite the v3.0 release paper
+``MontePython 3: boosted MCMC sampler and other features`` and the original release
+paper ``Conservative Constraints on Early Cosmology`` (see the tail of this document
+for the bibtex entries).
+
+
 If you are searching for specific examples of a work session, please refer to
-the pdf documentation. The code is under the MIT license. As an additional
-clause, you are also required to cite the original release paper when using it
-in a scientific publication: `Conservative Constraints on Early Cosmology` (see
-the tail of this document)
+the pdf documentation. See also the MontePython 3 paper for details on the code,
+as well as a summary of features as of v3.0. This includes an overview of all
+likelihoods currently implemented, with some details on those likelihoods, such as
+adatasets, last updated, type and relevant papers to cite when using the likelihood.
+
 
 
 Prerequisites
@@ -210,11 +219,23 @@ Bibtex entry
 ------------
 
 When using *Monte Python* in a publication, please acknowledge the code by citing
-the following paper. If you used *Class*, *Nested Sampling* or *Cosmo Hammer*,
-you should also cite the original works.
+the following papers. If you used *Class*, *Nested Sampling* or *Cosmo Hammer*,
+you should also cite the original works. Please also cite the relevant papers for
+each likelihood used: as of v3.0 we have a list of references for all likelihoods
+in the first of the papers below. Otherwise, this information can often be found
+in the .data file of the likelihood folder.
 
 .. code::
 
+    @article{Brinckmann:2018cvx,
+          author         = "Brinckmann, Thejs and Lesgourgues, Julien",
+          title          = "{MontePython 3: boosted MCMC sampler and other features}",
+          year           = "2018",
+          eprint         = "1804.07261",
+          archivePrefix  = "arXiv",
+          primaryClass   = "astro-ph.CO",
+          SLACcitation   = "%%CITATION = ARXIV:1804.07261;%%"
+    }
     @article{Audren:2012wb,
           author         = "Audren, Benjamin and Lesgourgues, Julien and Benabed,
                             Karim and Prunet, Simon",
