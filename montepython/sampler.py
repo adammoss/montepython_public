@@ -24,7 +24,8 @@ import warnings
 
 import io_mp
 import os
-
+import scipy.linalg as la
+import scipy.optimize as op
 
 def run(cosmo, data, command_line):
     """
@@ -57,6 +58,14 @@ def run(cosmo, data, command_line):
     elif command_line.method == 'Der':
         import add_derived as der
         der.run(cosmo, data, command_line)
+    elif command_line.method == 'Fisher':
+        command_line.fisher = True
+        import mcmc
+        mcmc.chain(cosmo, data, command_line)
+        try:
+            data.out.close()
+        except AttributeError:
+            pass
     else:
         raise io_mp.ConfigurationError(
             "Sampling method %s not understood" % command_line.method)
@@ -168,88 +177,6 @@ def get_covariance_matrix(cosmo, data, command_line):
         command_line.quiet
     except:
         command_line.quiet = False
-
-    if command_line.fisher and not command_line.cov:
-        # We will work out the fisher matrix for all the parameters and
-        # write it to a file
-        if not command_line.silent:
-            warnings.warn("Fisher implementation is being tested")
-
-        # Let us create a separate copy of data
-        from copy import deepcopy
-        # Do not modify data, instead copy
-        temp_data = deepcopy(data)
-        done = False
-
-        # Create the center dictionary, which will hold the center point
-        # information (or best-fit) TODO
-        # This dictionary will be updated in case it was too far from the
-        # best-fit, and found a non positive-definite symmetric fisher matrix.
-        center = {}
-        if not command_line.bf:
-            for elem in parameter_names:
-                temp_data.mcmc_parameters[elem]['current'] = (
-                    data.mcmc_parameters[elem]['initial'][0])
-                center[elem] = data.mcmc_parameters[elem]['initial'][0]
-        else:
-            read_args_from_bestfit(temp_data, command_line.bf)
-            for elem in parameter_names:
-                temp_data.mcmc_parameters[elem]['current'] = (
-                    temp_data.mcmc_parameters[elem]['last_accepted'])
-                center[elem] = temp_data.mcmc_parameters[elem]['last_accepted']
-
-        # Have a security index that prevents looping indefinitely
-        security = 0
-        while not done and security < 10:
-            security += 1
-            # Compute the Fisher matrix and the gradient array at the center
-            # point.
-            fisher_matrix, gradient = compute_fisher(
-                temp_data, cosmo, center, 0.01)
-
-            # Compute inverse of the fisher matrix, catch LinAlgError exception
-            fisher_invert_success = True
-            try:
-                if not command_line.silent:
-                    print("Fisher matrix computed:")
-                    print(fisher_matrix)
-                cov_matrix = np.linalg.inv(fisher_matrix)
-            except np.linalg.LinAlgError:
-                raise io_mp.ConfigurationError(
-                    "Could not find Fisher matrix, please remove the "
-                    "option --fisher and run with Metropolis-Hastings "
-                    "or another sampling method.")
-                fisher_invert_success = False
-                done = True
-
-            # Write it to the file
-            if fisher_invert_success:
-                io_mp.write_covariance_matrix(
-                    cov_matrix, parameter_names,
-                    os.path.join(command_line.folder, 'covariance_fisher.mat'))
-
-                command_line.cov = os.path.join(
-                    command_line.folder, 'covariance_fisher.mat')
-
-                done = True
-                # Check if the diagonal elements are non-negative
-                for h, elem in enumerate(parameter_names):
-                    if cov_matrix[h][h] < 0:
-                        warnings.warn(
-                            "Covariance has negative values on diagonal, "
-                            "moving to a better point and repeating "
-                            "the Fisher computation")
-                        done = False
-                        break
-
-                if not done:
-                    # Solve for a step
-                    step = np.dot(cov_matrix, gradient)
-                    # Now modify data_parameters TODO HERE update center
-                    for k, elem in enumerate(parameter_names):
-                        data.mcmc_parameters[elem]['initial'][0] = data.mcmc_parameters[elem]['initial'][0]-step[k]
-                        temp_data.mcmc_parameters[elem]['initial'][0] = temp_data.mcmc_parameters[elem]['initial'][0]-step[k]
-                        print "Moved %s to:"%(elem),data.mcmc_parameters[elem]['initial'][0]
 
     # if the user provides a .covmat file or if user asks to compute a fisher matrix
     if command_line.cov is not None:
@@ -403,7 +330,281 @@ def get_covariance_matrix(cosmo, data, command_line):
 
     #inverse, and diagonalization
     eigv, eigV = np.linalg.eig(np.linalg.inv(matrix))
+
+    #if command_line.start_from_fisher:
+    #    command_line.fisher = True
+    #if command_line.fisher:
+    #    eigv, eigV, matrix = get_fisher_matrix(cosmo, data, command_line, matrix)
+
     return eigv, eigV, matrix
+
+def get_minimum(cosmo, data, command_line, covmat):
+
+    if not command_line.silent:
+        warnings.warn("Minimization implementation is being tested")
+
+    # Create the center dictionary, which will hold the center point
+    # information
+    center = {}
+    parameter_names = data.get_mcmc_parameters(['varying'])
+
+    if not command_line.bf:
+        for elem in parameter_names:
+            center[elem] = data.mcmc_parameters[elem]['initial'][0]
+    else:
+        read_args_from_bestfit(data, command_line.bf)
+        for elem in parameter_names:
+            center[elem] = data.mcmc_parameters[elem]['last_accepted']
+
+    stepsizes = np.zeros(len(parameter_names), 'float64')
+    parameters = np.zeros(len(parameter_names), 'float64')
+    bounds = np.zeros([len(parameter_names),2], 'float64')
+    cons = ()
+    for index, elem in enumerate(parameter_names):
+        parameters[index] = center[elem]
+        stepsizes[index] = 0.1*covmat[index,index]**0.5
+        if data.mcmc_parameters[elem]['initial'][1] == None:
+            bounds[index,0] = center[elem] - 1.*covmat[index,index]**0.5
+        else:
+            bounds[index,0] = data.mcmc_parameters[elem]['initial'][1]
+        if data.mcmc_parameters[elem]['initial'][2] == None:
+            bounds[index,1] = center[elem] + 1.*covmat[index,index]**0.5
+        else:
+            bounds[index,1] = data.mcmc_parameters[elem]['initial'][2]
+        cons += ({'type': 'ineq', 'fun': lambda x: x[index] - bounds[index,0]},
+                 {'type': 'ineq', 'fun': lambda x: bounds[index,1] - x[index]},)
+        print 'bounds on ',elem,' : ',bounds[index,0],bounds[index,1]
+
+    print 'parameters: ',parameters
+    print 'stepsizes: ',stepsizes[0]
+    print 'bounds: ',bounds
+
+    #minimum, chi2 = op.fmin_cg(chi2_eff,
+    # Use unconstrained Polak & Ribiere conjugate gradient algorithm
+    # CosmoMC uses a constrained (Fletcher & Reeves) version of this
+    #xopt, fopt, func_calls, grad_calls, warnflags, allvecs = op.fmin_cg(chi2_eff,
+    #                                                                    parameters,
+    #                                                                    #fprime = gradient_chi2_eff,
+    #                                                                    epsilon = stepsizes,
+    #                                                                    args = (cosmo,data),#bounds),
+    #                                                                    full_output = True,
+    #                                                                    disp = True,
+    #                                                                    retall = True)
+    # Use constrained Newton conjugate gradient algorithm
+    #x, nfeval, rc = op.fmin_tnc(chi2_eff,
+    #                            parameters,
+    #                            #fprime = gradient_chi2_eff,
+    #                            args = (cosmo,data),
+    #                            approx_grad = True,
+    #                            bounds = bounds,
+    #                            epsilon = stepsizes,
+    #                            disp = 5)
+
+    #result = op.minimize(chi2_eff,
+    #                     parameters,
+    #                     args = (cosmo,data),
+    #                     method='COBYLA',
+    #                     #method='SLSQP',
+    #                     constraints=cons,
+    #                     #bounds=bounds,
+    #                     tol=0.000001,
+    #                     options = {'disp': True,
+    #                                'rhobeg': stepsizes})
+    #                                #'eps': stepsizes})
+
+    # For HST with 1 param the best is TNC with 'eps':stepsizes, bounds, tol, although bounds make it smlower (but avoids htting unphysical region)
+    # For forecasts or Planck lite SLSQP with tol=0.00001 works well, but does not work for full Planck TTTEEE highl
+    result = op.minimize(chi2_eff,
+                         parameters,
+                         args = (cosmo,data),
+                         #method='trust-region-exact',
+                         #method='BFGS',
+                         #method='TNC',
+                         #method='L-BFGS-B',
+                         method='SLSQP',
+                         #options={'eps':stepsizes},
+                         #constraints=cons,
+                         bounds=bounds,
+                         tol=command_line.minimize_tol)
+                         #options = {'disp': True})
+                                    #'initial_tr_radius': stepsizes,
+                                    #'max_tr_radius': stepsizes})
+
+    #result = op.differential_evolution(chi2_eff,
+    #                                   bounds,
+    #                                   args = (cosmo,data))
+
+    print 'Final output of minimize'
+    for index,elem in enumerate(parameter_names):
+        print elem, 'new:', result.x[index], ', old:', parameters[index]
+
+    return result.x
+
+def chi2_eff(params, cosmo, data, bounds=False):
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    for index, elem in enumerate(parameter_names):
+        #print elem,params[index]
+        data.mcmc_parameters[elem]['current'] = params[index]
+        if not type(bounds) == type(False):
+            if (params[index] < bounds[index,0]) or (params[index] > bounds[index,1]):
+                chi2 = 1e30
+                print elem+' exceeds bounds with value %f and bounds %f < x < %f' %(params[index],bounds[index,0],bounds[index,1])
+                return chi2
+    # Update current parameters to the new parameters, only taking steps as requested
+    data.update_cosmo_arguments()
+    # Compute loglike value for the new parameters
+    chi2 = -2.*compute_lkl(cosmo, data)
+    print 'In minimization: ',chi2,' at ',params
+    return chi2
+
+def gradient_chi2_eff(params, cosmo, data, bounds=False):
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    for index, elem in enumerate(parameter_names):
+        data.mcmc_parameters[elem]['current'] = params[index]
+    # Update current parameters to the new parameters, only taking steps as requested
+    data.update_cosmo_arguments()
+    # Compute loglike value for the new parameters
+    chi2 = -2.*compute_lkl(cosmo, data)
+    # Initialise the gradient field
+    gradient = np.zeros(len(parameter_names), 'float64')
+    for index, elem in enumerate(parameter_names):
+        dx = 0.01*params[index]
+        #
+
+        data.mcmc_parameters[elem]['current'] += dx
+        data.update_cosmo_arguments()
+        chi2_plus = -2.*compute_lkl(cosmo, data)
+        #
+        data.mcmc_parameters[elem]['current'] -= 2.*dx
+        data.update_cosmo_arguments()
+        chi2_minus = -2.*compute_lkl(cosmo, data)
+        #
+        gradient[index] = (chi2_plus - chi2_minus)/2./dx
+        #
+        data.mcmc_parameters[elem]['current'] += dx
+    return gradient
+
+def get_fisher_matrix(cosmo, data, command_line, inv_fisher_matrix, minimum=0):
+    # Fisher matrix method by T. Brinckmann
+    # Contributions from T. Tram, J. Lesgourgues
+
+    # We will work out the fisher matrix for all the parameters and
+    # write it and its inverse to a file
+
+    # Pass input to data structure
+    data.fisher_step_it = int(command_line.fisher_step_it)
+    data.fisher_delta = command_line.fisher_delta
+    data.fisher_tol = command_line.fisher_tol
+    data.fisher_sym_lkl = command_line.fisher_sym_lkl
+
+    # Whether to use symmetric step. Symmetric step is recommended, as it makes the
+    # computation faster and in most cases is sufficient.
+    data.use_symmetric_step = True
+    if command_line.fisher_asymmetric:
+        data.use_symmetric_step = False
+
+    if not command_line.silent:
+        warnings.warn("Fisher implementation is being tested")
+
+    # Create the center dictionary, which will hold the center point information
+    center = {}
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    if not type(minimum) == int:
+        for index, elem in enumerate(parameter_names):
+            center[elem] = minimum[index]
+    elif not command_line.bf:
+        for elem in parameter_names:
+            center[elem] = data.mcmc_parameters[elem]['initial'][0]
+    else:
+        read_args_from_bestfit(data, command_line.bf)
+        for elem in parameter_names:
+            center[elem] = data.mcmc_parameters[elem]['last_accepted']
+
+    scales = np.zeros((len(parameter_names)))
+    invscales = np.zeros((len(parameter_names)))
+    for index, elem in enumerate(parameter_names):
+        data.mcmc_parameters[elem]['current'] = center[elem]
+        scales[index] = data.mcmc_parameters[elem]['scale']
+        invscales[index] = 1./data.mcmc_parameters[elem]['scale']
+
+    # Load stepsize from input covmat or covmat generated from param file
+    # JL TODO: check this, and try another scheme to be sure that index and elem refer to the same params in the same order
+    # here the stepsizes are for the scaled parameter (e.g. 100*omega_b)
+    stepsize = np.zeros([len(parameter_names),3])
+    for index in range(len(parameter_names)):
+        stepsize[index,0] = -(inv_fisher_matrix[index][index])**0.5
+        stepsize[index,1] = (inv_fisher_matrix[index][index])**0.5
+    # Adjust stepsize in case step exceeds boundary
+    stepsize = adjust_fisher_bounds(data,command_line,center,stepsize)
+
+    fisher_iteration = 0
+    fisher_status = 0
+    while fisher_iteration < data.fisher_step_it and not fisher_status:
+        fisher_iteration += 1
+        # Compute the Fisher matrix and the gradient array at the center point.
+        print ("Compute Fisher [iteration %d/%d] with following stepsizes for scaled parameters:" % (fisher_iteration,data.fisher_step_it))
+        for index in range(len(parameter_names)):
+            print "%s : diagonal element = %e" % (parameter_names[index],inv_fisher_matrix[index,index])
+
+        # For rotating the step array, not implemented
+        step_matrix = np.identity(len(parameter_names), dtype='float64')
+
+        # Compute fisher matrix
+        fisher_matrix, gradient = compute_fisher(data, command_line, cosmo, center, stepsize, step_matrix)
+        # If we want to rotate back to the cosmological parameter basis
+        if not command_line.silent:
+            print ("Fisher matrix computed [iteration %d/%d]" % (fisher_iteration,data.fisher_step_it))
+
+        # Compute inverse of the fisher matrix, catch LinAlgError exception
+        try:
+            inv_fisher_matrix = np.linalg.inv(fisher_matrix)
+        except np.linalg.LinAlgError:
+            raise io_mp.ConfigurationError(
+                "Could not find Fisher matrix inverse. Try with different "
+                "fisher_tol, fisher_delta, input sigmas (or covmat), bestfit, or remove the "
+                "option --fisher and run with Metropolis-Hastings or another sampling method.")
+
+        # Check if the inverse fisher matrix is positive definite
+        try:
+            la.cholesky(inv_fisher_matrix).T
+            fisher_status = 1
+            print ("Inverse Fisher matrix computation successful! Saving Fisher and inverse Fisher matrices.")
+        except:
+            if not command_line.silent:
+                print 'Fisher matrix computation failed - inverse not positive definite'
+            if data.fisher_step_it < 2:
+                raise io_mp.ConfigurationError(
+                    "Could not find Fisher matrix inverse and fisher step iteration is not enabled. Use flag "
+                    "--fisher-step-it or change the input sigmas (or covariance matrix) or the bestfit.")
+            if fisher_iteration == data.fisher_step_it:
+                raise io_mp.ConfigurationError(
+                    "Could not find Fisher matrix inverse after %d attempts. Try with different "
+                    "fisher_tol, fisher_delta, input sigmas (or covmat), bestfit, or remove the "
+                    "option --fisher and run with Metropolis-Hastings or another sampling method." %(data.fisher_step_it))
+
+            # If the inverse Fisher matrix is not positive definite we want to
+            # iterate on the target fisher delta (--fisher-delta), increasing
+            # it incrementally by an amount equal to the original fisher delta.
+            if not command_line.silent:
+                print 'Increasing fisher_iteration by 1, to %d, and adjusting fisher_delta from %f to %f' %(fisher_iteration+1, data.fisher_delta, data.fisher_delta + command_line.fisher_delta)
+            data.fisher_delta += command_line.fisher_delta
+            fisher_status = 0
+
+        # When inverse Fisher matrix was successfully computed, take
+        # scalings into account and write the matrices in files. The scale
+        # factors are removed in order to store true parameter covariance
+        if fisher_status:
+            fisher_matrix = invscales[:,np.newaxis]*fisher_matrix*invscales[np.newaxis,:]
+            io_mp.write_covariance_matrix(
+                fisher_matrix, parameter_names,
+                os.path.join(command_line.folder, 'fisher.mat'))
+
+            inv_fisher_matrix = scales[:,np.newaxis]*inv_fisher_matrix*scales[np.newaxis,:]
+            io_mp.write_covariance_matrix(
+                inv_fisher_matrix, parameter_names,
+                os.path.join(command_line.folder, 'inv_fisher.mat'))
+
+    return inv_fisher_matrix
 
 
 def accept_step(data):
@@ -450,7 +651,7 @@ def compute_lkl(cosmo, data):
         sum of the likelihoods of the experiments specified in the input
         parameter file.
 
-        This function returns :attr:`data.boundary_loglkie
+        This function returns :attr:`data.boundary_loglike
         <data.data.boundary_loglike>`, defined in the module :mod:`data` if
         *i)* the current point in the parameter space has hit a prior edge, or
         *ii)* the cosmological module failed to compute the model. This value
@@ -492,18 +693,45 @@ def compute_lkl(cosmo, data):
         # point, but with minimum likelihood, so will be rejected, resulting in
         # the choice of a new point.
         try:
-            cosmo.compute(["lensing"])
-        except CosmoComputationError as failure_message:
-            sys.stderr.write(str(failure_message)+'\n')
-            sys.stderr.flush()
-            return data.boundary_loglike
-        except CosmoSevereError as critical_message:
-            raise io_mp.CosmologicalModuleError(
-                "Something went wrong when calling CLASS" +
-                str(critical_message))
-        except KeyboardInterrupt:
-            raise io_mp.CosmologicalModuleError(
-                "You interrupted execution")
+            data.cosmo_arguments['output']
+        except:
+            data.cosmo_arguments.update({'output': ''})
+        if 'SZ' in data.cosmo_arguments['output']:
+            try:
+                if 'SZ_counts':
+                    cosmo.compute(["szcount"])
+                else:
+                    cosmo.compute(["szpowerspectrum"])
+            except CosmoComputationError as failure_message:
+                sys.stderr.write(str(failure_message)+'\n')
+                sys.stderr.flush()
+                return data.boundary_loglike
+            except CosmoSevereError as critical_message:
+                raise io_mp.CosmologicalModuleError(
+                    "Something went wrong when calling CLASS" +
+                    str(critical_message))
+            except KeyboardInterrupt:
+                raise io_mp.CosmologicalModuleError(
+                    "You interrupted execution")
+        else:
+            try:
+                cosmo.compute(["lensing"])
+            except CosmoComputationError as failure_message:
+                # could be useful to uncomment for debugging:
+                #np.set_printoptions(precision=30, linewidth=150)
+                #print 'cosmo params'
+                #print data.cosmo_arguments
+                #print data.cosmo_arguments['tau_reio']
+                sys.stderr.write(str(failure_message)+'\n')
+                sys.stderr.flush()
+                return data.boundary_loglike
+            except CosmoSevereError as critical_message:
+                raise io_mp.CosmologicalModuleError(
+                    "Something went wrong when calling CLASS" +
+                    str(critical_message))
+            except KeyboardInterrupt:
+                raise io_mp.CosmologicalModuleError(
+                    "You interrupted execution")
 
     # For each desired likelihood, compute its value against the theoretical
     # model
@@ -521,10 +749,14 @@ def compute_lkl(cosmo, data):
         # Otherwise, take the existing value
         else:
             value = likelihood.backup_value
+        if data.command_line.display_each_chi2:
+            print "-> for ",likelihood.name,":  loglkl=",value,",  chi2eff=",-2.*value
         loglike += value
         # In case the fiducial file was written, store this information
         if value == 1j:
             flag_wrote_fiducial += 1
+    if data.command_line.display_each_chi2:
+        print "-> Total:  loglkl=",loglike,",  chi2eff=",-2.*loglike
 
     # Compute the derived parameters if relevant
     if data.get_mcmc_parameters(['derived']) != []:
@@ -563,89 +795,563 @@ def compute_lkl(cosmo, data):
                 "with each other. If everything looks fine, "
                 "you may now start a new run.")
 
-    return loglike
+    return loglike/data.command_line.temperature
 
 
-def compute_fisher(data, cosmo, center, step_size):
+def compute_fisher(data, command_line, cosmo, center, step_size, step_matrix):
+    # Function used by Fisher matrix method by T. Brinckmann
 
+    # Initialise
     parameter_names = data.get_mcmc_parameters(['varying'])
     fisher_matrix = np.zeros(
         (len(parameter_names), len(parameter_names)), 'float64')
     # Initialise the gradient field
     gradient = np.zeros(len(parameter_names), 'float64')
 
-    for k, elem_k in enumerate(parameter_names):
-        kdiff = center[elem_k]*step_size
-        if kdiff == 0.0:
-            kdiff = step_size
-        for h, elem_h in enumerate(parameter_names):
-            hdiff = center[elem_h]*step_size
-            if hdiff == 0.0:
-                hdiff = step_size
-            # Since the matrix is symmetric, we only compute the
-            # elements of one half of it plus the diagonal.
-            if k > h:
-                continue
-            if k != h:
-                fisher_matrix[k][h] = compute_fisher_element(
-                    data, cosmo, center,
-                    (elem_k, kdiff),
-                    (elem_h, hdiff))
-                fisher_matrix[h][k] = fisher_matrix[k][h]
-            else:
-                fisher_matrix[k][k], gradient[k] = compute_fisher_element(
-                    data, cosmo, center,
-                    (elem_k, kdiff))
+    # Re-center all parameters
+    for elem in center:
+        data.mcmc_parameters[elem]['current'] = center[elem]
+
+    # Compute loglike at the point supposed to be a good estimate of the best-fit
+    data.update_cosmo_arguments()
+    loglike_min = compute_lkl(cosmo, data)
+
+    # Loop through diagonal elements first, followed by off-diagonal elements
+    for elem in ['diag','off-diag']:
+
+        for k, elem_k in enumerate(parameter_names):
+            kdiff = step_size[k]
+
+            # loop over step direction
+            for step_index in [0,1]:
+                if elem == 'diag' and step_index == 1:
+                    continue
+                # loop over second parameter
+                for h, elem_h in enumerate(parameter_names):
+                    hdiff = step_size[h]
+
+                    # Since the matrix is symmetric, we only compute the
+                    # elements of one half of it plus the diagonal.
+                    if k > h:
+                        continue
+                    if k == h and elem == 'diag':
+                        if not command_line.silent:
+                            print '---> Computing fisher element (%d,%d)' % (k,h)
+                        temp1, temp2, diff_1 = compute_fisher_element(
+                            data, command_line, cosmo, center, step_matrix, loglike_min, step_index,
+                            (elem_k, kdiff))
+                        fisher_matrix[k][k] += temp1
+                        gradient[k] += temp2
+                        step_size[k] = diff_1
+                    elif k < h and elem == 'off-diag':
+                        if not command_line.silent:
+                            print '---> Computing fisher element (%d,%d), part %d/2' % (k,h,step_index+1)
+                        fisher_matrix[k][h] += compute_fisher_element(
+                            data, command_line, cosmo, center, step_matrix, loglike_min, step_index,
+                            (elem_k, kdiff),
+                            (elem_h, hdiff))
+                        fisher_matrix[h][k] = fisher_matrix[k][h]
 
     return fisher_matrix, gradient
 
-
-def compute_fisher_element(data, cosmo, center, one, two=None):
+def compute_fisher_element(data, command_line, cosmo, center, step_matrix, loglike_min, step_index_1, one, two=None):
+    # Function used by Fisher matrix method by T. Brinckmann
 
     # Unwrap
     name_1, diff_1 = one
     if two:
         name_2, diff_2 = two
-        data.mcmc_parameters[name_1]['current'] = (
-            center[name_1]+diff_1)
-        data.mcmc_parameters[name_2]['current'] = (
-            center[name_2]+diff_2)
-        data.update_cosmo_arguments()
-        loglike_1 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_2]['current'] -= 2*diff_2
-        data.update_cosmo_arguments()
-        loglike_2 = compute_lkl(cosmo, data)
+        if step_index_1 == 1:
+            # Calculate step (++)
+            step_index_2 = 1
+            loglike_1, rotated_step_xx = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
-        data.mcmc_parameters[name_1]['current'] -= 2*diff_1
-        data.mcmc_parameters[name_2]['current'] += 2*diff_2
-        data.update_cosmo_arguments()
-        loglike_3 = compute_lkl(cosmo, data)
+            # Calculate step (+-)
+            step_index_2 = 0
+            loglike_2, rotated_step_xy = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+        else:
+            loglike_1 = 0
+            loglike_2 = 0
 
-        data.mcmc_parameters[name_2]['current'] -= 2*diff_2
-        data.update_cosmo_arguments()
-        loglike_4 = compute_lkl(cosmo, data)
+        if step_index_1 == 0:
+            # Calculate step (-+). Assuming symmetry rotated_step_yx = rotated_step_xy
+            step_index_2 = 1
+            loglike_3, rotated_step_xy = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
 
-        fisher_off_diagonal = -(
-            loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
+            # Calculate step (--). Assuming symmetry rotated_step_yy = rotated_step_xx
+            step_index_2 = 0
+            loglike_4, rotated_step_xx = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+        else:
+            loglike_3 = 0
+            loglike_4 = 0
+
+        # If the left and right step sizes are equal these terms will cancel
+        if abs(diff_2[0]) == abs(diff_2[1]) or diff_2[2] or data.use_symmetric_step:
+            loglike_5 = 0.
+            loglike_6 = 0.
+        else:
+            if step_index_1 == 1:
+                # Calculate step (+/)
+                step_index_2 = None
+                loglike_5, rotated_step_x = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            else:
+                loglike_5 = 0
+
+            if step_index_1 == 0:
+                # Calculate step (-/)
+                step_index_2 = None
+                loglike_6, rotated_step_x = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+            else:
+                loglike_6 = 0
+
+        # If the left and right step sizes are equal these terms will cancel
+        if abs(diff_1[0]) == abs(diff_1[1]) or diff_1[2] or data.use_symmetric_step:
+            loglike_7 = 0.
+            loglike_8 = 0.
+        else:
+            step_index_1 = None
+            # Calculate step (/+)
+            step_index_2 = 1
+            loglike_7, rotated_step_y1 = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+
+            # Calculate step (/-)
+            step_index_2 = 0
+            loglike_8, rotated_step_y2 = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+
+        # Count the bestfit term at most once
+        if step_index_1:
+            loglike_min = 0
+
+        # In the following we want only the step magnitude, not sign
+        diff_1_backup = diff_1[:]
+        diff_2_backup = diff_2[:]
+        diff_1 = abs(diff_1)
+        diff_2 = abs(diff_2)
+        # Remember that in some cases only used diff_1[2] or diff_1[0]
+        if diff_1[2]:
+            diff_1[0] = diff_1[2]
+            diff_1[1] = diff_1[2]
+        elif data.use_symmetric_step:
+            diff_1[1] = diff_1[0]
+        # And only used diff_2[2] or diff_2[0]
+        if diff_2[2]:
+            diff_2[0] = diff_2[2]
+            diff_2[1] = diff_2[2]
+        elif data.use_symmetric_step:
+            diff_2[1] = diff_2[0]
+
+        # Extract parameter indices
+        parameter_names = data.get_mcmc_parameters(['varying'])
+        index_1 = parameter_names.index(name_1)
+        index_2 = parameter_names.index(name_2)
+
+        # In the case of symmetric steps reduces to -(loglike_1-loglike_2-loglike_3+loglike_4)/(4.*diff_1*diff_2)
+        fisher_off_diagonal = -((1./(diff_2[0]**2./diff_2[1]+diff_2[0]))* # sym. \Delta p_j: reduces to 1/(2 \Delta p_j)
+                                (1./(diff_1[0]**2./diff_1[1]+diff_1[0]))* # sym. \Delta p_i: reduces to 1/(2 \Delta p_i)
+                                ((diff_2[0]/diff_2[1])**2. * ((diff_1[0]/diff_1[1])**2.*loglike_1 - loglike_3) # sym. \Delta p_i and \Delta p_j: reduces to loglike_1 - loglike_3
+                                 -(diff_1[0]/diff_1[1])**2.*loglike_2 + loglike_4 # sym \Delta p_i: reduces to loglike_4 - loglike_2
+                                 +((diff_2[0]/diff_2[1])**2.-1.) * (loglike_6 - (diff_1[0]/diff_1[1])**2.*loglike_5 + ((diff_1[0]/diff_1[1])**2.-1.)*loglike_min) # cancels if sym. \Delta p_j
+                                 +((diff_1[0]/diff_1[1])**2.-1.) * (loglike_8 - (diff_2[0]/diff_2[1])**2.*loglike_7))) # cancels if sym. \Delta p_i
+        # For multiple parameters using the symmetric likelihood
+        # assumption we will likely encounter problems!
+        if diff_1[2] and diff_2[2]:
+            warnings.warn('Symmetric likelihood assumed for multiple parameters, with fisher_off_diagonal = %f, setting off-diagonal to zero' % fisher_off_diagonal)
+            fisher_off_diagonal = 0.
+
+        # Restore step sign
+        diff_1 = diff_1_backup
+        diff_2 = diff_2_backup
 
         return fisher_off_diagonal
     # It is otherwise a diagonal component
     else:
-        data.mcmc_parameters[name_1]['current'] = center[name_1]
+        # Calculate left step
+        step_index_1 = 0
+        step_index_2 = None
+        loglike_left, diff_1, rotated_step_left = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+        # Update 'one' with the new step size to pass to the next step
+        one = (one[0],diff_1)
+
+        # Calculate right step
+        step_index_1 = 1
+        loglike_right, diff_1, rotated_step_right = compute_fisher_step(data,command_line,cosmo,center,step_matrix,loglike_min,one,two,step_index_1,step_index_2)
+
+        # In the following we want only the step magnitude, not sign
+        diff_1_backup = diff_1[:]
+        diff_1 = abs(diff_1)
+        # Remember that in some cases only used diff_1[2] or diff_1[0]
+        if diff_1[2]:
+            diff_1[0] = diff_1[2]
+            diff_1[1] = diff_1[2]
+        elif data.use_symmetric_step:
+            diff_1[1] = diff_1[0]
+
+        parameter_names = data.get_mcmc_parameters(['varying'])
+        index = parameter_names.index(name_1)
+
+        # In case of symmetric steps reduces to -(loglike_right-2.*loglike_min+loglike_left)/(diff_1**2)
+        fisher_diagonal = -2.*((diff_1[0]/diff_1[1])*loglike_right-(diff_1[0]/diff_1[1]+1.)
+                                *loglike_min+loglike_left)/(diff_1[0]*diff_1[1]+diff_1[0]**2.)
+
+        # In case of symmetric steps reduces to -(loglike_right-loglike_left)/(2.*diff_1)
+        gradient = -((diff_1[0]/diff_1[1])**2.*loglike_right-loglike_left-((diff_1[0]/diff_1[1])**2.-1.)
+                     *loglike_min)/((diff_1[0]**2./diff_1[1])+diff_1[0])
+
+        # Restore step sign
+        diff_1 = diff_1_backup
+
+        return fisher_diagonal, gradient, diff_1
+
+
+def compute_fisher_step(data, command_line, cosmo, center, step_matrix, loglike_min, one, two, step_index_1, step_index_2):
+    # Function used by Fisher matrix method by T. Brinckmann
+
+    # Unwrap
+    name_1, diff_1 = one
+    if two:
+        name_2, diff_2 = two
+
+    # Save input parameters
+    deltaloglkl_req = data.fisher_delta
+    deltaloglkl_tol = data.fisher_tol
+
+    # Create an array of the center value
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    center_array = np.zeros(len(center), 'float64')
+    for elem in parameter_names:
+        index = parameter_names.index(elem)
+        center_array[index] = center[elem]
+
+    backup_step = [0.]
+    repeat = 1
+    while repeat:
+        # Create array with new steps in the basis of the parameters
+        step_array = np.zeros(len(parameter_names), 'float64')
+        if not step_index_1 == None:
+            index = parameter_names.index(name_1)
+
+            # Check if the parameter step had exceeded a boundary.
+            # Assume symmetric likelihood and use opposite step if so.
+            # I.e. both steps (+/-) will be the same and will return the same -loglkl.
+            if diff_1[2]:
+                step_array[index] = diff_1[2]/norm**0.5
+            # If symmetric step is required use diff_1[0] to determine size of step.
+            # Only step_index_1=0 goes through the iteration cycle in this case.
+            # If diff_1[2] is defined, will instead use that value.
+            elif data.use_symmetric_step:
+                step_array[index] = np.sign(diff_1[step_index_1])*abs(diff_1[0])
+            else:
+                step_array[index] = diff_1[step_index_1]
+
+            # If this is a diagonal element computation and the other parameter
+            # uses the symmetric assumption (i.e. diff_2[2] is non-zero) and we
+            # are considering the step direction that would have exceeded the
+            # boundary (so it would have had a sign opposite the sign of diff_2[2]),
+            # then we want to flip the sign for *this* (not the other) parameter.
+            if two:
+                if diff_1[2] and diff_2[2]:
+                    warnings.warn('BOTH PARAMETERS SYMMETRIC! Need one-sided derivative (not-implemented)')
+                elif (step_index_2 == 0 and diff_2[2] > 0) or (step_index_2 == 1 and diff_2[2] < 0):
+                    step_array[index] = -step_array[index]
+                    if not command_line.silent:
+                        print 'changed step array from (%f,%f) to (%f,%f)' %(-step_array[index],diff_2[2],step_array[index],diff_2[2])
+
+        if two and not step_index_2 == None:
+            index = parameter_names.index(name_2)
+
+            # Check if the parameter step had exceeded a boundary.
+            # Assume symmetric likelihood and use opposite step if so.
+            # I.e. both steps (+/-) will be the same and will return the same -loglkl.
+            if diff_2[2]:
+                step_array[index] = diff_2[2]
+            # If symmetric step is required use diff_2[0] to determine size of step.
+            # Only step_index_2=0 goes through the iteration cycle in this case.
+            # If diff_2[2] is defined, will instead use that value.
+            elif data.use_symmetric_step:
+                step_array[index] = np.sign(diff_2[step_index_2])*abs(diff_2[0])
+            else:
+                step_array[index] = diff_2[step_index_2]
+
+            # If this is a diagonal element computation and the other parameter
+            # uses the symmetric assumption (i.e. diff_2[2] is non-zero) and we
+            # are considering the step direction that would have exceeded the
+            # boundary (so it would have had a sign opposite the sign of diff_2[2]),
+            # then we want to flip the sign for *this* (not the other) parameter.
+            if diff_1[2] and diff_2[2]:
+                warnings.warn('BOTH PARAMETERS SYMMETRIC! Need one-sided derivative (not implemented)')
+            elif (step_index_1 == 0 and diff_1[2] > 0) or (step_index_1 == 1 and diff_1[2] < 0):
+                step_array[index] = -step_array[index]
+                if not command_line.silent:
+                    print 'changed step array from (%f,%f) to (%f,%f)' %(diff_1[2],-step_array[index],diff_1[2],step_array[index])
+
+        # Rotate the step vector to the basis of the covariance matrix
+        # Not implemented, step_matrix is a unit matrix
+        rotated_array = np.dot(step_matrix, step_array)
+
+        # Construct step vector for comparison with previous step
+        step_array = center_array + rotated_array
+
+        # Check for slow/fast parameters, comparing to the last step in the Fisher matrix calculation.
+        # This means calling CLASS can be skipped if only nuisance parameters changed.
+        data.check_for_slow_step(step_array)
+
+        # In order to take the correct new step we need to re-center
+        # the parameters and add the rotated step vector.
+        for elem in center:
+            index = parameter_names.index(elem)
+            data.mcmc_parameters[elem]['current'] = center[elem] + rotated_array[index]
+
+        # Update current parameters to the new parameters, only taking steps as requested
         data.update_cosmo_arguments()
-        loglike_1 = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] += diff_1
-        data.update_cosmo_arguments()
-        loglike_2 = compute_lkl(cosmo, data)
+        # Compute loglike value for the new parameters
+        loglike = compute_lkl(cosmo, data)
 
-        data.mcmc_parameters[name_1]['current'] -= 2*diff_1
-        data.update_cosmo_arguments()
-        loglike_3 = compute_lkl(cosmo, data)
+        # Iterative stepsize. If -Delta ln(L) > 1, change step size and repeat steps above
+        # if data.use_symmetric_step=True only runs for step_index_1=0
+        if not two and not (data.use_symmetric_step and step_index_1 == 1) and data.fisher_step_it:
+            # Save previous step
+            # For symmetric step
+            if diff_1[2]:
+                backup_step.append(diff_1[2])
+            # For normal step
+            else:
+                backup_step.append(diff_1[step_index_1])
 
-        fisher_diagonal = -(
-            loglike_2-2.*loglike_1+loglike_3)/(diff_1**2)
-        gradient = -(loglike_2-loglike_3)/(2.*diff_1)
+            # Calculate Delta ln(L)
+            deltaloglike = loglike - loglike_min
+            if not command_line.silent:
+                print ">>>> For %s[%d],Delta ln(L)=%e using min(ln(L))=%e"%(name_1,int(np.sign(diff_1[step_index_1])),deltaloglike,loglike_min)
+            if loglike-loglike_min > 0.:
+                warnings.warn('Loglike(step) < Loglike(center): Fisher matrix calculation not centered on the minimum, exercise caution')
+            # If -Delta ln(L) is larger than desired reduce stepsize
+            if -deltaloglike > (deltaloglkl_req + deltaloglkl_tol):
+                if diff_1[2]:
+                    diff_1[2] -= np.sign(diff_1[2]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[2])
+                    if not command_line.silent:
+                        print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[2]
+                else:
+                    diff_1[step_index_1] -= np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
+                    if not command_line.silent:
+                        print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                repeat = len(backup_step)
+                # If stepsize is not converging to the required tolerance within 10 steps
+                # relax tolerance recursively tolerance_i+1 = tolerance_i * (1 + N_step)/10,
+                # with the first tolerance_i given by the input delta loglkl tolerance.
+                if repeat > 10:
+                    deltaloglkl_tol *= (1. + repeat)/10.
 
-        return fisher_diagonal, gradient
+            # If -Delta ln(L) is smaller than desired increase stepsize
+            # ISSUE: what about boundaries when increasing stepsize?
+            elif -deltaloglike < (deltaloglkl_req - deltaloglkl_tol):
+                if repeat > 1:
+                    if diff_1[2]:
+                        diff_1[2] += np.sign(diff_1[2]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[2])
+                        if not command_line.silent:
+                            print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[2]
+                    else:
+                        diff_1[step_index_1] += np.sign(diff_1[step_index_1]) * 0.5 * abs(backup_step[abs(repeat)-1] - diff_1[step_index_1])
+                        if not command_line.silent:
+                            print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                    repeat = len(backup_step)
+                    # If stepsize is not converging to the required tolerance within 10 steps
+                    # relax tolerance recursively tolerance_i+1 = tolerance_i * (1 + N_step)/10,
+                    # with the first tolerance_i given by the input delta loglkl tolerance.
+                    if repeat > 10:
+                        deltaloglkl_tol *= (1. + repeat)/10.
+                else:
+                    if diff_1[2]:
+                        diff_1[2] *= 2.
+                    else:
+                        diff_1[step_index_1] *= 2.
+                    if not command_line.silent:
+                        print 'Updated stepsize. Before, after =',backup_step[abs(repeat)],diff_1[step_index_1]
+                    repeat = -len(backup_step)
+                    # If stepsize is not converging to the required tolerance within 10 steps
+                    # relax tolerance recursively tolerance_i+1 = tolerance_i * (1 + N_step)/10,
+                    # with the first tolerance_i given by the input delta loglkl tolerance.
+                    if repeat > 10:
+                        deltaloglkl_tol *= (1. + repeat)/10.
+            else:
+                if deltaloglkl_tol > data.fisher_tol:
+                    warnings.warn('Could not converge to the desired delta within the expected tolerance. '
+                                  'Adjusted tolerance from %f to %f. Final Delta ln(L) value was %f.'
+                                  % (data.fisher_tol,deltaloglkl_tol,deltaloglike))
+                return loglike, diff_1, rotated_array
+        elif not two:
+            return loglike, diff_1, rotated_array
+        else:
+            return loglike, rotated_array
+
+
+def adjust_fisher_bounds(data, command_line, center, step_size):
+    # Function used by Fisher matrix method by T. Brinckmann
+
+    # For the Fisher approach we may need to adjust the step size
+    # if the step exceed the bounds on the parameter given in the
+    # param file. We Loop through all parameters, adjusting the
+    # step size of any parameter where that step exceeded the bounds.
+
+    # If the distance between the boundary and the center value
+    # is larger than the threshold value (default: 0.1*sigma)
+    # the initial step size is given by the distance between
+    # the center and the boundary.
+
+    # However, if the distance is less than the threshold,
+    # the code will switch to using the symmetric likelihood
+    # assumption and only do likelihood evaluations in one
+    # direction of parameter space (e.g. positive) and mirror
+    # the likelihood value for the other direction. This is
+    # useful for parameters where the best fit of the likelihood
+    # is close to a boundary.
+
+    # This behavior is controlled via --fisher-sym-lkl, which
+    # defines the threshold for when to switch to the symmetric
+    # likelihood assumption.
+
+    # WARNING: causes problems if multiple parameters use the
+    # symmetric likelihood assumption. In this case we need to
+    # switch to a one-sided derivative computation (instead of
+    # two-sided with mirroring), which has not been implemented.
+
+    for index, elem in enumerate(data.get_mcmc_parameters(['varying'])):
+        param = data.mcmc_parameters[elem]['initial']
+        if not command_line.silent:
+            print elem,'with center =',center[elem],', lower bound =',param[1],' and upper bound =',param[2]
+
+        # Non-Gaussian parameters are intrinsically problematic and
+        # may need to be handled separately by the advanced user.
+        # In this case, the resulting Fisher matrix will never be
+        # very accurate, but may still serve as a useful input
+        # covariance matrix for an MCMC run. Some trial and error
+        # will be necessary in order to successfully compute a
+        # positive definite inverse Fisher matrix.
+        # Alternately, consider fixing problematic parameters and
+        # only computing the Fisher matrix for Gaussian parameters.
+        # The inverse Fisher matrix can then be used for MCMC runs
+        # along with best guess sigma values from the param file
+
+        #if elem == 'xi_sz_cib':
+        #    step_size[index,2] = param[2] - center[elem]#step_size[index,1]
+        #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to +%f' %(elem,step_size[index,2])
+        #    continue
+            #if center[elem] + step_size[index,2] < param[2]:
+            #    continue
+            #else:
+            #    step_size[index,2] = param[2] - center[elem]
+            #    print 'New step for %s with center %f exceeded boundary %f, instead setting stepsize to +%f' %(elem,center[elem],param[2],step_size[index,2])
+            #    pass
+        #elif elem == 'A_sz':
+        #    step_size[index,2] = param[1] - center[elem]#step_size[index,0]
+        #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
+        #    continue
+            #if center[elem] + step_size[index,2] > param[1]:
+            #    continue
+            #else:
+            #    step_size[index,2] = param[1] - center[elem]
+            #    print 'New step for %s with center %f exceeded boundary %f, instead setting stepsize to %f' %(elem,center[elem],param[1],step_size[index,2])
+            #    continue
+        #elif elem == 'ksz_norm':
+        #    step_size[index,2] = param[1] - center[elem]#step_size[index,0]
+        #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
+        #    continue
+        #elif elem == 'M_tot':
+        #    step_size[index,2] = step_size[index,1]
+        #    print 'Encountered Planck nuisance parameter %s, assuming symmetry and setting stepsize to %f' %(elem,step_size[index,2])
+        #    continue
+
+        boundary_flag = 0
+        if param[1] != None:
+            if param[1] > center[elem]:
+                raise io_mp.ConfigurationError("Error in parameter ranges: left edge %e bigger than central value %e for %s.\n"
+                                               %(param[1],center[elem],elem))
+            # When encountering a boundary, set stepsize to boundary limit if reasonable
+            if center[elem] + data.fisher_sym_lkl*step_size[index,0] > param[1] > center[elem] + step_size[index,0]:
+                if not command_line.silent:
+                    print 'For %s encountered lower boundary %f with center value %f, changing stepsize from %f and +%f' %(elem,param[1],center[elem],step_size[index,0],step_size[index,1])
+                step_size[index,0] = -(center[elem] - param[1])
+                if data.use_symmetric_step:
+                    step_size[index,1] = center[elem] - param[1]
+                if not command_line.silent:
+                    print 'to %f and +%f' %(step_size[index,0],step_size[index,1])
+                boundary_flag = 1
+            # Otherwise assumme symmetric likelihood and use positive step
+            elif param[1] >= center[elem] + data.fisher_sym_lkl*step_size[index,0]:
+                if not command_line.silent:
+                    print 'For %s encountered lower boundary %f with center value %f and step_size %f, this is closer to the central value than %f*step_size' %(elem,param[1],center[elem],step_size[index,0],data.fisher_sym_lkl)
+                boundary_flag = 2
+                if param[2] == None or param[2] > center[elem] + step_size[index,1]:
+                    if not command_line.silent:
+                        print 'Upper boundary not a problem, so assuming symmetry and only computing the positive step'
+                    step_size[index,2] = step_size[index,1]
+                    warnings.warn('Negative step exceeded boundary for '+elem+' - using symmetry assumption with stepsize = %f' % step_size[index,2])
+                else:
+                    if not command_line.silent:
+                        print 'Upper boundary also a problem, will adjust step later'
+                    else:
+                        pass
+
+        if param[2] != None:
+            if param[2] < center[elem]:
+                raise io_mp.ConfigurationError("Error in parameter ranges: right edge %e smaller than central value %e for %s.\n"
+                                               %(param[2],center[elem],elem))
+            # When encountering a boundary, set stepsize to boundary limit if reasonable.
+            if center[elem] + data.fisher_sym_lkl*step_size[index,1] < param[2] < center[elem] + step_size[index,1] and boundary_flag < 2:
+                if not command_line.silent:
+                    print 'For %s encountered upper boundary %f with center value %f, changing stepsize from %f and +%f' %(elem,param[2],center[elem],step_size[index,0],step_size[index,1])
+                # If both boundaries are smaller than the stepsize, set stepsize to the
+                # smaller of the two.
+                if not boundary_flag or (boundary_flag == 1 and abs(step_size[index,0]) > abs((param[2] - center[elem]))):
+                    if data.use_symmetric_step:
+                        step_size[index,0] = -(param[2] - center[elem])
+                    step_size[index,1] = param[2] - center[elem]
+                    if not command_line.silent:
+                        print 'to %f and +%f' %(step_size[index,0],step_size[index,1])
+                else:
+                    if not command_line.silent:
+                        print 'Lower boundary nearer center than the upper boundary, will use previously adjusted step_size %f and %f' %(step_size[index,0],step_size[index,1])
+                    else:
+                        pass
+            # Otherwise assumme symmetric likelihood and use negative step
+            elif param[2] <= center[elem] + step_size[index,1]:
+                if not command_line.silent:
+                    print 'For %s encountered upper boundary %f with center value %f and step_size %f, this is closer to the central value than %f*step_size' %(elem,param[2],center[elem],step_size[index,1],data.fisher_sym_lkl)
+                # Check if the lower bound poses a problem for symmetric step
+                if boundary_flag < 2:
+                    step_size[index,2] = step_size[index,0]
+                    warnings.warn('Positive step exceeded boundary for '+elem+' - using symmetry assumption with stepsize = %f' % step_size[index,2])
+                # If it does, select the largest difference between center and boundary instead
+                else:
+                    if param[2] - center[elem] > center[elem] - param[1]:
+                        step_size[index,2] = param[2] - center[elem]
+                        warnings.warn('Boundary exceeded for both step directions for '+elem+' - using symmetry assumption with the larger of the two with stepsize = %f' % step_size[index,2])
+                    else:
+                        step_size[index,2] = center[elem] - param[1]
+                        warnings.warn('Boundary exceeded for both step directions for '+elem+' - using symmetry assumption with the larger of the two with stepsize = %f' % step_size[index,2])
+
+    return step_size
+
+
+def vectorize_dictionary(data, center, one, two, step_index_1, step_index_2):
+    # Function used by Fisher matrix method by T. Brinckmann
+    name_1, diff_1 = one
+    if two:
+        name_2, diff_2 = two
+
+    # In order to compare the last step to the current step via
+    # data.check_for_slow_step we need the parameters ordered
+    # correctly as an array.
+    parameter_names = data.get_mcmc_parameters(['varying'])
+    step_vector = np.zeros(len(center))
+    for elem in parameter_names:
+        index = parameter_names.index(elem)
+        step_vector[index] = center[elem]
+        if not step_index_1 == None:
+            if elem == name_1:
+                step_vector[index] += diff_1[step_index_1]
+        if not step_index_2 == None:
+            if elem == name_2:
+                step_vector[index] += diff_2[step_index_2]
+
+    return step_vector

@@ -1,0 +1,11 @@
+# ISW likelihood
+# arXiv:1710.03238
+# Author: Benjamin Stölzner 2017
+# See init file for details
+ISW.data_directory = os.path.join(data.path['data'], 'ISW')
+ISW.use_nuisance= ['A_ISW','b0_sdss','b1_sdss','b2_sdss','b3_sdss','b4_sdss','b0_qso','b1_qso','b2_qso','b0_mpz','b1_mpz','b2_mpz','b0_wisc','b1_wisc','b2_wisc','b0_nvss']
+ISW.sdss_files = ['sdss_bin_0.data','sdss_bin_1.data','sdss_bin_2.data','sdss_bin_3.data','sdss_bin_4.data']
+ISW.qso_files = ['qso_bin_0.data','qso_bin_1.data','qso_bin_2.data']
+ISW.wisc_files = ['wisc_bin_0.data','wisc_bin_1.data','wisc_bin_2.data']
+ISW.mpz_files = ['mpz_bin_0.data','mpz_bin_1.data','mpz_bin_2.data']
+ISW.nvss_files = ['nvss_bin_0.data']

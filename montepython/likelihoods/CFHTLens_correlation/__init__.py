@@ -137,7 +137,7 @@ class CFHTLens_correlation(Likelihood):
         else:
             mask = np.ones(2*nt*self.ntheta)
 
-        self.num_mask = np.sum(mask)
+        self.num_mask = int(np.sum(mask))
         self.mask_indices = np.zeros(self.num_mask)
         j = 0
         for i in xrange(self.ntheta*nt*2):

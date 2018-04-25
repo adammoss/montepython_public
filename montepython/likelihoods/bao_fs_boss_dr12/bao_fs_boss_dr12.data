@@ -1,0 +1,8 @@
+# BOSS BAO+FS DR12
+# Alam et al. 2016 (arxiv:1607.03155)
+# By Thejs Brinckmann June 2017
+bao_fs_boss_dr12.data_directory      = data.path['data']
+bao_fs_boss_dr12.data_file           = 'COMBINEDDR12_final_consensus_dM_Hz/final_consensus_results_dM_Hz_fsig.txt'
+bao_fs_boss_dr12.cov_file            = 'COMBINEDDR12_final_consensus_dM_Hz/final_consensus_covtot_dM_Hz_fsig.txt'
+bao_fs_boss_dr12.rs_rescale          = 1.
+bao_fs_boss_dr12.rd_fid_in_Mpc	     = 147.78

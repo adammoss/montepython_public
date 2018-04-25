@@ -1,0 +1,75 @@
+# input for likelihood for P(k) from SDSS LRG (DR7)
+# adapted from Beth Reid arXiv:0907.1659
+# MontePython version initiated by Antonio Cuesta (2015) and implemented by Thejs Brinckmann (May 2017)
+
+# location of data files
+sdss_lrgDR7.data_directory = data.path['data']
+
+# number of points and kbands in the input files
+sdss_lrgDR7.num_mpk_points_full = 45
+sdss_lrgDR7.num_mpk_kbands_full = 250
+
+# decide which bandpowers to use, min to max
+sdss_lrgDR7.min_mpk_points_use = 1
+sdss_lrgDR7.max_mpk_points_use = 45
+
+# decide which k's to use, min to max
+sdss_lrgDR7.min_mpk_kbands_use = 1
+sdss_lrgDR7.max_mpk_kbands_use = 250
+
+# parameter for the rescaling with respect to a fiducial model
+sdss_lrgDR7.use_scaling = True
+
+# effective redshift of sample
+# old value used previously
+#sdss_lrgDR7.redshift = 0.35
+# new value updated by Beth Reid in CosmoMC based on Percival+2009
+sdss_lrgDR7.redshift = 0.312782
+
+# zmax of sample
+sdss_lrgDR7.zmax = 0.5
+
+# kmax for analysis
+sdss_lrgDR7.kmax = 0.2
+
+# Values for zeff=0.312782 using a flat fiducial with
+# Omega_m = 0.25 Omega_Lambda = 0.75, h=0.701
+# Recompute these if you need to change relevant quantities
+# (e.g. other fixed cosmological parameter)
+sdss_lrgDR7.d_angular_fid = 955.0314
+sdss_lrgDR7.d_radial_fid = 3728.3035
+
+# data filenames
+sdss_lrgDR7.windows_file = 'sdss_lrgDR7/lrgdr7_windows.txt'
+sdss_lrgDR7.kbands_file = 'sdss_lrgDR7/lrgdr7_kbands.txt'
+sdss_lrgDR7.measurements_file = 'sdss_lrgDR7/lrgdr7_ccmeasurements.txt'
+sdss_lrgDR7.zerowindowfxn_file = 'sdss_lrgDR7/lrgdr7_zerowindowfxn.txt'
+sdss_lrgDR7.zerowindowfxnsubtractdat_file = 'sdss_lrgDR7/lrgdr7_zerowindowfxnsubtractdat.txt'
+
+# can provide either a covmat or inverse covmat
+sdss_lrgDR7.use_invcov = True
+#sdss_lrgDR7.covmat_file = 'sdss_lrgDR7/lrgdr7_cov.txt'
+sdss_lrgDR7.covmat_file = 'sdss_lrgDR7/lrgdr7_invcov.txt'
+
+# constants for nuisance parameter marginalization
+sdss_lrgDR7.nptsa1 = 41
+sdss_lrgDR7.nptsa2 = 41
+sdss_lrgDR7.nptstot = 325
+sdss_lrgDR7.a1maxval = 1.1482
+sdss_lrgDR7.s1 = 0.04
+sdss_lrgDR7.s2 = 0.10
+sdss_lrgDR7.k1 = 0.1
+sdss_lrgDR7.k2 = 0.2
+
+# use halofit to model cosmological dependence of non-linear corrections
+sdss_lrgDR7.use_halofit = True
+
+# set to true to save fiducial model for non-linear corrections
+# using the flat fiducial Omega_b = 0.25, Omega_L = 0.75, h = 0.701
+# re-run if changes are made to how non-linear corrections are done
+# e.g. if you change the halofit implementation in CLASS
+# Can keep enabled, as it will only be computed quickly at the start of each run
+sdss_lrgDR7.create_fid = True
+
+# additional options
+sdss_lrgDR7.use_sdssDR7 = True

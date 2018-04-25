@@ -1,0 +1,19 @@
+wisc_bin0.data_directory = os.path.join(data.path['data'], 'ISW')
+
+wisc_bin0.cl_cross_file='wisc/cross/cl0.txt'
+wisc_bin0.cov_cross_file='wisc/cross/cov0.txt'
+wisc_bin0.cl_auto_file='wisc/auto/cl0.txt'
+wisc_bin0.cov_auto_file='wisc/auto/cov0.txt'
+
+wisc_bin0.dndz_file='wisc/dndz_wisc.txt'
+
+wisc_bin0.z_min=0.09
+wisc_bin0.z_max=0.21
+
+wisc_bin0.l_min_cross=4
+wisc_bin0.l_max_cross=100
+wisc_bin0.n_bins_cross=4
+
+wisc_bin0.l_min_auto=10
+wisc_bin0.l_max_auto=50
+wisc_bin0.n_bins_auto=4

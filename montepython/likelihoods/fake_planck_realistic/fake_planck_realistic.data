@@ -1,0 +1,46 @@
+# This is a fake Planck Gaussian likelihood, to be
+# used in error forecasts with a MontePython-generated
+# fiducial model, not containing any actual Planck data,
+# but with a fair estimate of the Planck noise spectrum
+# for the full Planck mission. This likelihood is based
+# on the fake_planck_bluebook likelihood, with extra
+# options implemented for the core_m5 papers, e.g.
+# lensing extraction, de-lensing, or B-modes.
+# Updated noise spectra by D.C. Hooper and T. Brinckmann
+
+# Where to read/write fiducial model:
+fake_planck_realistic.data_directory     = data.path['data']
+fake_planck_realistic.fiducial_file      = 'fake_planck_realistic_fiducial.dat'
+
+# Experimental sensitivity:
+fake_planck_realistic.l_min              = 2
+#fake_planck_realistic.l_max              = 2500
+fake_planck_realistic.l_max              = 3000
+fake_planck_realistic.f_sky              = 0.57
+
+# do you want to include Bmodes (Gaussian approximation)?
+core_m5.Bmodes = False
+core_m5.delensing = False
+
+# do you want to use noise from file?
+fake_planck_realistic.noise_from_file = True
+
+# Noise file used for CORE-M5 papers, Sprenger et al. 2018.
+# By A. Challinor. See data file for details.
+#fake_planck_realistic.noise_file = 'fake_planck_realistic.dat'
+
+# As we cannot easily model the noise associated with
+# foregrounds for the 217 GHz channel, we instead prefer
+# to omit this channel and only use the first two channels.
+# channels = 100, 143, (217) in GHz
+# fwhm = 10.0 7.1, (5.0) in arcmin
+# sigma_T = 6.8 6.0, (13.1) in muK per pixel
+# sigma_P = 10.9 11.4, (18.5) in  muK per pixel
+# Minimum variance noise estimate using these settings
+fake_planck_realistic.noise_file = 'noise_fake_planck_realistic_two.dat'
+
+# do you want to include lensing extraction?
+fake_planck_realistic.LensingExtraction = True
+fake_planck_realistic.neglect_TD = True
+fake_planck_realistic.unlensed_clTTTEEE = False
+core_m5.ExcludeTTTEEE = False

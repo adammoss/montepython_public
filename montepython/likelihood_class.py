@@ -15,6 +15,9 @@ import math
 import warnings
 import re
 import scipy.constants as const
+import scipy.integrate
+import scipy.interpolate
+import scipy.misc
 
 import io_mp
 
@@ -183,7 +186,7 @@ class Likelihood(object):
 
         """
         # get C_l^XX from the cosmological code
-        cl = cosmo.lensed_cl(l_max)
+        cl = cosmo.lensed_cl(int(l_max))
 
         # convert dimensionless C_l's to C_l in muK**2
         T = cosmo.T_cmb()
@@ -883,7 +886,8 @@ class Likelihood_clik(Likelihood):
         except clik.lkl.CError:
             raise io_mp.LikelihoodError(
                 "The path to the .clik file for the likelihood "
-                "%s was not found where indicated." % self.name +
+                "%s was not found where indicated:\n%s\n"
+                % (self.name,self.path_clik) +
                 " Note that the default path to search for it is"
                 " one directory above the path['clik'] field. You"
                 " can change this behaviour in all the "
@@ -901,7 +905,7 @@ class Likelihood_clik(Likelihood):
         self.nuisance = list(self.clik.extra_parameter_names)
 
         # line added to deal with a bug in planck likelihood release: A_planck called A_Planck in plik_lite
-        if (self.name == 'Planck_highl_lite'):
+        if (self.name == 'Planck_highl_lite') or (self.name == 'Planck_highl_TTTEEE_lite'):
             for i in range(len(self.nuisance)):
                 if (self.nuisance[i] == 'A_Planck'):
                     self.nuisance[i] = 'A_planck'
@@ -1017,7 +1021,7 @@ class Likelihood_clik(Likelihood):
         for nuisance in self.clik.get_extra_parameter_names():
 
             # line added to deal with a bug in planck likelihood release: A_planck called A_Planck in plik_lite
-            if (self.name == 'Planck_highl_lite'):
+            if (self.name == 'Planck_highl_lite') or (self.name == 'Planck_highl_TTTEEE_lite'):
                 if nuisance == 'A_Planck':
                     nuisance = 'A_planck'
 
@@ -1060,31 +1064,111 @@ class Likelihood_mock_cmb(Likelihood):
         # Noise spectrum
         ################
 
-        # convert arcmin to radians
-        self.theta_fwhm *= np.array([math.pi/60/180])
-        self.sigma_T *= np.array([math.pi/60/180])
-        self.sigma_P *= np.array([math.pi/60/180])
+        try:
+            self.noise_from_file
+        except:
+            self.noise_from_file = False
 
-        # compute noise in muK**2
-        self.noise_T = np.zeros(self.l_max+1, 'float64')
-        self.noise_P = np.zeros(self.l_max+1, 'float64')
+        if self.noise_from_file:
 
-        for l in range(self.l_min, self.l_max+1):
-            self.noise_T[l] = 0
-            self.noise_P[l] = 0
-            for channel in range(self.num_channels):
-                self.noise_T[l] += self.sigma_T[channel]**-2 *\
-                    math.exp(
-                        -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
-                self.noise_P[l] += self.sigma_P[channel]**-2 *\
-                    math.exp(
-                        -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
-            self.noise_T[l] = 1/self.noise_T[l]
-            self.noise_P[l] = 1/self.noise_P[l]
+            try:
+                self.noise_file
+            except:
+                raise io_mp.LikelihoodError("For reading noise from file, you must provide noise_file")
+
+            self.noise_T = np.zeros(self.l_max+1, 'float64')
+            self.noise_P = np.zeros(self.l_max+1, 'float64')
+            if self.LensingExtraction:
+                self.Nldd = np.zeros(self.l_max+1, 'float64')
+
+            if os.path.exists(os.path.join(self.data_directory, self.noise_file)):
+                noise = open(os.path.join(
+                    self.data_directory, self.noise_file), 'r')
+                line = noise.readline()
+                while line.find('#') != -1:
+                    line = noise.readline()
+
+                for l in range(self.l_min, self.l_max+1):
+                    ll = int(float(line.split()[0]))
+                    if l != ll:
+                        # if l_min is larger than the first l in the noise file we can skip lines
+                        # until we are at the correct l. Otherwise raise error
+                        while l > ll:
+                            try:
+                                line = fid_file.readline()
+                                ll = int(float(line.split()[0]))
+                            except:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
+                        if l < ll:
+                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the noise file")
+                    # read noise for C_l in muK**2
+                    self.noise_T[l] = float(line.split()[1])
+                    self.noise_P[l] = float(line.split()[2])
+                    if self.LensingExtraction:
+                        try:
+                            # read noise for C_l^dd = l(l+1) C_l^pp
+                            self.Nldd[l] = float(line.split()[3])/(l*(l+1)/2./math.pi)
+                        except:
+                            raise io_mp.LikelihoodError("For reading lensing noise from file, you must provide one more column")
+                    line = noise.readline()
+            else:
+                raise io_mp.LikelihoodError("Could not find file ",self.noise_file)
+
+
+        else:
+            # convert arcmin to radians
+            self.theta_fwhm *= np.array([math.pi/60/180])
+            self.sigma_T *= np.array([math.pi/60/180])
+            self.sigma_P *= np.array([math.pi/60/180])
+
+            # compute noise in muK**2
+            self.noise_T = np.zeros(self.l_max+1, 'float64')
+            self.noise_P = np.zeros(self.l_max+1, 'float64')
+
+            for l in range(self.l_min, self.l_max+1):
+                self.noise_T[l] = 0
+                self.noise_P[l] = 0
+                for channel in range(self.num_channels):
+                    self.noise_T[l] += self.sigma_T[channel]**-2 *\
+                                       math.exp(
+                                           -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
+                    self.noise_P[l] += self.sigma_P[channel]**-2 *\
+                                       math.exp(
+                                           -l*(l+1)*self.theta_fwhm[channel]**2/8/math.log(2))
+                self.noise_T[l] = 1/self.noise_T[l]
+                self.noise_P[l] = 1/self.noise_P[l]
+
+
+        # trick to remove any information from polarisation for l<30
+        try:
+            self.no_small_l_pol
+        except:
+            self.no_small_l_pol = False
+
+        if self.no_small_l_pol:
+            for l in range(self.l_min,30):
+                # plug a noise level of 100 muK**2, equivalent to no detection at all of polarisation
+                self.noise_P[l] = 100.
+
+        # trick to remove any information from temperature above l_max_TT
+        try:
+            self.l_max_TT
+        except:
+            self.l_max_TT = False
+
+        if self.l_max_TT:
+            for l in range(self.l_max_TT+1,l_max+1):
+                # plug a noise level of 100 muK**2, equivalent to no detection at all of temperature
+                self.noise_T[l] = 100.
 
         # impose that the cosmological code computes Cl's up to maximum l
         # needed by the window function
         self.need_cosmo_arguments(data, {'l_max_scalars': self.l_max})
+
+        # if you want to print the noise spectra:
+        #test = open('noise_T_P','w')
+        #for l in range(self.l_min, self.l_max+1):
+        #    test.write('%d  %e  %e\n'%(l,self.noise_T[l],self.noise_P[l]))
 
         ###########################################################################
         # implementation of default settings for flags describing the likelihood: #
@@ -1115,6 +1199,15 @@ class Likelihood_mock_cmb(Likelihood):
             self.unlensed_clTTTEEE
         except:
             self.unlensed_clTTTEEE = False
+        # - do not exclude TTEE by default:
+        try:
+            self.ExcludeTTTEEE
+            if self.ExcludeTTTEEE and not self.LensingExtraction:
+                raise io_mp.LikelihoodError("Mock CMB likelihoods where TTTEEE is not used have only been "
+                                            "implemented for the deflection spectrum (i.e. not for B-modes), "
+                                            "but you do not seem to have lensing extraction enabled")
+        except:
+            self.ExcludeTTTEEE = False
 
         ##############################################
         # Delensing noise: implemented by  S. Clesse #
@@ -1138,7 +1231,16 @@ class Likelihood_mock_cmb(Likelihood):
                 for l in range(self.l_min, self.l_max+1):
                     ll = int(float(line.split()[0]))
                     if l != ll:
-                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        # if l_min is larger than the first l in the delensing file we can skip lines
+                        # until we are at the correct l. Otherwise raise error
+                        while l > ll:
+                            try:
+                                line = fid_file.readline()
+                                ll = int(float(line.split()[0]))
+                            except:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        if l < ll:
+                            raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
                     self.noise_delensing[ll] = float(line.split()[2])/(ll*(ll+1)/2./math.pi)
                     # change 3 to 4 in the above line for CMBxCIB delensing
                     line = delensing_file.readline()
@@ -1151,7 +1253,11 @@ class Likelihood_mock_cmb(Likelihood):
         ###############################################################
 
         # default:
-        numCls = 3
+        if not self.ExcludeTTTEEE:
+            numCls = 3
+        # default 0 if excluding TT EE
+        else:
+            numCls = 0
 
         # deal with BB:
         if self.Bmodes:
@@ -1162,38 +1268,49 @@ class Likelihood_mock_cmb(Likelihood):
         if self.LensingExtraction:
             self.index_pp = numCls
             numCls += 1
-            self.index_tp = numCls
-            numCls += 1
+            if not self.ExcludeTTTEEE:
+                self.index_tp = numCls
+                numCls += 1
 
-            # provide a file containing NlDD (noise for the extracted
-            # deflection field spectrum) This option is temporary
-            # because at some point this module will compute NlDD
-            # itself, when logging the fiducial model spectrum.
-            try:
-                self.temporary_Nldd_file
-            except:
-                raise io_mp.LikelihoodError("For lensing extraction, you must provide a temporary_Nldd_file")
+            if not self.noise_from_file:
+                # provide a file containing NlDD (noise for the extracted
+                # deflection field spectrum) This option is temporary
+                # because at some point this module will compute NlDD
+                # itself, when logging the fiducial model spectrum.
+                try:
+                    self.temporary_Nldd_file
+                except:
+                    raise io_mp.LikelihoodError("For lensing extraction, you must provide a temporary_Nldd_file")
 
-            # read the NlDD file
-            self.Nldd = np.zeros(self.l_max+1, 'float64')
+                # read the NlDD file
+                self.Nldd = np.zeros(self.l_max+1, 'float64')
 
-            if os.path.exists(os.path.join(self.data_directory, self.temporary_Nldd_file)):
-                fid_file = open(os.path.join(self.data_directory, self.temporary_Nldd_file), 'r')
-                line = fid_file.readline()
-                while line.find('#') != -1:
+                if os.path.exists(os.path.join(self.data_directory, self.temporary_Nldd_file)):
+                    fid_file = open(os.path.join(self.data_directory, self.temporary_Nldd_file), 'r')
                     line = fid_file.readline()
-                while (line.find('\n') != -1 and len(line) == 1):
-                    line = fid_file.readline()
-                for l in range(self.l_min, self.l_max+1):
-                    ll = int(float(line.split()[0]))
-                    if l != ll:
-                        raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
-                    # this lines assumes that Nldd is stored in the
-                    # 4th column (can be customised)
-                    self.Nldd[ll] = float(line.split()[3])/(l*(l+1.)/2./math.pi)
-                    line = fid_file.readline()
-            else:
-                raise io_mp.LikelihoodError("Could not find file ",self.temporary_Nldd_file)
+                    while line.find('#') != -1:
+                        line = fid_file.readline()
+                    while (line.find('\n') != -1 and len(line) == 1):
+                        line = fid_file.readline()
+                    for l in range(self.l_min, self.l_max+1):
+                        ll = int(float(line.split()[0]))
+                        if l != ll:
+                            # if l_min is larger than the first l in the delensing file we can skip lines
+                            # until we are at the correct l. Otherwise raise error
+                            while l > ll:
+                                try:
+                                    line = fid_file.readline()
+                                    ll = int(float(line.split()[0]))
+                                except:
+                                    raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                            if l < ll:
+                                raise io_mp.LikelihoodError("Mismatch between required values of l in the code and in the delensing file")
+                        # this lines assumes that Nldd is stored in the
+                        # 4th column (can be customised)
+                        self.Nldd[ll] = float(line.split()[3])/(l*(l+1.)/2./math.pi)
+                        line = fid_file.readline()
+                else:
+                    raise io_mp.LikelihoodError("Could not find file ",self.temporary_Nldd_file)
 
         # deal with fiducial model:
         # If the file exists, initialize the fiducial values
@@ -1211,9 +1328,10 @@ class Likelihood_mock_cmb(Likelihood):
                 line = fid_file.readline()
             for l in range(self.l_min, self.l_max+1):
                 ll = int(line.split()[0])
-                self.Cl_fid[0, ll] = float(line.split()[1])
-                self.Cl_fid[1, ll] = float(line.split()[2])
-                self.Cl_fid[2, ll] = float(line.split()[3])
+                if not self.ExcludeTTTEEE:
+                    self.Cl_fid[0, ll] = float(line.split()[1])
+                    self.Cl_fid[1, ll] = float(line.split()[2])
+                    self.Cl_fid[2, ll] = float(line.split()[3])
                 # read BB:
                 if self.Bmodes:
                     try:
@@ -1225,7 +1343,8 @@ class Likelihood_mock_cmb(Likelihood):
                 if self.LensingExtraction:
                     try:
                         self.Cl_fid[self.index_pp, ll] = float(line.split()[self.index_pp+1])
-                        self.Cl_fid[self.index_tp, ll] = float(line.split()[self.index_tp+1])
+                        if not self.ExcludeTTTEEE:
+                            self.Cl_fid[self.index_tp, ll] = float(line.split()[self.index_tp+1])
                     except:
                         raise io_mp.LikelihoodError(
                             "The fiducial model does not have enough columns.")
@@ -1256,6 +1375,10 @@ class Likelihood_mock_cmb(Likelihood):
             print "  neglect_TD is True"
         else:
             print "  neglect_TD is False"
+        if self.ExcludeTTTEEE:
+            print "  ExcludeTTTEEE is True"
+        else:
+            print "  ExcludeTTTEEE is False"
         print ""
 
         # end of initialisation
@@ -1304,9 +1427,10 @@ class Likelihood_mock_cmb(Likelihood):
             fid_file.write('\n')
             for l in range(self.l_min, self.l_max+1):
                 fid_file.write("%5d  " % l)
-                fid_file.write("%.8g  " % (cl['tt'][l]+self.noise_T[l]))
-                fid_file.write("%.8g  " % (cl['ee'][l]+self.noise_P[l]))
-                fid_file.write("%.8g  " % cl['te'][l])
+                if not self.ExcludeTTTEEE:
+                    fid_file.write("%.8g  " % (cl['tt'][l]+self.noise_T[l]))
+                    fid_file.write("%.8g  " % (cl['ee'][l]+self.noise_P[l]))
+                    fid_file.write("%.8g  " % cl['te'][l])
                 if self.Bmodes:
                     # next three lines added by S. Clesse for delensing
                     if self.delensing:
@@ -1317,7 +1441,8 @@ class Likelihood_mock_cmb(Likelihood):
                     # we want to store clDD = l(l+1) clpp
                     # and ClTD = sqrt(l(l+1)) Cltp
                     fid_file.write("%.8g  " % (l*(l+1.)*cl['pp'][l] + self.Nldd[l]))
-                    fid_file.write("%.8g  " % (math.sqrt(l*(l+1.))*cl['tp'][l]))
+                    if not self.ExcludeTTTEEE:
+                        fid_file.write("%.8g  " % (math.sqrt(l*(l+1.))*cl['tp'][l]))
                 fid_file.write("\n")
             print '\n'
             warnings.warn(
@@ -1329,12 +1454,16 @@ class Likelihood_mock_cmb(Likelihood):
 
         chi2 = 0
 
-        # cound number of modes.
+        # count number of modes.
         # number of modes is different form number of spectra
         # modes = T,E,[B],[D=deflection]
         # spectra = TT,EE,TE,[BB],[DD,TD]
         # default:
-        num_modes=2
+        if not self.ExcludeTTTEEE:
+            num_modes=2
+        # default 0 if excluding TT EE
+        else:
+            num_modes=0
         # add B mode:
         if self.Bmodes:
             num_modes += 1
@@ -1349,7 +1478,7 @@ class Likelihood_mock_cmb(Likelihood):
         for l in range(self.l_min, self.l_max+1):
 
             if self.Bmodes and self.LensingExtraction:
-                raise io_mp.LikelihoodError("We have implemented a version of the liklihood with B modes, a version with lensing extraction, but not yet a version with both at the same time. You can implement it.")
+                raise io_mp.LikelihoodError("We have implemented a version of the likelihood with B modes, a version with lensing extraction, but not yet a version with both at the same time. You can implement it.")
 
             # case with B modes:
             elif self.Bmodes:
@@ -1370,13 +1499,21 @@ class Likelihood_mock_cmb(Likelihood):
                         [0, 0, cl['bb'][l]+self.noise_P[l]]])
 
             # case with lensing
-            # note that the likelihood is base on ClDD (deflection spectrum)
+            # note that the likelihood is based on ClDD (deflection spectrum)
             # rather than Clpp (lensing potential spectrum)
             # But the Bolztmann code input is Clpp
             # So we make the conversion using ClDD = l*(l+1.)*Clpp
             # So we make the conversion using ClTD = sqrt(l*(l+1.))*Cltp
-            elif self.LensingExtraction:
 
+            # just DD, i.e. no TT or EE.
+            elif self.LensingExtraction and self.ExcludeTTTEEE:
+                cldd_fid = self.Cl_fid[self.index_pp, l]
+                cldd = l*(l+1.)*cl['pp'][l]
+                Cov_obs = np.array([[cldd_fid]])
+                Cov_the = np.array([[cldd+self.Nldd[l]]])
+
+            # Usual TTTEEE plus DD and TD
+            elif self.LensingExtraction:
                 cldd_fid = self.Cl_fid[self.index_pp, l]
                 cldd = l*(l+1.)*cl['pp'][l]
                 if self.neglect_TD:
@@ -1447,16 +1584,24 @@ class Likelihood_mpk(Likelihood):
         if self.use_halofit:
             self.need_cosmo_arguments(data, {'non linear': 'halofit'})
 
+        # sdssDR7 by T. Brinckmann
+        # Based on Reid et al. 2010 arXiv:0907.1659 - Note: arXiv version not updated
+        try:
+            self.use_sdssDR7
+        except:
+            self.use_sdssDR7 = False
+
         # read values of k (in h/Mpc)
         self.k_size = self.max_mpk_kbands_use-self.min_mpk_kbands_use+1
         self.mu_size = 1
         self.k = np.zeros((self.k_size), 'float64')
         self.kh = np.zeros((self.k_size), 'float64')
 
-        datafile = open(self.data_directory+self.kbands_file, 'r')
-
+        datafile = open(os.path.join(self.data_directory, self.kbands_file), 'r')
         for i in range(self.num_mpk_kbands_full):
             line = datafile.readline()
+            while line.find('#') != -1:
+                line = datafile.readline()
             if i+2 > self.min_mpk_kbands_use and i < self.max_mpk_kbands_use:
                 self.kh[i-self.min_mpk_kbands_use+1] = float(line.split()[0])
         datafile.close()
@@ -1492,7 +1637,7 @@ class Likelihood_mpk(Likelihood):
                     "'use_giggleZPP0' is set to true for WiggleZ")
 
         if self.use_giggleZ:
-            datafile = open(self.data_directory+self.giggleZ_fidpk_file, 'r')
+            datafile = open(os.path.join(self.data_directory,self.giggleZ_fidpk_file), 'r')
 
             line = datafile.readline()
             k = float(line.split()[0])
@@ -1514,8 +1659,12 @@ class Likelihood_mpk(Likelihood):
             khmax *= 2
 
         # require k_max and z_max from the cosmological module
-        self.need_cosmo_arguments(
-            data, {'P_k_max_h/Mpc': khmax, 'z_max_pk': self.redshift})
+        if self.use_sdssDR7:
+            self.need_cosmo_arguments(data, {'z_max_pk': self.zmax})
+            self.need_cosmo_arguments(data, {'P_k_max_h/Mpc': 7.5*self.kmax})
+        else:
+            self.need_cosmo_arguments(
+                data, {'P_k_max_h/Mpc': khmax, 'z_max_pk': self.redshift})
 
         # read information on different regions in the sky
         try:
@@ -1544,35 +1693,31 @@ class Likelihood_mpk(Likelihood):
         self.window = np.zeros(
             (self.num_regions, self.n_size, self.k_size), 'float64')
 
-        datafile = open(self.data_directory+self.windows_file, 'r')
+        datafile = open(os.path.join(self.data_directory, self.windows_file), 'r')
         for i_region in range(self.num_regions):
-            if self.num_regions > 1:
-                line = datafile.readline()
             for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
-                if (i+2 > self.min_mpk_points_use and
-                        i < self.max_mpk_points_use):
+                while line.find('#') != -1:
+                    line = datafile.readline()
+                if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
                     for j in range(self.k_size):
-                        self.window[i_region, i-self.min_mpk_points_use+1, j]=\
-                            float(line.split()[j+self.min_mpk_kbands_use-1])
+                        self.window[i_region, i-self.min_mpk_points_use+1, j] = float(line.split()[j+self.min_mpk_kbands_use-1])
         datafile.close()
 
         # read measurements
         self.P_obs = np.zeros((self.num_regions, self.n_size), 'float64')
         self.P_err = np.zeros((self.num_regions, self.n_size), 'float64')
 
-        datafile = open(self.data_directory+self.measurements_file, 'r')
+        datafile = open(os.path.join(self.data_directory, self.measurements_file), 'r')
         for i_region in range(self.num_regions):
-            for i in range(2):
-                line = datafile.readline()
             for i in range(self.num_mpk_points_full):
                 line = datafile.readline()
+                while line.find('#') != -1:
+                    line = datafile.readline()
                 if (i+2 > self.min_mpk_points_use and
-                        i < self.max_mpk_points_use):
-                    self.P_obs[i_region, i-self.min_mpk_points_use+1] = \
-                        float(line.split()[3])
-                    self.P_err[i_region, i-self.min_mpk_points_use+1] = \
-                        float(line.split()[4])
+                    i < self.max_mpk_points_use):
+                    self.P_obs[i_region, i-self.min_mpk_points_use+1] = float(line.split()[3])
+                    self.P_err[i_region, i-self.min_mpk_points_use+1] = float(line.split()[4])
         datafile.close()
 
         # read covariance matrices
@@ -1582,6 +1727,11 @@ class Likelihood_mpk(Likelihood):
         except:
             self.use_covmat = False
 
+        try:
+            self.use_invcov
+        except:
+            self.use_invcov = False
+
         self.invcov = np.zeros(
             (self.num_regions, self.n_size, self.n_size), 'float64')
 
@@ -1589,21 +1739,21 @@ class Likelihood_mpk(Likelihood):
             cov = np.zeros((self.n_size, self.n_size), 'float64')
             invcov_tmp = np.zeros((self.n_size, self.n_size), 'float64')
 
-            datafile = open(self.data_directory+self.covmat_file, 'r')
+            datafile = open(os.path.join(self.data_directory, self.covmat_file), 'r')
             for i_region in range(self.num_regions):
-                for i in range(1):
-                    line = datafile.readline()
                 for i in range(self.num_mpk_points_full):
                     line = datafile.readline()
-                    if (i+2 > self.min_mpk_points_use and
-                            i < self.max_mpk_points_use):
+                    while line.find('#') != -1:
+                        line = datafile.readline()
+                    if (i+2 > self.min_mpk_points_use and i < self.max_mpk_points_use):
                         for j in range(self.num_mpk_points_full):
-                            if (j+2 > self.min_mpk_points_use and
-                                    j < self.max_mpk_points_use):
-                                cov[i-self.min_mpk_points_use+1,
-                                    j-self.min_mpk_points_use+1] =\
-                                    float(line.split()[j])
-                invcov_tmp = np.linalg.inv(cov)
+                            if (j+2 > self.min_mpk_points_use and j < self.max_mpk_points_use):
+                                cov[i-self.min_mpk_points_use+1,j-self.min_mpk_points_use+1] = float(line.split()[j])
+
+                if self.use_invcov:
+                    invcov_tmp = cov
+                else:
+                    invcov_tmp = np.linalg.inv(cov)
                 for i in range(self.n_size):
                     for j in range(self.n_size):
                         self.invcov[i_region, i, j] = invcov_tmp[i, j]
@@ -1618,7 +1768,7 @@ class Likelihood_mpk(Likelihood):
         if self.use_giggleZ:
             self.P_fid = np.zeros((self.k_fid_size), 'float64')
             self.k_fid = np.zeros((self.k_fid_size), 'float64')
-            datafile = open(self.data_directory+self.giggleZ_fidpk_file, 'r')
+            datafile = open(os.path.join(self.data_directory,self.giggleZ_fidpk_file), 'r')
             for i in range(ifid_discard):
                 line = datafile.readline()
             for i in range(self.k_fid_size):
@@ -1627,7 +1777,129 @@ class Likelihood_mpk(Likelihood):
                 self.P_fid[i] = float(line.split()[1])
             datafile.close()
 
+        # read integral constraint
+        if self.use_sdssDR7:
+            self.zerowindowfxn = np.zeros((self.k_size), 'float64')
+            datafile = open(os.path.join(self.data_directory,self.zerowindowfxn_file), 'r')
+            for i in range(self.k_size):
+                line = datafile.readline()
+                self.zerowindowfxn[i] = float(line.split()[0])
+            datafile.close()
+            self.zerowindowfxnsubtractdat = np.zeros((self.n_size), 'float64')
+            datafile = open(os.path.join(self.data_directory,self.zerowindowfxnsubtractdat_file), 'r')
+            line = datafile.readline()
+            self.zerowindowfxnsubtractdatnorm = float(line.split()[0])
+            for i in range(self.n_size):
+                line = datafile.readline()
+            self.zerowindowfxnsubtractdat[i] = float(line.split()[0])
+            datafile.close()
+
+        # initialize array of values for the nuisance parameters a1,a2
+        if self.use_sdssDR7:
+            nptsa1=self.nptsa1
+            nptsa2=self.nptsa2
+            a1maxval=self.a1maxval
+            self.a1list=np.zeros(self.nptstot)
+            self.a2list=np.zeros(self.nptstot)
+            da1 = a1maxval/(nptsa1/2)
+            da2 = self.a2maxpos(-a1maxval) / (nptsa2/2)
+            count=0
+            for i in range(-nptsa1/2, nptsa1/2+1):
+                for j in range(-nptsa2/2, nptsa2/2+1):
+                    a1val = da1*i
+                    a2val = da2*j
+                    if ((a2val >= 0.0 and a2val <= self.a2maxpos(a1val) and a2val >= self.a2minfinalpos(a1val)) or \
+                        (a2val <= 0.0 and a2val <= self.a2maxfinalneg(a1val) and a2val >= self.a2minneg(a1val))):
+                        if (self.testa1a2(a1val,a2val) == False):
+                            raise io_mp.LikelihoodError(
+                                'Error in likelihood %s ' % (self.name) +
+                                'Nuisance parameter values not valid: %s %s' % (a1,a2) )
+                        if(count >= self.nptstot):
+                            raise io_mp.LikelihoodError(
+                                'Error in likelihood %s ' % (self.name) +
+                                'count > nptstot failure' )
+                        self.a1list[count]=a1val
+                        self.a2list[count]=a2val
+                        count=count+1
+
         return
+
+    # functions added for nuisance parameter space checks.
+    def a2maxpos(self,a1val):
+        a2max = -1.0
+        if (a1val <= min(self.s1/self.k1,self.s2/self.k2)):
+            a2max = min(self.s1/self.k1**2 - a1val/self.k1, self.s2/self.k2**2 - a1val/self.k2)
+        return a2max
+
+    def a2min1pos(self,a1val):
+        a2min1 = 0.0
+        if(a1val <= 0.0):
+            a2min1 = max(-self.s1/self.k1**2 - a1val/self.k1, -self.s2/self.k2**2 - a1val/self.k2, 0.0)
+        return a2min1
+
+    def a2min2pos(self,a1val):
+        a2min2 = 0.0
+        if(abs(a1val) >= 2.0*self.s1/self.k1 and a1val <= 0.0):
+            a2min2 = a1val**2/self.s1*0.25
+        return a2min2
+
+    def a2min3pos(self,a1val):
+        a2min3 = 0.0
+        if(abs(a1val) >= 2.0*self.s2/self.k2 and a1val <= 0.0):
+            a2min3 = a1val**2/self.s2*0.25
+        return a2min3
+
+    def a2minfinalpos(self,a1val):
+        a2minpos = max(self.a2min1pos(a1val),self.a2min2pos(a1val),self.a2min3pos(a1val))
+        return a2minpos
+
+    def a2minneg(self,a1val):
+        if (a1val >= max(-self.s1/self.k1,-self.s2/self.k2)):
+            a2min = max(-self.s1/self.k1**2 - a1val/self.k1, -self.s2/self.k2**2 - a1val/self.k2)
+        else:
+            a2min = 1.0
+        return a2min
+
+    def a2max1neg(self,a1val):
+        if(a1val >= 0.0):
+            a2max1 = min(self.s1/self.k1**2 - a1val/self.k1, self.s2/self.k2**2 - a1val/self.k2, 0.0)
+        else:
+            a2max1 = 0.0
+        return a2max1
+
+    def a2max2neg(self,a1val):
+        a2max2 = 0.0
+        if(abs(a1val) >= 2.0*self.s1/self.k1 and a1val >= 0.0):
+            a2max2 = -a1val**2/self.s1*0.25
+        return a2max2
+
+    def a2max3neg(self,a1val):
+        a2max3 = 0.0
+        if(abs(a1val) >= 2.0*self.s2/self.k2 and a1val >= 0.0):
+            a2max3 = -a1val**2/self.s2*0.25
+        return a2max3
+
+    def a2maxfinalneg(self,a1val):
+        a2maxneg = min(self.a2max1neg(a1val),self.a2max2neg(a1val),self.a2max3neg(a1val))
+        return a2maxneg
+
+    def testa1a2(self,a1val, a2val):
+        testresult = True
+        # check if there's an extremum; either a1val or a2val has to be negative, not both
+        if (a2val==0.):
+             return testresult #not in the original code, but since a2val=0 returns True this way I avoid zerodivisionerror
+        kext = -a1val/2.0/a2val
+        diffval = abs(a1val*kext + a2val*kext**2)
+        if(kext > 0.0 and kext <= self.k1 and diffval > self.s1):
+            testresult = False
+        if(kext > 0.0 and kext <= self.k2 and diffval > self.s2):
+            testresult = False
+        if (abs(a1val*self.k1 + a2val*self.k1**2) > self.s1):
+            testresult = False
+        if (abs(a1val*self.k2 + a2val*self.k2**2) > self.s2):
+            testresult = False
+        return testresult
+
 
     def add_common_knowledge(self, common_dictionary):
         """
@@ -1658,7 +1930,7 @@ class Likelihood_mpk(Likelihood):
         # reduced Hubble parameter
         h = cosmo.h()
 
-        # WiggleZ specific
+        # WiggleZ and sdssDR7 specific
         if self.use_scaling:
             # angular diameter distance at this redshift, in Mpc
             d_angular = cosmo.angular_distance(self.redshift)
@@ -1679,7 +1951,6 @@ class Likelihood_mpk(Likelihood):
                 (self.d_radial_fid/d_radial), 1./3.)
         else:
             scaling = 1
-
         # get rescaled values of k in 1/Mpc
         self.k = self.kh*h*scaling
 
@@ -1713,6 +1984,105 @@ class Likelihood_mpk(Likelihood):
                 # get P_lin by interpolation. It is still in (Mpc/h)**3
                 P_lin = np.interp(self.kh, self.k_fid, P)
 
+        elif self.use_sdssDR7:
+            kh = np.logspace(math.log(1e-3),math.log(1.0),num=(math.log(1.0)-math.log(1e-3))/0.01+1,base=math.exp(1.0)) # k in h/Mpc
+            # Rescale the scaling factor by the fiducial value for h divided by the sampled value
+            # h=0.701 was used for the N-body calibration simulations
+            scaling = scaling * (0.701/h)
+            k = kh*h # k in 1/Mpc
+
+            # Define redshift bins and associated bao 2 sigma value [NEAR, MID, FAR]
+            z = np.array([0.235, 0.342, 0.421])
+            sigma2bao = np.array([86.9988, 85.1374, 84.5958])
+            # Initialize arrays
+            # Analytical growth factor for each redshift bin
+            D_growth = np.zeros(len(z))
+            # P(k) *with* wiggles, both linear and nonlinear
+            Plin = np.zeros(len(k), 'float64')
+            Pnl = np.zeros(len(k), 'float64')
+            # P(k) *without* wiggles, both linear and nonlinear
+            Psmooth = np.zeros(len(k), 'float64')
+            Psmooth_nl = np.zeros(len(k), 'float64')
+            # Damping function and smeared P(k)
+            fdamp = np.zeros([len(k), len(z)], 'float64')
+            Psmear = np.zeros([len(k), len(z)], 'float64')
+            # Ratio of smoothened non-linear to linear P(k)
+            nlratio = np.zeros([len(k), len(z)], 'float64')
+            # Loop over each redshift bin
+            for j in range(len(z)):
+                # Compute growth factor at each redshift
+                # This growth factor is normalized by the growth factor today
+                D_growth[j] = cosmo.scale_independent_growth_factor(z[j])
+                # Compute Pk *with* wiggles, both linear and nonlinear
+                # Get P(k) at right values of k in Mpc**3, convert it to (Mpc/h)^3 and rescale it
+                # Get values of P(k) in Mpc**3
+                for i in range(len(k)):
+                    Plin[i] = cosmo.pk_lin(k[i], z[j])
+                    Pnl[i] = cosmo.pk(k[i], z[j])
+                # Get rescaled values of P(k) in (Mpc/h)**3
+                Plin *= h**3 #(h/scaling)**3
+                Pnl *= h**3 #(h/scaling)**3
+                # Compute Pk *without* wiggles, both linear and nonlinear
+                Psmooth = self.remove_bao(kh,Plin)
+                Psmooth_nl = self.remove_bao(kh,Pnl)
+                # Apply Gaussian damping due to non-linearities
+                fdamp[:,j] = np.exp(-0.5*sigma2bao[j]*kh**2)
+                Psmear[:,j] = Plin*fdamp[:,j]+Psmooth*(1.0-fdamp[:,j])
+                # Take ratio of smoothened non-linear to linear P(k)
+                nlratio[:,j] = Psmooth_nl/Psmooth
+
+            # Save fiducial model for non-linear corrections using the flat fiducial
+            # Omega_m = 0.25, Omega_L = 0.75, h = 0.701
+            # Re-run if changes are made to how non-linear corrections are done
+            # e.g. the halofit implementation in CLASS
+            # To re-run fiducial, set <experiment>.create_fid = True in .data file
+            # Can leave option enabled, as it will only compute once at the start
+            try:
+                self.create_fid
+            except:
+                self.create_fid = False
+
+            if self.create_fid == True:
+                # Calculate relevant flat fiducial quantities
+                fidnlratio, fidNEAR, fidMID, fidFAR = self.get_flat_fid(cosmo,data,kh,z,sigma2bao)
+                try:
+                    existing_fid = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
+                    print 'sdss_lrgDR7: Checking fiducial deviations for near, mid and far bins:', np.sum(existing_fid[:,1] - fidNEAR),np.sum(existing_fid[:,2] - fidMID), np.sum(existing_fid[:,3] - fidFAR)
+                    if np.sum(existing_fid[:,1] - fidNEAR) + np.sum(existing_fid[:,2] - fidMID) + np.sum(existing_fid[:,3] - fidFAR) < 10**-5:
+                        self.create_fid = False
+                except:
+                    pass
+                if self.create_fid == True:
+                    print 'sdss_lrgDR7: Creating fiducial file with Omega_b = 0.25, Omega_L = 0.75, h = 0.701'
+                    print '             Required for non-linear modeling'
+                    # Save non-linear corrections from N-body sims for each redshift bin
+                    arr=np.zeros((np.size(kh),7))
+                    arr[:,0]=kh
+                    arr[:,1]=fidNEAR
+                    arr[:,2]=fidMID
+                    arr[:,3]=fidFAR
+                    # Save non-linear corrections from halofit for each redshift bin
+                    arr[:,4:7]=fidnlratio
+                    np.savetxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat',arr)
+                    self.create_fid = False
+                    print '             Fiducial created'
+
+            # Load fiducial model
+            fiducial = np.loadtxt('data/sdss_lrgDR7/sdss_lrgDR7_fiducialmodel.dat')
+            fid = fiducial[:,1:4]
+            fidnlratio = fiducial[:,4:7]
+
+            # Put all factors together to obtain the P(k) for each redshift bin
+            Pnear=np.interp(kh,kh,Psmear[:,0]*(nlratio[:,0]/fidnlratio[:,0])*fid[:,0]*D_growth[0]**(-2.))
+            Pmid =np.interp(kh,kh,Psmear[:,1]*(nlratio[:,1]/fidnlratio[:,1])*fid[:,1]*D_growth[1]**(-2.))
+            Pfar =np.interp(kh,kh,Psmear[:,2]*(nlratio[:,2]/fidnlratio[:,2])*fid[:,2]*D_growth[2]**(-2.))
+
+            # Define and rescale k
+            self.k=self.kh*h*scaling
+            # Weighted mean of the P(k) for each redshift bin
+            P_lin=(0.395*Pnear+0.355*Pmid+0.250*Pfar)
+            P_lin=np.interp(self.k,kh*h,P_lin)*(1./scaling)**3 # remember self.k is scaled but self.kh isn't
+
         else:
             # get rescaled values of k in 1/Mpc
             self.k = self.kh*h*scaling
@@ -1722,63 +2092,257 @@ class Likelihood_mpk(Likelihood):
             # get rescaled values of P(k) in (Mpc/h)**3
             P_lin *= (h/scaling)**3
 
-        W_P_th = np.zeros((self.n_size), 'float64')
-
-        # starting analytic marginalisation over bias
-
-        # Define quantities living in all the regions possible. If only a few
-        # regions are selected in the .data file, many elements from these
-        # arrays will stay at 0.
-        P_data_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-        W_P_th_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-        cov_dat_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-        cov_th_large = np.zeros(
-            (self.n_size*self.num_regions_used), 'float64')
-
-        normV = 0
-
         # infer P_th from P_lin. It is still in (Mpc/h)**3. TODO why was it
         # called P_lin in the first place ? Couldn't we use now P_th all the
         # way ?
         P_th = P_lin
 
-        # Loop over all the available regions
-        for i_region in range(self.num_regions):
-            # In each region that was selected with the array of flags
-            # self.used_region, define boundaries indices, and fill in the
-            # corresponding windowed power spectrum. All the unused regions
-            # will still be set to zero as from the initialization, which will
-            # not contribute anything in the final sum.
-            if self.used_region[i_region]:
-                imin = i_region*self.n_size
-                imax = (i_region+1)*self.n_size-1
+        if self.use_sdssDR7:
+            chisq =np.zeros(self.nptstot)
+            chisqmarg = np.zeros(self.nptstot)
 
-                W_P_th = np.dot(self.window[i_region, :], P_th)
-                for i in range(self.n_size):
-                    P_data_large[imin+i] = self.P_obs[i_region, i]
-                    W_P_th_large[imin+i] = W_P_th[i]
-                    cov_dat_large[imin+i] = np.dot(
-                        self.invcov[i_region, i, :],
-                        self.P_obs[i_region, :])
-                    cov_th_large[imin+i] = np.dot(
-                        self.invcov[i_region, i, :],
-                        W_P_th[:])
+            Pth = P_th
+            Pth_k = P_th*(self.k/h) # self.k has the scaling included, so self.k/h != self.kh
+            Pth_k2 = P_th*(self.k/h)**2
 
-        # Explain what it is TODO
-        normV += np.dot(W_P_th_large, cov_th_large)
-        # Sort of bias TODO ?
-        b_out = np.sum(W_P_th_large*cov_dat_large) / \
-            np.sum(W_P_th_large*cov_th_large)
+            WPth = np.dot(self.window[0,:], Pth)
+            WPth_k = np.dot(self.window[0,:], Pth_k)
+            WPth_k2 = np.dot(self.window[0,:], Pth_k2)
 
-        # Explain this formula better, link to article ?
-        chisq = np.dot(P_data_large, cov_dat_large) - \
-            np.dot(W_P_th_large, cov_dat_large)**2/normV
+            sumzerow_Pth = np.sum(self.zerowindowfxn*Pth)/self.zerowindowfxnsubtractdatnorm
+            sumzerow_Pth_k = np.sum(self.zerowindowfxn*Pth_k)/self.zerowindowfxnsubtractdatnorm
+            sumzerow_Pth_k2 = np.sum(self.zerowindowfxn*Pth_k2)/self.zerowindowfxnsubtractdatnorm
+
+            covdat = np.dot(self.invcov[0,:,:],self.P_obs[0,:])
+            covth  = np.dot(self.invcov[0,:,:],WPth)
+            covth_k  = np.dot(self.invcov[0,:,:],WPth_k)
+            covth_k2  = np.dot(self.invcov[0,:,:],WPth_k2)
+            covth_zerowin  = np.dot(self.invcov[0,:,:],self.zerowindowfxnsubtractdat)
+            sumDD = np.sum(self.P_obs[0,:] * covdat)
+            sumDT = np.sum(self.P_obs[0,:] * covth)
+            sumDT_k = np.sum(self.P_obs[0,:] * covth_k)
+            sumDT_k2 = np.sum(self.P_obs[0,:] * covth_k2)
+            sumDT_zerowin = np.sum(self.P_obs[0,:] * covth_zerowin)
+
+            sumTT = np.sum(WPth*covth)
+            sumTT_k = np.sum(WPth*covth_k)
+            sumTT_k2 = np.sum(WPth*covth_k2)
+            sumTT_k_k = np.sum(WPth_k*covth_k)
+            sumTT_k_k2 = np.sum(WPth_k*covth_k2)
+            sumTT_k2_k2 = np.sum(WPth_k2*covth_k2)
+            sumTT_zerowin = np.sum(WPth*covth_zerowin)
+            sumTT_k_zerowin = np.sum(WPth_k*covth_zerowin)
+            sumTT_k2_zerowin = np.sum(WPth_k2*covth_zerowin)
+            sumTT_zerowin_zerowin = np.sum(self.zerowindowfxnsubtractdat*covth_zerowin)
+
+            currminchisq = 1000.0
+
+            # analytic marginalization over a1,a2
+            for i in range(self.nptstot):
+                a1val = self.a1list[i]
+                a2val = self.a2list[i]
+                zerowinsub = -(sumzerow_Pth + a1val*sumzerow_Pth_k + a2val*sumzerow_Pth_k2)
+                sumDT_tot = sumDT + a1val*sumDT_k + a2val*sumDT_k2 + zerowinsub*sumDT_zerowin
+                sumTT_tot = sumTT + a1val**2.0*sumTT_k_k + a2val**2.0*sumTT_k2_k2 + \
+                    zerowinsub**2.0*sumTT_zerowin_zerowin + \
+                    2.0*a1val*sumTT_k + 2.0*a2val*sumTT_k2 + 2.0*a1val*a2val*sumTT_k_k2 + \
+                    2.0*zerowinsub*sumTT_zerowin + 2.0*zerowinsub*a1val*sumTT_k_zerowin + \
+                    2.0*zerowinsub*a2val*sumTT_k2_zerowin
+                minchisqtheoryamp = sumDT_tot/sumTT_tot
+                chisq[i] = sumDD - 2.0*minchisqtheoryamp*sumDT_tot + minchisqtheoryamp**2.0*sumTT_tot
+                chisqmarg[i] = sumDD - sumDT_tot**2.0/sumTT_tot + math.log(sumTT_tot) - \
+                    2.0*math.log(1.0 + math.erf(sumDT_tot/2.0/math.sqrt(sumTT_tot)))
+                if(i == 0 or chisq[i] < currminchisq):
+                    myminchisqindx = i
+                    currminchisq = chisq[i]
+                    currminchisqmarg = chisqmarg[i]
+                    minchisqtheoryampminnuis = minchisqtheoryamp
+                if(i == int(self.nptstot/2)):
+                    chisqnonuis = chisq[i]
+                    minchisqtheoryampnonuis = minchisqtheoryamp
+                    if(abs(a1val) > 0.001 or abs(a2val) > 0.001):
+                         print 'sdss_lrgDR7: ahhhh! violation!!', a1val, a2val
+
+            # numerically marginalize over a1,a2 now using values stored in chisq
+            minchisq = np.min(chisqmarg)
+            maxchisq = np.max(chisqmarg)
+
+            LnLike = np.sum(np.exp(-(chisqmarg-minchisq)/2.0)/(self.nptstot*1.0))
+            if(LnLike == 0):
+                #LnLike = LogZero
+                raise io_mp.LikelihoodError(
+                    'Error in likelihood %s ' % (self.name) +
+                    'LRG LnLike LogZero error.' )
+            else:
+                chisq = -2.*math.log(LnLike) + minchisq
+            #print 'DR7 chi2/2=',chisq/2.
+
+        #if we are not using DR7
+        else:
+            W_P_th = np.zeros((self.n_size), 'float64')
+
+            # starting analytic marginalisation over bias
+
+            # Define quantities living in all the regions possible. If only a few
+            # regions are selected in the .data file, many elements from these
+            # arrays will stay at 0.
+            P_data_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+            W_P_th_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+            cov_dat_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+            cov_th_large = np.zeros(
+                (self.n_size*self.num_regions_used), 'float64')
+
+            normV = 0
+
+            # Loop over all the available regions
+            for i_region in range(self.num_regions):
+                # In each region that was selected with the array of flags
+                # self.used_region, define boundaries indices, and fill in the
+                # corresponding windowed power spectrum. All the unused regions
+                # will still be set to zero as from the initialization, which will
+                # not contribute anything in the final sum.
+
+                if self.used_region[i_region]:
+                    imin = i_region*self.n_size
+                    imax = (i_region+1)*self.n_size-1
+
+                    W_P_th = np.dot(self.window[i_region, :], P_th)
+                    #print W_P_th
+                    for i in range(self.n_size):
+                        P_data_large[imin+i] = self.P_obs[i_region, i]
+                        W_P_th_large[imin+i] = W_P_th[i]
+                        cov_dat_large[imin+i] = np.dot(
+                            self.invcov[i_region, i, :],
+                            self.P_obs[i_region, :])
+                        cov_th_large[imin+i] = np.dot(
+                            self.invcov[i_region, i, :],
+                            W_P_th[:])
+
+            # Explain what it is TODO
+            normV += np.dot(W_P_th_large, cov_th_large)
+            # Sort of bias TODO ?
+            b_out = np.sum(W_P_th_large*cov_dat_large) / \
+                np.sum(W_P_th_large*cov_th_large)
+
+            # Explain this formula better, link to article ?
+            chisq = np.dot(P_data_large, cov_dat_large) - \
+                np.dot(W_P_th_large, cov_dat_large)**2/normV
+            #print 'WiggleZ chi2=',chisq/2.
 
         return -chisq/2
 
+    def remove_bao(self,k_in,pk_in):
+        # De-wiggling routine by Mario Ballardini
+
+        # This k range has to contain the BAO features:
+        k_ref=[2.8e-2, 4.5e-1]
+
+        # Get interpolating function for input P(k) in log-log space:
+        _interp_pk = scipy.interpolate.interp1d( np.log(k_in), np.log(pk_in),
+                                                 kind='quadratic', bounds_error=False )
+        interp_pk = lambda x: np.exp(_interp_pk(np.log(x)))
+
+        # Spline all (log-log) points outside k_ref range:
+        idxs = np.where(np.logical_or(k_in <= k_ref[0], k_in >= k_ref[1]))
+        _pk_smooth = scipy.interpolate.UnivariateSpline( np.log(k_in[idxs]),
+                                                         np.log(pk_in[idxs]), k=3, s=0 )
+        pk_smooth = lambda x: np.exp(_pk_smooth(np.log(x)))
+
+        # Find second derivative of each spline:
+        fwiggle = scipy.interpolate.UnivariateSpline(k_in, pk_in / pk_smooth(k_in), k=3, s=0)
+        derivs = np.array([fwiggle.derivatives(_k) for _k in k_in]).T
+        d2 = scipy.interpolate.UnivariateSpline(k_in, derivs[2], k=3, s=1.0)
+
+        # Find maxima and minima of the gradient (zeros of 2nd deriv.), then put a
+        # low-order spline through zeros to subtract smooth trend from wiggles fn.
+        wzeros = d2.roots()
+        wzeros = wzeros[np.where(np.logical_and(wzeros >= k_ref[0], wzeros <= k_ref[1]))]
+        wzeros = np.concatenate((wzeros, [k_ref[1],]))
+        wtrend = scipy.interpolate.UnivariateSpline(wzeros, fwiggle(wzeros), k=3, s=0)
+
+        # Construct smooth no-BAO:
+        idxs = np.where(np.logical_and(k_in > k_ref[0], k_in < k_ref[1]))
+        pk_nobao = pk_smooth(k_in)
+        pk_nobao[idxs] *= wtrend(k_in[idxs])
+
+        # Construct interpolating functions:
+        ipk = scipy.interpolate.interp1d( k_in, pk_nobao, kind='linear',
+                                          bounds_error=False, fill_value=0. )
+
+        pk_nobao = ipk(k_in)
+
+        return pk_nobao
+
+    def get_flat_fid(self,cosmo,data,kh,z,sigma2bao):
+        # SDSS DR7 LRG specific function
+        # Compute fiducial properties for a flat fiducial
+        # with Omega_m = 0.25, Omega_L = 0.75, h = 0.701
+        param_backup = data.cosmo_arguments
+        data.cosmo_arguments = {'P_k_max_h/Mpc': 1.5, 'ln10^{10}A_s': 3.0, 'N_ur': 3.04, 'h': 0.701,
+                                'omega_b': 0.035*0.701**2, 'non linear': ' halofit ', 'YHe': 0.24, 'k_pivot': 0.05,
+                                'n_s': 0.96, 'tau_reio': 0.084, 'z_max_pk': 0.5, 'output': ' mPk ',
+                                'omega_cdm': 0.215*0.701**2, 'T_cmb': 2.726}
+        cosmo.empty()
+        cosmo.set(data.cosmo_arguments)
+        cosmo.compute(['lensing'])
+        h = data.cosmo_arguments['h']
+        k = kh*h
+        # P(k) *with* wiggles, both linear and nonlinear
+        Plin = np.zeros(len(k), 'float64')
+        Pnl = np.zeros(len(k), 'float64')
+        # P(k) *without* wiggles, both linear and nonlinear
+        Psmooth = np.zeros(len(k), 'float64')
+        Psmooth_nl = np.zeros(len(k), 'float64')
+        # Damping function and smeared P(k)
+        fdamp = np.zeros([len(k), len(z)], 'float64')
+        Psmear = np.zeros([len(k), len(z)], 'float64')
+        # Ratio of smoothened non-linear to linear P(k)
+        fidnlratio = np.zeros([len(k), len(z)], 'float64')
+        # Loop over each redshift bin
+        for j in range(len(z)):
+            # Compute Pk *with* wiggles, both linear and nonlinear
+            # Get P(k) at right values of k in Mpc**3, convert it to (Mpc/h)^3 and rescale it
+            # Get values of P(k) in Mpc**3
+            for i in range(len(k)):
+                Plin[i] = cosmo.pk_lin(k[i], z[j])
+                Pnl[i] = cosmo.pk(k[i], z[j])
+            # Get rescaled values of P(k) in (Mpc/h)**3
+            Plin *= h**3 #(h/scaling)**3
+            Pnl *= h**3 #(h/scaling)**3
+            # Compute Pk *without* wiggles, both linear and nonlinear
+            Psmooth = self.remove_bao(kh,Plin)
+            Psmooth_nl = self.remove_bao(kh,Pnl)
+            # Apply Gaussian damping due to non-linearities
+            fdamp[:,j] = np.exp(-0.5*sigma2bao[j]*kh**2)
+            Psmear[:,j] = Plin*fdamp[:,j]+Psmooth*(1.0-fdamp[:,j])
+            # Take ratio of smoothened non-linear to linear P(k)
+            fidnlratio[:,j] = Psmooth_nl/Psmooth
+
+        # Polynomials to shape small scale behavior from N-body sims
+        kdata=kh
+        fidpolyNEAR=np.zeros(np.size(kdata))
+        fidpolyNEAR[kdata<=0.194055] = (1.0 - 0.680886*kdata[kdata<=0.194055] + 6.48151*kdata[kdata<=0.194055]**2)
+        fidpolyNEAR[kdata>0.194055] = (1.0 - 2.13627*kdata[kdata>0.194055] + 21.0537*kdata[kdata>0.194055]**2 - 50.1167*kdata[kdata>0.194055]**3 + 36.8155*kdata[kdata>0.194055]**4)*1.04482
+        fidpolyMID=np.zeros(np.size(kdata))
+        fidpolyMID[kdata<=0.19431] = (1.0 - 0.530799*kdata[kdata<=0.19431] + 6.31822*kdata[kdata<=0.19431]**2)
+        fidpolyMID[kdata>0.19431] = (1.0 - 1.97873*kdata[kdata>0.19431] + 20.8551*kdata[kdata>0.19431]**2 - 50.0376*kdata[kdata>0.19431]**3 + 36.4056*kdata[kdata>0.19431]**4)*1.04384
+        fidpolyFAR=np.zeros(np.size(kdata))
+        fidpolyFAR[kdata<=0.19148] = (1.0 - 0.475028*kdata[kdata<=0.19148] + 6.69004*kdata[kdata<=0.19148]**2)
+        fidpolyFAR[kdata>0.19148] = (1.0 - 1.84891*kdata[kdata>0.19148] + 21.3479*kdata[kdata>0.19148]**2 - 52.4846*kdata[kdata>0.19148]**3 + 38.9541*kdata[kdata>0.19148]**4)*1.03753
+
+        fidNEAR=np.interp(kh,kdata,fidpolyNEAR)
+        fidMID=np.interp(kh,kdata,fidpolyMID)
+        fidFAR=np.interp(kh,kdata,fidpolyFAR)
+
+        cosmo.empty()
+        data.cosmo_arguments = param_backup
+        cosmo.set(data.cosmo_arguments)
+        cosmo.compute(['lensing'])
+
+        return fidnlratio, fidNEAR, fidMID, fidFAR
 
 class Likelihood_sn(Likelihood):
 
@@ -1929,3 +2493,87 @@ class Likelihood_clocks(Likelihood):
             chi2 += (self.Hz[index]-H_cosmo)**2/self.err[index]**2
 
         return -0.5 * chi2
+
+###################################
+# ISW-Likelihood
+# by B. Stoelzner
+###################################
+class Likelihood_isw(Likelihood):
+    def __init__(self, path, data, command_line):
+        # Initialize
+        Likelihood.__init__(self, path, data, command_line)
+        self.need_cosmo_arguments(data, {'output': 'mPk','P_k_max_h/Mpc' : 300,'z_max_pk' : 5.1})
+
+        # Read l,C_l, and the covariance matrix of the autocorrelation of the survey and the crosscorrelation of the survey with the CMB
+        self.l_cross,cl_cross=np.loadtxt(os.path.join(self.data_directory,self.cl_cross_file),unpack=True,usecols=(0,1))
+        self.l_auto,cl_auto=np.loadtxt(os.path.join(self.data_directory,self.cl_auto_file),unpack=True,usecols=(0,1))
+        cov_cross=np.loadtxt(os.path.join(self.data_directory,self.cov_cross_file))
+        cov_auto=np.loadtxt(os.path.join(self.data_directory,self.cov_auto_file))
+
+        # Extract data in the specified range in l.
+        self.l_cross=self.l_cross[self.l_min_cross:self.l_max_cross+1]
+        cl_cross=cl_cross[self.l_min_cross:self.l_max_cross+1]
+        self.l_auto=self.l_auto[self.l_min_auto:self.l_max_auto+1]
+        cl_auto=cl_auto[self.l_min_auto:self.l_max_auto+1]
+        cov_cross=cov_cross[self.l_min_cross:self.l_max_cross+1,self.l_min_cross:self.l_max_cross+1]
+        cov_auto=cov_auto[self.l_min_auto:self.l_max_auto+1,self.l_min_auto:self.l_max_auto+1]
+
+        # Create logarithically spaced bins in l.
+        self.bins_cross=np.ceil(np.logspace(np.log10(self.l_min_cross),np.log10(self.l_max_cross),self.n_bins_cross+1))
+        self.bins_auto=np.ceil(np.logspace(np.log10(self.l_min_auto),np.log10(self.l_max_auto),self.n_bins_auto+1))
+
+        # Bin l,C_l, and covariance matrix in the previously defined bins
+        self.l_binned_cross,self.cl_binned_cross,self.cov_binned_cross=self.bin_cl(self.l_cross,cl_cross,self.bins_cross,cov_cross)
+        self.l_binned_auto,self.cl_binned_auto,self.cov_binned_auto=self.bin_cl(self.l_auto,cl_auto,self.bins_auto,cov_auto)
+
+        # Read the redshift distribution of objects in the survey, perform an interpolation of dN/dz(z), and calculate the normalization in this redshift bin
+        zz,dndz=np.loadtxt(os.path.join(self.data_directory,self.dndz_file),unpack=True,usecols=(0,1))
+        self.dndz=scipy.interpolate.interp1d(zz,dndz,kind='cubic')
+        self.norm=scipy.integrate.quad(self.dndz,self.z_min,self.z_max)[0]
+
+    def bin_cl(self,l,cl,bins,cov=None):
+        # This function bins l,C_l, and the covariance matrix in given bins in l
+        B=[]
+        for i in range(1,len(bins)):
+            if i!=len(bins)-1:
+                a=np.where((l<bins[i])&(l>=bins[i-1]))[0]
+            else:
+                a=np.where((l<=bins[i])&(l>=bins[i-1]))[0]
+            c=np.zeros(len(l))
+            c[a]=1./len(a)
+            B.append(c)
+        l_binned=np.dot(B,l)
+        cl_binned=np.dot(B,cl)
+        if cov is not None:
+            cov_binned=np.dot(B,np.dot(cov,np.transpose(B)))
+            return l_binned,cl_binned,cov_binned
+        else:
+            return l_binned,cl_binned
+
+    def integrand_cross(self,z,cosmo,l):
+        # This function will be integrated to calculate the exspected crosscorrelation between the survey and the CMB
+        c= const.c/1000.
+        H0=cosmo.h()*100
+        Om=cosmo.Omega0_m()
+        k=lambda z:(l+0.5)/(cosmo.angular_distance(z)*(1+z))
+        return (3*Om*H0**2)/((c**2)*(l+0.5)**2)*self.dndz(z)*cosmo.Hubble(z)*cosmo.scale_independent_growth_factor(z)*scipy.misc.derivative(lambda z:cosmo.scale_independent_growth_factor(z)*(1+z),x0=z,dx=1e-4)*cosmo.pk(k(z),0)/self.norm
+
+    def integrand_auto(self,z,cosmo,l):
+        # This function will be integrated to calculate the expected autocorrelation of the survey
+        c= const.c/1000.
+        H0=cosmo.h()*100
+        k=lambda z:(l+0.5)/(cosmo.angular_distance(z)*(1+z))
+        return (self.dndz(z))**2*(cosmo.scale_independent_growth_factor(z))**2*cosmo.pk(k(z),0)*cosmo.Hubble(z)/(cosmo.angular_distance(z)*(1+z))**2/self.norm**2
+
+    def compute_loglkl(self, cosmo, data,b):
+        # Retrieve sampled parameter
+        A=data.mcmc_parameters['A_ISW']['current']*data.mcmc_parameters['A_ISW']['scale']
+
+        # Calculate the expected auto- and crosscorrelation by integrating over the redshift.
+        cl_binned_cross_theory=np.array([(scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll]))[0]+scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.bins_cross[ll+1]))[0]+scipy.integrate.quad(self.integrand_cross,self.z_min,self.z_max,args=(cosmo,self.l_binned_cross[ll]))[0])/3 for ll in range(self.n_bins_cross)])
+        cl_binned_auto_theory=np.array([scipy.integrate.quad(self.integrand_auto,self.z_min,self.z_max,args=(cosmo,ll),epsrel=1e-8)[0] for ll in self.l_binned_auto])
+
+        # Calculate the chi-square of auto- and crosscorrelation
+        chi2_cross=np.asscalar(np.dot(self.cl_binned_cross-A*b*cl_binned_cross_theory,np.dot(np.linalg.inv(self.cov_binned_cross),self.cl_binned_cross-A*b*cl_binned_cross_theory)))
+        chi2_auto=np.asscalar(np.dot(self.cl_binned_auto-b**2*cl_binned_auto_theory,np.dot(np.linalg.inv(self.cov_binned_auto),self.cl_binned_auto-b**2*cl_binned_auto_theory)))
+        return -0.5*(chi2_cross+chi2_auto)

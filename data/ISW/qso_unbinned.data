@@ -1,0 +1,19 @@
+qso_unbinned.data_directory = os.path.join(data.path['data'], 'ISW')
+
+qso_unbinned.cl_cross_file='qso/cross/cl_unbinned.txt'
+qso_unbinned.cov_cross_file='qso/cross/cov_unbinned.txt'
+qso_unbinned.cl_auto_file='qso/auto/cl_unbinned.txt'
+qso_unbinned.cov_auto_file='qso/auto/cov_unbinned.txt'
+
+qso_unbinned.dndz_file='qso/dndz_qso.txt'
+
+qso_unbinned.z_min=0.01
+qso_unbinned.z_max=3
+
+qso_unbinned.l_min_cross=4
+qso_unbinned.l_max_cross=100
+qso_unbinned.n_bins_cross=4
+
+qso_unbinned.l_min_auto=10
+qso_unbinned.l_max_auto=70
+qso_unbinned.n_bins_auto=5

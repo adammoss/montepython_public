@@ -1,0 +1,108 @@
+#######################################################################
+# Data and precision parameters for the KiDS-450 shear power spectrum #
+# likelihood for data measured with a quadratic estimator as given in #
+# Koehlinger et al. 2017 (MNRAS, 471, 4412; arXiv:1706.02892)         #
+# Data available at: http://kids.strw.leidenuniv.nl/sciencedata.php   #
+#######################################################################
+
+# set path correctly in "default.conf" or supply root path here:
+#kids450_qe_likelihood_public.data_directory = '/your/path/to/data_for_likelihood/'
+#kids450_qe_likelihood_public.data_directory = data.path['root']+'/data_for_likelihood/'
+
+# set to "True" if you want to correct for the resetting bias:
+# default: "True"
+kids450_qe_likelihood_public.correct_resetting_bias = True
+
+# choose photo-z calibration method:
+default: 'Nz_DIR'
+kids450_qe_likelihood_public.photoz_method = 'Nz_DIR'
+
+# set flag if you want to marginalize over bootstrap errors of n(z)
+# default: True
+# but: large impact on runtime less though on errorbars
+kids450_qe_likelihood_public.bootstrap_photoz_errors = True
+
+# if above flag is set to True, then specify lowest and highest index of bootstrap realizations
+# from which one bootstrap is drawn randomly per evaluation step
+# default: *_low = 0 and * _high = 999
+kids450_qe_likelihood_public.index_bootstrap_low = 0
+kids450_qe_likelihood_public.index_bootstrap_high = 999
+
+# k_max in h/Mpc (i.e. l_max/D_M(z_min):
+# NOTE: in original analysis this was set to k_max = 40. /Mpc (no small h)
+# default: k_max_h_by_Mpc = 50 h/Mpc
+kids450_qe_likelihood_public.k_max_h_by_Mpc = 50.
+
+# the number of nodes for the spline-interpolation of the n(z) histograms:
+# (this also sets the resolution for all redshift integrations)
+# default: integrate at histogram resolution and set nzmax = 72
+kids450_qe_likelihood_public.nzmax = 72
+
+# number of ell values used to compute nodes for theoretical C_l:
+# default: 39 (following the "euclid_lensing" likelihood)
+kids450_qe_likelihood_public.nellsmax = 39
+
+# keyword for type of matter power spectrum:
+# default: 'halofit' (look in CLASS documentation for other options)
+kids450_qe_likelihood_public.mode = 'halofit'
+
+# supply borders of redshift bins:
+# 3 z-bins:
+kids450_qe_likelihood_public.zbin_min = [0.10, 0.30, 0.60]
+kids450_qe_likelihood_public.zbin_max = [0.30, 0.60, 0.90]
+# 2 z-bins:
+#kids450_qe_likelihood_public.zbin_min = [0.10, 0.45]
+#kids450_qe_likelihood_public.zbin_max = [0.45, 0.90]
+
+# supply binary vector of which band powers (per z-correlation) should be used in likelihood estimation (0 --> don't use it, 1 --> use it)
+# example: 7 bands in total, don't use first and last band (in each z-correlation): [0, 1, 1, 1, 1, 1, 0]
+# for fiducial 3 z-bins and 2-zbins analyses:
+kids450_qe_likelihood_public.bands_EE_to_use = [0, 1, 1, 1, 1, 0, 0]
+# B-modes are one band less than EE (first band omitted)
+kids450_qe_likelihood_public.bands_BB_to_use = [1, 1, 1, 1, 0, 0]
+
+# nuisance parameters for marginalizing over a constant shift in any of the n(z):
+# NOTE: these were not used in the original analysis!
+#kids450_qe_likelihood_public.use_nuisance = ['D_z1', 'D_z2','D_z3']
+
+# set this flag if only cross-correlation bins should be used for fitting:
+# default: False
+kids450_qe_likelihood_public.fit_cross_correlations_only = False
+
+### Nuisance parameters ###
+
+# Boolean for adding a baryon feedback bias to the DM P(k, z); see equations 8, 10 in J. Harnois-Deraps et al. 2014 (arXiv1407.XXXX)
+# default: True
+kids450_qe_likelihood_public.baryon_feedback = True
+
+# choose a baryonic feedback model: 'REF', 'AGN', 'DBLIM' (used in OWLS):
+# flag above must be set to True!
+# default: 'AGN'
+kids450_qe_likelihood_public.baryon_model = 'AGN'
+
+# this allows to marginalize over a free baryon feedback amplitude A_bary:
+# default: added to list
+#kids450_qe_likelihood_public.use_nuisance = ['A_bary']
+
+# nuisance parameters for m-correction:
+# assumed to be a global m-correction per z-bin, since errors are collerated we only set the m-correction of the lowest redshift-bin
+# as a nuisance-parameter:
+# default: added to list
+#kids450_qe_likelihood_public.use_nuisance = ['m_corr']
+
+# nuisance parameters for residual noise power:
+# independent amplitudes per z-bin (must match number of z-bins):
+# default: added to list
+#kids450_qe_likelihood_public.use_nuisance = ['A_noise_z1', 'A_noise_z2', 'A_noise_z3']
+
+# this allows to include IA:
+# if only 'amp_IA' is passed, 'exp_IA' = 0 (i.e. redshift-scaling is turned off!)
+# default: only 'A_IA' added to list (i.e. exp_IA = 0)
+#kids450_qe_likelihood_public.use_nuisance = ['A_IA', 'exp_IA']
+#kids450_qe_likelihood_public.use_nuisance = ['A_IA']
+
+# if more than one nuisance parameter --> make a list:
+# for the fiducial 2 z-bin run:
+#kids450_qe_likelihood_public.use_nuisance = ['m_corr', 'A_noise_z1', 'A_noise_z2', 'A_IA', 'A_bary']
+# for the fiducial 3 z-bin run:
+kids450_qe_likelihood_public.use_nuisance = ['m_corr', 'A_noise_z1', 'A_noise_z2', 'A_noise_z3', 'A_IA', 'A_bary']

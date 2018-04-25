@@ -1,0 +1,12 @@
+# fake DESI + Euclid BAO likelihood
+# switches from DESI to Euclid when error bar becomes smaller
+# covariance matrix provided by Antony Lewis
+#
+fake_desi_euclid_bao.data_directory      = data.path['data']
+fake_desi_euclid_bao.fiducial_file       = 'fake_desi_euclid_bao_fiducial.dat'
+fake_desi_euclid_bao.exclude             = []
+fake_desi_euclid_bao.sensitivity         = 'bao_desi_euclid_sensitivity.txt'
+# what is the type of measurement?
+# (D_V/rs=3, Dv/Mpc=4, DA/rs=5, c/Hrs=6, rs/D_v=7, H*rs+DA/rs-with-invcovmat=8)
+fake_desi_euclid_bao.error_type          = 8
+fake_desi_euclid_bao.nickname = 'DESI-EUCLID-BAO'

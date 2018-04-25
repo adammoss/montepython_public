@@ -359,7 +359,7 @@ def create_parser():
             Note that the list of parameters in the input covariance matrix and
             in the run do not necessarily coincide.<++>
         <**>-j<**> : str
-            <++>jumping method<++> (`global` (default), `sequential` or `fast`)
+            <++>jumping method<++> (`global`, `sequential` or `fast` (default))
             (*OPT*).
 
             With the `global` method the code generates a new random direction
@@ -373,8 +373,8 @@ def create_parser():
             generate a covariance matrix to be used later with the `default`
             jumping method.
 
-            The `fast` method implements the Cholesky decomposition presented
-            in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
+            The `fast` method (default) implements the Cholesky decomposition
+            presented in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
         <**>-m<**> : str
             <++>sampling method<++>, by default 'MH' for Metropolis-Hastings,
             can be set to 'MN' for MultiNest (using Multinest wrapper
@@ -385,9 +385,69 @@ def create_parser():
             Note that when running with Importance sampling, you need to
             specify a folder to start from.<++>
         <**>--update<**> : int
-            <++>update frequency for Metropolis Hastings.<++>
+            <++>Enabled by default. Method for periodic update of the covariance
+            matrix. Input: covmat update frequency for Metropolis Hastings.<++>
+            If greater than zero, number of steps after which the proposal
+            covariance matrix is updated automatically (recommended: 50). This
+            number is then multiplied by the cycle length (N_slow + f_fast * N_fast),
+            where N_slow is the number of slow parameters, f_fast is the over sampling
+            for each fast block and N_fast is the number of parameters for each fast
+            block. Leaving this option enabled should help speed up convergence.
+            Can set to zero to disable, i.e. if starting from a good covmat.
+
+            The Markovian properties of the MCMC are maintained by the MontePython
+            analyze module, which will only analyze steps after the last covariance
+            matrix update.
+
+            Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
+
+            Note: the covmat saved to the folder is the last updated one.
+            Use this covmat for restarting chains.<++>
+        <**>--superupdate<**> : int
+            <++>Disabled by default. Method for updating jumping factor and covariance
+            matrix for Metropolis Hastings. Input: Number of steps to wait after updating
+            the covmat before adapting the jumping factor. Enable to speed up convergence.<++>
+            For optimizing the acceptance rate. If enabled, should be set to at
+            least 20 (recommended: 20). This number is then multiplied by the cycle length
+            (N_slow + f_fast * N_fast), where N_slow is the number of slow parameters, f_fast
+            is the over sampling for each fast block and N_fast is the number of
+            parameters for each fast block.
+
+            The Markovian properties of the MCMC are maintained by the MontePython
+            analyze module, which will only analyze steps after the last covariance
+            matrix update and last step where the jumping factor was changed.
+
+            Criteria for updating covariance matrix: max(R-1) between 0.4 and 3.
+            Adapting jumping factor stops when above criteria is not fulfilled, plus
+            the acceptance rate of (26 +/- 1) percent is achieved, and the jumping factor
+            changed by less than 1 percent compared to the mean of the last superupdate
+            times cycle length (N_slow + f_fast * N_fast) steps.
+
+            The target acceptance rate and tolerance for that criterium can be
+            customized with --superupdate-ar and --superupdate-ar-tol.
+
+            Note: the covmat saved to the folder is the last updated one.
+            Use this covmat for restarting chains (*OPT*).<++>
+        <**>--superupdate-ar<**> : float
+            <++>For use with --superupdate. Target acceptance rate.<++>
+            For customizing superupdate (Default: 0.26) (*OPT*).<++>
+        <**>--superupdate-ar-tol<**> : float
+            <++>For use with --superupdate. Tolerance for target acceptance rate.<++>
+            For customizing superupdate (Default: 0.01) (*OPT*).<++>
+        <**>--adaptive<**> : int
+            <++>Disabled by default. Method for continuous adaptation of covariance matrix
+            and jumping factor. Input: Starting step for adaptive Metropolis Hastings.<++>
             If greater than zero, number of steps after which the proposal covariance
-            matrix is updated automatically (*OPT*).<++>
+            matrix is updated automatically (recommended: 10*dimension) (*OPT*).
+
+            The Markovian properties of the MCMC is not guaranteed, but as the change
+            of the covariance matrix and jumping factor is gradual and decreases over
+            time, the ergodic properties of the chain remains.
+
+            Not compatible with multiple chains. TODO: Implement adaptive for MPI.(*OPT*)<++>
+        <**>--adaptive-ts<**> : int
+            <++>For use with --adaptive. Starting step for adapting the jumping factor.<++>
+            For optimizing the acceptance rate (recommended: 100*dimension) (*OPT*).<++>
         <**>-f<**> : float
             <++>jumping factor<++> (>= 0, default to 2.4) (*OPT*).
 
@@ -405,12 +465,15 @@ def create_parser():
 
             Using :code:`-f 0 -N 1` is a convenient way to get the likelihood
             exactly at the starting point passed in input.<++>
+        <**>-T<**> : float
+            <++>Sample from the probability distribution P^(1/T) instead of P.<++>
+            (*OPT*)<++>
         <**>--conf<**> : str
             <++>configuration file<++> (default to `default.conf`) (*OPT*).
             This file contains the path to your cosmological module
             directory.<++>
         <**>--chain-number<**> : str
-            arbitrary <++>number of the output chain<++>, to overcome the
+            <++>user-assigned number for the output chain<++>, to overcome the
             automatic one (*OPT*).
 
             By default, the chains are named :code:`yyyy-mm-dd_N__i.txt` with
@@ -432,9 +495,46 @@ def create_parser():
         <**>-b<**> : str
             <++>start a new chain from the bestfit file<++> computed with
             analyze.  (*OPT*)<++>
+        <**>--minimize<**> : None
+            <++>Minimize the log likelihood before starting the engine or the fisher<++>.
+            Instead of starting the chains or centering the Fisher calculation on the model
+            passed through the input parameter file or through the .bestfit file, find the
+            minimum of the log likelihood up to some tolerance<++>
+        <**>--minimize-tol<**> : float
+            <++>Tolerance for minimize algorithm<++>.
+            Used by option --minimize (Default: 0.00001)<++>
         <**>--fisher<**> : None
-            <++>Calculates the inverse of the fisher matrix<++> to use as
-            proposal distribution<++>
+            <++>Calculates the Fisher matrix, its inverse, and then stop<++>.
+            The inverse Fisher matrix can be used as a proposal distribution covmat,
+            or to make plots with Fisher ellipses.<++>
+        <**>--fisher-asymmetric<**> : bool
+            <++>Use asymmetric steps for Fisher matrix computation<++>,
+            used by option --fisher (Default: False). Slows down computation.
+            May help in cases where the parameter space boundary is reached.<++>
+        <**>--fisher-step-it<**> : int
+            <++>Have the Fisher matrix calculation iterate the step-size<++>.
+            Used by option --fisher (Default: 10). The step-size will be
+            interated until reaching the desired delta log-likelihood specified
+            by --fisher-delta, within the tolerance given by --fisher-tol.<++>
+        <**>--fisher-delta<**> : float
+            <++>Target -deltaloglkl for fisher step iteration<++>.
+            Used by option --fisher (Default: 0.1)<++>
+        <**>--fisher-tol<**> : float
+            <++>Tolerance for -deltaloglkl for fisher step iteration<++>.
+            Used by option --fisher (Default: 0.05)<++>
+        <**>--fisher-sym-lkl<**> : float
+            <++>Threshold for when to assume a symmetric likelihood<++>.
+            Used by option --fisher (Default: 0.1). Sets the threshold
+            (in units of sigma) for when to switch to the symmetric
+            likelihood assumption, i.e. do likelihood evaluations in
+            one direction of parameter space (e.g. positive) and mirror
+            the value for the other direction. Useful for parameters
+            where the best fit of the likelihood is close to a boundary.
+
+            WARNING: causes problems if multiple parameters use the
+            symmetric likelihood assumption. In this case we need to
+            switch to a one-sided derivative computation (instead of
+            two-sided with mirroring), which has not been implemented.<++>
         <**>--silent<**> : None
             <++>silence the standard output<++> (useful when running on
             clusters)<++>
@@ -455,6 +555,9 @@ def create_parser():
         <**>--stop-after-update<**> : bool
             <++>When using update mode, stop run after updating the covariant matrix.<++>
             Useful if you want to change settings after the first guess (*OPT*) (flag)<++>
+        <**>--display-each-chi2<**> : bool
+            <++>Shows the effective chi2 from each likelihood and the total.<++>
+            Useful e.g. if you run at the bestfit point with -f 0 (flag)<++>
 
         For MultiNest, PolyChord and Cosmo Hammer arguments, see
         :mod:`MultiNest`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
@@ -479,11 +582,17 @@ def create_parser():
             <++>number of bins in the histograms<++> used to derive posterior
             probabilities and credible intervals (default to 20). Decrease this
             number for smoother plots at the expense of masking details.<++>
+        <**>-T<**> : float
+            <++>Raise posteriors to the power T.<++>
+            Interpret the chains as samples from the probability distribution
+            P^(1/T) instead of P. (*OPT*)<++>
         <**>--no-mean<**> : None
             <++>remove the mean likelihood from the plot<++>. By default, when
             plotting marginalised 1D posteriors, the code also shows the mean
             likelihood per bin with dashed lines; this flag switches off the
             dashed lines.<++>
+        <**>--short-title-1d<**> : None
+            <++>short 1D plot titles<++>. Remove mean and confidence limits above each 1D plots.<++>
         <**>--extra<**> : str
             <++>extra file to customize the output plots<++>. You can actually
             set all the possible options in this file, including line-width,
@@ -494,7 +603,7 @@ def create_parser():
             name, and value set to the new variable name), `info.to_plot` (list
             of variables with new names to plot), and `info.new_scales` (dict
             with keys set to the new variable names, and values set to the
-            number by which it should be multiplied in the graph).<++> For
+            number by which it should be multiplied in the graph). For
             instance,
 
             .. code::
@@ -502,7 +611,7 @@ def create_parser():
                 info.to_change={'oldname1':'newname1','oldname2':'newname2',...}
                 info.to_plot=['name1','name2','newname3',...]
                 info.new_scales={'name1':number1,'name2':number2,...}
-
+            <++>
         <**>--noplot<**> : bool
             <++>do not produce any plot, simply compute the posterior<++>
             (*OPT*) (flag)<++>
@@ -517,6 +626,8 @@ def create_parser():
             <++>change the extension for the output file. Any extension handled
             by :code:`matplotlib` can be used<++>. (`pdf` (default), `png`
             (faster))<++>
+        <**>--num-columns-1d<**> : int
+            <++>for 1d plot, number of plots per horizontal raw; if 'None' this is set automatically<++> (trying to approach a square plot).<++>
         <**>--fontsize<**> : int
             <++>desired fontsize<++> (default to 16)<++>
         <**>--ticksize<**> : int
@@ -532,21 +643,30 @@ def create_parser():
             `top`.<++>
         <**>--keep-non-markovian<**> : bool
             <++>Use this flag to keep the non-markovian part of the chains produced
-            at the beginning of runs with --update mode<++>
+            at the beginning of runs with --update mode (default: False)<++>
             This option is only relevant when the chains were produced with --update (*OPT*) (flag)<++>
         <**>--keep-fraction<**> : float
-            <++>after burn-in removal, analyze only last fraction of each chain.<++>
+            <++>after burn-in removal, analyze only last fraction of each chain. (default: 1)<++>
             (between 0 and 1). Normally one would not use this for runs with --update mode,
             unless --keep-non-markovian is switched on (*OPT*)<++>
         <**>--want-covmat<**> : bool
-            <++>calculate the covariant matrix when analyzing the chains.<++>
+            <++>calculate the covariant matrix when analyzing the chains. (default: False)<++>
             Warning: this will interfere with ongoing runs utilizing update mode (*OPT*) (flag)<++>
         <**>--gaussian-smoothing<**> : float
-            <++>width of gaussian smoothing for plotting posteriors<++>,
+            <++>width of gaussian smoothing for plotting posteriors (default: 0.5)<++>,
             in units of bin size, increase for smoother data<++>
         <**>--interpolation-smoothing<**> : float
-            <++>interpolation factor for plotting posteriors<++>,
+            <++>interpolation factor for plotting posteriors (default: 4)<++>,
             1 means no interpolation, increase for smoother curves<++>
+        <**>--posterior-smoothing<**> : int
+            <++>smoothing scheme for 1d posteriors (default: 5)<++>,
+            0 means no smoothing, 1 means cubic interpolation, higher means fitting ln(L) with polynomial of order n<++>
+        <**>--plot-fisher<**> : None
+            <++>Tries to add Fisher ellipses to contour plots<++>,
+            if a previous run has produced a Fisher matrix and stored it.<++>
+        <**>--center-fisher<**> : None
+            <++>Centers Fisher ellipse on bestfit of last set of chains,<++>,
+            instead of the center values of the log.param<++>
 
     Returns
     -------
@@ -596,16 +716,56 @@ def create_parser():
     # -- sampling method (OPTIONAL)
     runparser.add_argument('-m', '--method', help=helpdict['m'],
                            dest='method', default='MH',
-                           choices=['MH', 'MN', 'PC', 'CH', 'IS', 'Der'])
+                           choices=['MH', 'MN', 'PC', 'CH', 'IS', 'Der', 'Fisher'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
-                           default=0)
+                           dest='update', default=50)
+    # -- update Metropolis Hastings with an adaptive jumping factor (OPTIONAL)
+    runparser.add_argument('--superupdate', help=helpdict['superupdate'], type=int,
+                           dest='superupdate', default=0)
+    # -- superupdate acceptance rate argument (OPTIONAL)
+    runparser.add_argument('--superupdate-ar', help=helpdict['superupdate-ar'], type=float,
+                           dest='superupdate_ar', default=0.26)
+    # -- superupdate acceptance rate tolerance argument (OPTIONAL)
+    runparser.add_argument('--superupdate-ar-tol', help=helpdict['superupdate-ar-tol'], type=float,
+                           dest='superupdate_ar_tol', default=0.01)
+    # -- adaptive jumping factor Metropolis Hastings (OPTIONAL)
+    runparser.add_argument('--adaptive', help=helpdict['adaptive'], type=int,
+                           dest='adaptive', default=0)
+    # -- adaptive ts argument (OPTIONAL)
+    runparser.add_argument('--adaptive-ts', help=helpdict['adaptive-ts'], type=int,
+                           dest='adaptive_ts', default=1000)
+
     # -- jumping factor (OPTIONAL)
     runparser.add_argument('-f', help=helpdict['f'], type=float,
                            dest='jumping_factor', default=2.4)
-    # -- fisher (EXPERIMENTAL)
+    # -- temperature (OPTIONAL)
+    runparser.add_argument('-T', help=helpdict['T'], type=float,
+                           dest='temperature', default=1.0)
+    # -- minimize (OPTIONAL)
+    runparser.add_argument('--minimize', help=helpdict['minimize'],
+                           action='store_true')
+    # -- minimize argument, minimization tolerance (OPTIONAL)
+    runparser.add_argument('--minimize-tol', help=helpdict['minimize-tol'], type=float,
+                           dest='minimize_tol', default=0.00001)
+    # -- fisher (OPTIONAL)
     runparser.add_argument('--fisher', help=helpdict['fisher'],
                            action='store_true')
+    # -- fisher argument (OPTIONAL)
+    runparser.add_argument('--fisher-asymmetric', help=helpdict['fisher-asymmetric'],
+                           dest='fisher_asymmetric',action='store_true')
+    # -- fisher step iteration (OPTIONAL)
+    runparser.add_argument('--fisher-step-it', help=helpdict['fisher-step-it'],
+                           dest='fisher_step_it', default=10)
+    # -- fisher step iteration argument, -deltaloglkl target (OPTIONAL)
+    runparser.add_argument('--fisher-delta', help=helpdict['fisher-delta'], type=float,
+                           dest='fisher_delta', default=0.1)
+    # -- fisher step iteration argument, -deltaloglkl tolerance (OPTIONAL)
+    runparser.add_argument('--fisher-tol', help=helpdict['fisher-tol'], type=float,
+                           dest='fisher_tol', default=0.05)
+    # -- fisher symmetric likelihood assumption threshold (OPTIONAL)
+    runparser.add_argument('--fisher-sym-lkl', help=helpdict['fisher-sym-lkl'], type=float,
+                           dest='fisher_sym_lkl', default=0.1)
     # -- configuration file (OPTIONAL)
     runparser.add_argument('--conf', help=helpdict['conf'],
                            type=str, dest='config_file',
@@ -615,6 +775,9 @@ def create_parser():
     # -- stop run after first successful update using --update (EXPERIMENTAL)
     runparser.add_argument('--stop-after-update', help=helpdict['stop-after-update'],
                            dest='stop_after_update', action='store_true')
+    # display option
+    runparser.add_argument('--display-each-chi2', help=helpdict['display-each-chi2'],
+                           dest='display_each_chi2', action='store_true')
 
     ###############
     # MCMC restart from chain or best fit file
@@ -709,9 +872,15 @@ def create_parser():
     # -- number of bins (defaulting to 20)
     infoparser.add_argument('--bins', help=helpdict['bins'],
                             type=int, default=20)
+    # -- temperature (OPTIONAL)
+    infoparser.add_argument('-T', help=helpdict['T'], type=float,
+                           dest='temperature', default=1.0)
     # -- to remove the mean-likelihood line
     infoparser.add_argument('--no-mean', help=helpdict['no-mean'],
                             dest='mean_likelihood', action='store_false')
+    # -- to remove the mean and 68% limits on top of each 1D plot
+    infoparser.add_argument('--short-title-1d', help=helpdict['short-title-1d'],
+                            dest='short_title_1d', action='store_true')
     # -- possible plot file describing custom commands
     infoparser.add_argument('--extra', help=helpdict['extra'],
                             dest='optional_plot_file', default='')
@@ -732,7 +901,10 @@ def create_parser():
     # but takes long, valid options are png and eps)
     infoparser.add_argument('--ext', help=helpdict['ext'],
                             type=str, dest='extension', default='pdf')
-    # -- only analyze the markovian part of the chains
+    # -- to set manually the number of plots per hoorizontal raw in 1d plot
+    infoparser.add_argument('--num-columns-1d', help=helpdict['num-columns-1d'],
+                            type=int, dest='num_columns_1d')
+    # -- also analyze the non-markovian part of the chains
     infoparser.add_argument('--keep-non-markovian', help=helpdict['keep-non-markovian'],
                             dest='markovian', action='store_false')
     # -- fraction of chains to be analyzed after burn-in removal (defaulting to 1.0)
@@ -768,12 +940,20 @@ def create_parser():
     # -- width of gaussian smoothing for plotting posteriors,
     # in units of bin size, increase for smoother data.
     infoparser.add_argument('--gaussian-smoothing', help=helpdict['gaussian-smoothing'],
-                            type=float, default=1.)
+                            type=float, default=0.5)
     # interpolation factor for plotting posteriors, 1 means no interpolation,
     # increase for smoother curves (it means that extra bins are created
     # and interpolated between computed bins)
     infoparser.add_argument('--interpolation-smoothing', help=helpdict['interpolation-smoothing'],
                             type=int, default=4)
+    # -- plot Fisher ellipses
+    infoparser.add_argument('--plot-fisher', help=helpdict['plot-fisher'],
+                           dest='plot_fisher',action='store_true')
+    infoparser.add_argument('--center-fisher', help=helpdict['center-fisher'],
+                           dest='center_fisher',action='store_true')
+
+    infoparser.add_argument('--posterior-smoothing', help=helpdict['posterior-smoothing'],
+                            type=int, default=5)
 
     return parser
 

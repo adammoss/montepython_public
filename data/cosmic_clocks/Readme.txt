@@ -1,3 +1,12 @@
+Updated April 2018 by T. Brinckmann & S. Vagnozzi
+
+Added  Hz_2016.dat with H(z) measurements from
+Table 4 of Moresco et al. 1601.01701, for use
+with the 'cosmic_clocks_2016' likelihood. Because
+there is an overlap in measurements, this likelihood
+should not be used with any of the older likelihoods.
+
+
 Full information regarding the Cosmic clocks data can be found here
 
 http://www.physics-astronomy.unibo.it/en/research/areas/astrophysics/cosmology-with-cosmic-chr

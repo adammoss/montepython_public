@@ -1,0 +1,74 @@
+#------Experiments to test (separated with commas)-----
+
+data.experiments=['kids450_qe_likelihood_public']
+
+#------ Settings for the over-sampling. The first element will always be set to
+# 1, for it is the sampling of the cosmological parameters. The other numbers
+# describe the over sampling of the nuisance parameter space. This array must
+# have the same dimension as the number of blocks in your run (so, 1 for
+# cosmological parameters, and then 1 for each experiment with varying nuisance
+# parameters).
+#data.over_sampling=[1, 4]
+
+#------ Parameter list -------
+
+# data.parameters[class name] = [mean, min, max, 1-sigma, scale, role]
+# - if min max irrelevant, put to -1
+# - if fixed, put 1-sigma to 0
+# - if scale irrelevant, put to 1, otherwise to the appropriate factor
+# - role is either 'cosmo' or 'nuisance'
+
+# Cosmological parameters list
+
+# main parameters to extract:
+data.parameters['omega_cdm']    = [0.11919,   0.01, 0.99, 0.0027,    1, 'cosmo']
+data.parameters['ln10^{10}A_s'] = [3.0753,   1.7, 5., 0.0029,    1, 'cosmo']
+data.parameters['omega_b']      = [0.022253,  0.01875, 0.02625, 0.028,  1, 'cosmo']
+data.parameters['n_s']          = [0.96229,   0.7, 1.3, 0.0074,    1, 'cosmo']
+data.parameters['h']         	= [0.673,     0.64,   0.82,   0.0065, 1, 'cosmo']
+data.parameters['M_tot']        = [0.2, 0.06, 10., 0.06, 1, 'cosmo']
+
+# Nuisance parameters list
+
+# m-correction in +-2sigma range:
+data.parameters['m_corr'] = [-0.01301, -0.03301, 0.00699, 0.02, 1, 'nuisance']
+
+# amplitudes for residual noise power:
+data.parameters['A_noise_z1'] = [0., -0.1, 0.1, 0.05, 1, 'nuisance']
+data.parameters['A_noise_z2'] = [0., -0.1, 0.1, 0.05, 1, 'nuisance']
+
+# amplitude for IA:
+data.parameters['A_IA'] = [0., -6., 6., 0.5, 1, 'nuisance']
+
+# amplitude for baryon feedback:
+data.parameters['A_bary'] = [2., 0., 10., 0.5, 1, 'nuisance']
+
+# Derived parameters list
+
+data.parameters['Omega_m']      = [1, None, None, 0, 1, 'derived']  
+data.parameters['sigma8']       = [1, None, None, 0, 1, 'derived']  
+
+# Other cosmo parameters (fixed parameters, precision parameters, etc.)
+
+# fix main cosmology to Planck:
+# Table 2 last column (Planck + WP, 68% c.l.) from Planck 2014 (A&A, 571, A16 (2014))
+#data.cosmo_arguments['tau_reio'] = 0.089
+data.cosmo_arguments['Omega_k'] = 0.
+
+# neutrinos:
+data.cosmo_arguments['N_ncdm'] = 1
+data.cosmo_arguments['deg_ncdm'] = 3
+data.cosmo_arguments['T_ncdm'] = 0.71611
+# "one more remark: if you have respectively 1,2,3 massive neutrinos, if you stick to the default value 
+# T_ncdm equal to 0.71611, designed to give m/omega of 93.14 eV, and if you want to use N_ur to get N_eff=3.046 in 
+# the early universe, then you should pass for 'N_ur' or 'N_eff' (deprecated) here respectively 2.0328, 1.0196, 0.00641" 
+# we assume three degenerate, massive neutrinos, thus:
+data.cosmo_arguments['N_ur'] = 0.00641
+
+# standard BBN prediction of the primordial Helium abundance $Y_p$:
+data.cosmo_arguments['sBBN file'] = data.path['cosmo']+'/bbn/sBBN.dat'
+data.cosmo_arguments['k_pivot'] = 0.05
+# this writes out all parameters used (also the hidden ones, I hope):
+#data.cosmo_arguments['write parameters'] = 'yes'
+# only needed for regular MCMC:
+data.write_step=1

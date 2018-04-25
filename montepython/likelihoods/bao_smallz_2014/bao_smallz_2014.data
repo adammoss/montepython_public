@@ -1,0 +1,7 @@
+# BAO BOSS 2014 low redshift likelihood
+# Uses 6FD (arXiv:1106.3366v1) and MGS (arXiv:1409.3242v1) samples
+# Intended to be compatible with BOSS DR12 (which is z>0.2)
+# By Thejs Brinckmann June 2017
+bao_smallz_2014.data_directory      = data.path['data']
+bao_smallz_2014.file                = 'bao_smallz_2014.txt'
+bao_smallz_2014.exclude             = []

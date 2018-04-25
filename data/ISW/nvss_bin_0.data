@@ -1,0 +1,19 @@
+nvss_bin0.data_directory = os.path.join(data.path['data'], 'ISW')
+
+nvss_bin0.cl_cross_file='nvss/cross/cl0.txt'
+nvss_bin0.cov_cross_file='nvss/cross/cov0.txt'
+nvss_bin0.cl_auto_file='nvss/auto/cl0.txt'
+nvss_bin0.cov_auto_file='nvss/auto/cov0.txt'
+
+nvss_bin0.dndz_file='nvss/dndz_nvss.txt'
+
+nvss_bin0.z_min=0
+nvss_bin0.z_max=5
+
+nvss_bin0.l_min_cross=4
+nvss_bin0.l_max_cross=100
+nvss_bin0.n_bins_cross=4
+
+nvss_bin0.l_min_auto=10
+nvss_bin0.l_max_auto=100
+nvss_bin0.n_bins_auto=6

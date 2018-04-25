@@ -72,7 +72,7 @@ class polarbear(Likelihood):
         for block in self.bpwf:
             # each block contains a window function
             integrand = np.array(
-                [block[index, 1]*cls_bb[e]
+                [block[index, 1]*cls_bb[int(e)]
                  for index, e in enumerate(block[:, 0])])
             convolution = 0.5*((integrand[1:]+integrand[:-1])*(
                 block[1:, 0]-block[:-1, 0])).sum()

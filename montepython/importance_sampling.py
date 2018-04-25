@@ -161,6 +161,10 @@ def translate_chain(data, cosmo, command_line,
     with open(input_path, 'r') as input_chain:
         with open(output_path, 'w') as output_chain:
             for line in input_chain:
+                # T. Brinckmann: Added next 3 lines for compatibility with --update
+                if line[0]=='#':
+                    output_chain.write(line)
+                    continue
                 params = line.split()
                 # recover the likelihood of this point
                 if not ignore_likelihood:
