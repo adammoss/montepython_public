@@ -174,7 +174,7 @@ PC_user_arguments = {
         },
 
     'compression_factor' :
-        {'type': double,
+        {'type': float,
                 'help':(
         '(Default: exp(-1))\n'
         'How often to update the files and do clustering.'
