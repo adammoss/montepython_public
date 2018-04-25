@@ -116,13 +116,13 @@ def initialise(cosmo, data, command_line):
         data.mcmc_parameters, varying_param_names)
     if not is_flat:
         raise io_mp.ConfigurationError(
-            'Nested Sampling with MultiNest is only possible ' +
-            'with flat priors. Sorry!')
+            'Nested Sampling with MultiNest is only possible with flat ' +
+            'priors. Sorry!')
     if not is_bound:
         raise io_mp.ConfigurationError(
-            'Nested Sampling with MultiNest is only possible ' +
-            'for bound parameters. Set reasonable bounds for them in the ' +
-            '".param" file.')
+            'Nested Sampling with MultiNest is only possible for bound ' +
+            'parameters. Set reasonable bounds for them in the ".param"' +
+            'file.')
 
     # If absent, create the sub-folder MN
     MN_folder = os.path.join(command_line.folder, MN_subfolder)

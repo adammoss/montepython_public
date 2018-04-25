@@ -173,11 +173,11 @@ PC_user_arguments = {
         )
         },
 
-    'update_files' :
-        {'type': int,
+    'compression_factor' :
+        {'type': double,
                 'help':(
-        '(Default: nlive)\n'
-        'How often to update the files in <base_dir>.'
+        '(Default: exp(-1))\n'
+        'How often to update the files and do clustering.'
         )
         }
     }
