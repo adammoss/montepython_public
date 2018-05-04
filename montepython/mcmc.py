@@ -533,6 +533,12 @@ def chain(cosmo, data, command_line):
                     # By B. Schroer and T. Brinckmann
 
                     c_array[(k-1)%(command_line.superupdate)] = data.jumping_factor
+
+                    # If acceptance rate deviates too much from the target acceptance
+                    # rate we want to resume adapting the jumping factor
+                    if abs(np.mean(ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
+                        stop_c = False
+
                     # Start adapting the jumping factor after command_line.superupdate steps if R-1 < 10
                     # The lower R-1 criterium is an arbitrary choice to keep from updating when the R-1
                     # calculation fails (i.e. returns only zeros).
@@ -650,6 +656,14 @@ def chain(cosmo, data, command_line):
             # slave chain behavior
             else:
                 # Start of slave superupdate routine
+
+                # If acceptance rate deviates too much from the target acceptance
+                # rate we want to resume adapting the jumping factor. This line
+                # will force the slave chains to check if the jumping factor
+                # has been updated
+                if abs(np.mean(ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
+                    stop_c = False
+
 		# Update the jumping factor every 5 steps in superupdate
 		if not k % 5 and k > command_line.superupdate and command_line.superupdate and (not stop_c or (stop_c and k % command_line.update)):
 		    try:
