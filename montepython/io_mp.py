@@ -124,14 +124,10 @@ def log_parameter_names(data, command_line):
     """
     Log the parameter names to <date_today>_<N>_.paramnames for GetDist compatibility.
     """
-
     number = command_line.N
-
     # If N was not provided, assumes N is 10 (default value)
     if not number:
-        print number
         number = data.N
-        print number
 
     # If a restart set number to correspond to new chains filename
     if command_line.restart:
