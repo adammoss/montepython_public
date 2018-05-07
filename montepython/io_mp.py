@@ -124,10 +124,21 @@ def log_parameter_names(data, command_line):
     """
     Log the parameter names to <date_today>_<N>_.paramnames for GetDist compatibility.
     """
+
     number = command_line.N
+
     # If N was not provided, assumes N is 10 (default value)
     if not number:
+        print number
         number = data.N
+        print number
+
+    # If a restart set number to correspond to new chains filename
+    if command_line.restart:
+        number += int(
+            command_line.restart.split(os.path.sep)[-1].split('__')[0].
+            split('_')[1])
+
     outname_base = '{0}_{1}_'.format(date.today(), number)
     log = open(os.path.join(command_line.folder, outname_base+'.paramnames'), 'w')
     # Create list of varying and derived parameters
