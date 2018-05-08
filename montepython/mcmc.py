@@ -249,7 +249,17 @@ def chain(cosmo, data, command_line):
     if command_line.superupdate and data.jumping_factor:
         try:
             jump_file = open(command_line.folder + '/jumping_factor.txt','r')
-	    rank = 1
+            if command_line.restart is None:
+                rank = 1
+            else:
+                # For restart runs we want to save the input jumping factor
+                # as starting jumping factor, but continue from the jumping
+                # factor stored in the file.
+                starting_jumping_factor = data.jumping_factor
+                # This will load the value irrespective of whether it starts
+                # with # (i.e. the jumping factor adaptation was started) or not.
+                jump_value = jump_file.read().replace('# ','')
+                data.jumping_factor = float(jump_value)
 	    jump_file.close()
 	    print 'rank = ',rank
         except:
@@ -308,6 +318,15 @@ def chain(cosmo, data, command_line):
         Cholesky = la.cholesky(C).T
         Rotation = np.identity(len(sigma_eig))
 
+    # define path and covmat
+    input_covmat = command_line.cov
+    base = os.path.basename(command_line.folder)
+    # the previous line fails when "folder" is a string ending with a slash. This issue is cured by the next lines:
+    if base == '':
+        base = os.path.basename(command_line.folder[:-1])
+    command_line.cov = os.path.join(
+        command_line.folder, base+'.covmat')
+
     # Fast Parameter Multiplier (fpm) for adjusting update and superupdate numbers.
     # This is equal to N_slow + f_fast N_fast, where N_slow is the number of slow
     # parameters, f_fast is the over sampling number for each fast block and f_fast
@@ -326,8 +345,6 @@ def chain(cosmo, data, command_line):
         # Rescale update number by cycle length N_slow + f_fast * N_fast to account for fast parameters
         command_line.update *= fpm
         previous = (sigma_eig, U, C, Cholesky)
-
-    # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
 
     # Initialise adaptive
     if command_line.adaptive:
@@ -378,8 +395,15 @@ def chain(cosmo, data, command_line):
         updated_steps = 0
         stop_c = False
         jumping_factor_rescale = 0
+        if command_line.restart:
+            try:
+                jump_file = open(command_line.cov,'r')
+                jumping_factor_rescale = 1
+            except:
+                jumping_factor_rescale = 0
         c_array = np.zeros(command_line.superupdate) # Allows computation of mean of jumping factor
         R_minus_one = np.array([100.,100.]) # 100 to make sure max(R-1) value is high if computation failed
+        # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
         ar = np.zeros(command_line.superupdate)
         # Make sure update is enabled
         if command_line.update == 0:
@@ -387,6 +411,7 @@ def chain(cosmo, data, command_line):
                 print 'Update routine required by superupdate. Setting --update 50'
                 print 'This number is then rescaled by cycle length: %d (N_slow + f_fast * N_fast)' % fpm
             command_line.update = 50 * fpm
+            previous = (sigma_eig, U, C, Cholesky)
 
     # If restart wanted, pick initial value for arguments
     if command_line.restart is not None:
@@ -424,15 +449,6 @@ def chain(cosmo, data, command_line):
 
     acc, rej = 0.0, 0.0  # acceptance and rejection number count
     N = 1   # number of time the system stayed in the current position
-
-    # define path and covmat
-    input_covmat = command_line.cov
-    base = os.path.basename(command_line.folder)
-    # the previous line fails when "folder" is a string ending with a slash. This issue is cured by the next lines:
-    if base == '':
-        base = os.path.basename(command_line.folder[:-1])
-    command_line.cov = os.path.join(
-        command_line.folder, base+'.covmat')
 
     # Print on screen the computed parameters
     if not command_line.silent and not command_line.quiet:
