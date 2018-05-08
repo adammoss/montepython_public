@@ -380,7 +380,7 @@ def chain(cosmo, data, command_line):
         jumping_factor_rescale = 0
         c_array = np.zeros(command_line.superupdate) # Allows computation of mean of jumping factor
         R_minus_one = np.array([100.,100.]) # 100 to make sure max(R-1) value is high if computation failed
-        ar = np.zeros(command_line.superupdate*fpm)
+        ar = np.zeros(command_line.superupdate)
         # Make sure update is enabled
         if command_line.update == 0:
             if not rank and not command_line.silent:
@@ -764,7 +764,7 @@ def chain(cosmo, data, command_line):
             if command_line.superupdate:
 	        ar[k%(command_line.superupdate)]=1 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
             elif command_line.adaptive:
-                ar[k%100] = 0 # Local acceptance rate of last 100 steps
+                ar[k%100] = 1 # Local acceptance rate of last 100 steps
         else:  # reject step
             rej += 1.0
             N += 1  # Increase multiplicity of last accepted point
