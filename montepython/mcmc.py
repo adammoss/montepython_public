@@ -546,7 +546,7 @@ def chain(cosmo, data, command_line):
                         c = data.jumping_factor**2/len(parameter_names)
                         # To avoid getting trapped in local minima, the jumping factor should
                         # not go below 0.1 (arbitrary) times the starting jumping factor.
-                        if (c + (np.mean(ar) - command_line.superupdate_ar)/(k - updated_steps)) > (0.1*starting_jumping_factor)**2./len(parameter_names):
+                        if (c + (np.mean(ar) - command_line.superupdate_ar)/(k - updated_steps)) > (0.1*starting_jumping_factor)**2./len(parameter_names) or ((np.mean(ar) - command_line.superupdate_ar)/(k - updated_steps) > 0):
                             c += (np.mean(ar) - command_line.superupdate_ar)/(k - updated_steps)
                             data.jumping_factor = np.sqrt(len(parameter_names) * c)
 
