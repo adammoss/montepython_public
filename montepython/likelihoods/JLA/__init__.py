@@ -55,9 +55,9 @@ class JLA(Likelihood_sn):
             raise io_mp.LikelihoodError(
                 "The JLA data files were not found. Please download the "
                 "following link "
-                "http://supernovae.in2p3.fr/sdss_snls_jla/jla_likelihood_v4.tgz"
+                "http://supernovae.in2p3.fr/sdss_snls_jla/jla_likelihood_v6.tgz"
                 ", extract it, and copy all files present in "
-                "`jla_likelihood_v4/data` to `your_montepython/data/JLA`")
+                "`jla_likelihood_v6/data` to `your_montepython/data/JLA`")
 
         # Load matrices from text files, whose names were read in the
         # configuration file
