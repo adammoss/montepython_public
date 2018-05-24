@@ -9,8 +9,6 @@
 # See google doc document prepared by the Euclid IST - Splinter 2
 #
 # Modified by J. Lesgourgues in March 2016 to vectorise and speed up
-#
-# Modified by Tim Sprenger in May 2017 to include z-dependent lmax
 
 from montepython.likelihood_class import Likelihood
 import io_mp
@@ -21,7 +19,7 @@ from scipy import interpolate as itp
 import os
 import numpy as np
 import math
-import warnings
+
 
 class euclid_lensing(Likelihood):
 
@@ -33,15 +31,11 @@ class euclid_lensing(Likelihood):
         # max(self.z) and for k up to k_max
         self.need_cosmo_arguments(data, {'output': 'mPk'})
         self.need_cosmo_arguments(data, {'z_max_pk': self.zmax})
-        self.need_cosmo_arguments(data, {'P_k_max_1/Mpc': 0.75*self.k_max_h_by_Mpc})
+        self.need_cosmo_arguments(data, {'P_k_max_h/Mpc': self.k_max_h_by_Mpc})
 
         # Compute non-linear power spectrum if requested
         if (self.use_halofit):
             self.need_cosmo_arguments(data, {'non linear':'halofit'})
-
-	# Warn if theoretical error and linear cutoff are requested
-	if (self.use_lmax_lincut and self.theoretical_error!=0):
-	    warnings.warn("A lmax cutoff infered from kmax and a theoretical error are requested. This combination is not implemented and in most cases not necessary as the theoretical error should induce a cutoff by itself.")
 
         # Define array of l values, and initialize them
         # It is a logspace
@@ -70,18 +64,16 @@ class euclid_lensing(Likelihood):
         # Create the array that will contain the z boundaries for each bin. The
         # first value is already correctly set to 0.
         self.z_bin_edge = np.zeros(self.nbin+1, 'float64')
-	
-	total_count = 0.
+
         for Bin in xrange(self.nbin-1):
             bin_count = 0.
             z = self.z_bin_edge[Bin]
-            while (bin_count <= (n_tot-total_count)/(self.nbin-Bin)):
+            while (bin_count <= n_tot/self.nbin):
                 gd_1 = self.galaxy_distribution(z)
                 gd_2 = self.galaxy_distribution(z+self.dz)
                 bin_count += 0.5*(gd_1+gd_2)*self.dz
                 z += self.dz
             self.z_bin_edge[Bin+1] = z
-	    total_count += bin_count
         self.z_bin_edge[self.nbin] = self.zmax
 
         # Fill array of discrete z values
@@ -208,8 +200,8 @@ class euclid_lensing(Likelihood):
         self.eta_r = self.eta_z*(self.dzdr[:, np.newaxis]/self.eta_norm)
 
         # Compute function g_i(r), that depends on r and the bin
-        # g_i(r) = 2r(1+z(r)) int_r^+\infty drs eta_r(rs) (rs-r)/rs
-        # The integration starts from r.
+        # g_i(r) = 2r(1+z(r)) int_0^+\infty drs eta_r(rs) (rs-r)/rs
+        # TODO is the integration from 0 or r ?
         g = np.zeros((self.nzmax, self.nbin), 'float64')
         for Bin in xrange(self.nbin):
             for nr in xrange(1, self.nzmax-1):
@@ -217,52 +209,6 @@ class euclid_lensing(Likelihood):
                 g[nr, Bin] = np.sum(0.5*(
                     fun[1:]+fun[:-1])*(self.r[nr+1:]-self.r[nr:-1]))
                 g[nr, Bin] *= 2.*self.r[nr]*(1.+self.z[nr])
-
-	# compute the maximum l where most contributions are linear
-	# as a function of the lower bin number
-	if self.use_lmax_lincut:
-            lintegrand_lincut_o = np.zeros((self.nzmax, self.nbin, self.nbin), 'float64')
-            lintegrand_lincut_u = np.zeros((self.nzmax, self.nbin, self.nbin), 'float64')
-            l_lincut = np.zeros((self.nbin, self.nbin), 'float64')
-            l_lincut_mean = np.zeros(self.nbin, 'float64')
-            for Bin1 in xrange(self.nbin):
-                for Bin2 in xrange(Bin1,self.nbin):
-                    lintegrand_lincut_o[1:,Bin1, Bin2] = g[1:, Bin1]*g[1:, Bin2]/(
-                        self.r[1:])
-            for Bin1 in xrange(self.nbin):
-                for Bin2 in xrange(Bin1,self.nbin):
-                    lintegrand_lincut_u[1:,Bin1, Bin2] = g[1:, Bin1]*g[1:, Bin2]/(
-                        self.r[1:]**2)
-            for Bin1 in xrange(self.nbin):
-                for Bin2 in xrange(Bin1,self.nbin):
-                    l_lincut[Bin1, Bin2] = np.sum(0.5*(
-                        lintegrand_lincut_o[1:, Bin1, Bin2] +
-                        lintegrand_lincut_o[:-1, Bin1, Bin2])*(
-                        self.r[1:]-self.r[:-1]))
-                    l_lincut[Bin1, Bin2] /= np.sum(0.5*(
-                        lintegrand_lincut_u[1:, Bin1, Bin2] +
-                        lintegrand_lincut_u[:-1, Bin1, Bin2])*(
-                        self.r[1:]-self.r[:-1]))
-	    z_peak = np.zeros((self.nbin, self.nbin), 'float64')
-            for Bin1 in xrange(self.nbin):
-                for Bin2 in xrange(Bin1,self.nbin):
-	    	    z_peak[Bin1, Bin2] = self.zmax
-                    for index_z in xrange(self.nzmax):
-			if (self.r[index_z]>l_lincut[Bin1, Bin2]):
-			    z_peak[Bin1, Bin2] = self.z[index_z]
-			    break
-                    if self.use_zscaling:
-		        l_lincut[Bin1, Bin2] *= self.kmax_hMpc*cosmo.h()*pow(1.+z_peak[Bin1, Bin2],2./(2.+cosmo.n_s()))
-                    else:
-		        l_lincut[Bin1, Bin2] *= self.kmax_hMpc*cosmo.h()
-		l_lincut_mean[Bin1] = np.sum(l_lincut[Bin1, :])/(self.nbin-Bin1)
-
-	    #for Bin1 in xrange(self.nbin):
-	        #for Bin2 in xrange(Bin1,self.nbin):
-		    #print("%s\t%s\t%s\t%s" % (Bin1, Bin2, l_lincut[Bin1, Bin2], l_lincut_mean[Bin1]))
-
-	#for nr in xrange(1, self.nzmax-1):
-	#	print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % (self.z[nr], g[nr, 0], g[nr, 1], g[nr, 2], g[nr, 3], g[nr, 4], g[nr, 5], g[nr, 6], g[nr, 7], g[nr, 8], g[nr, 9]))
 
         # Get power spectrum P(k=l/r,z(r)) from cosmological module
         kmin_in_inv_Mpc = self.k_min_h_by_Mpc * cosmo.h()
@@ -285,8 +231,6 @@ class euclid_lensing(Likelihood):
                 else:
                     pk[index_l, index_z] = cosmo.pk(self.l[index_l]/self.r[index_z], self.z[index_z])
 
-		#print("%s\t%s\t%s" %(self.l[index_l], self.z[index_z], pk[index_l, index_z]))
-
         # Recover the non_linear scale computed by halofit. If no scale was
         # affected, set the scale to one, and make sure that the nuisance
         # parameter epsilon is set to zero
@@ -296,32 +240,16 @@ class euclid_lensing(Likelihood):
         else:
             k_sigma = cosmo.nonlinear_scale(self.z, self.nzmax)
 
-	# replace unphysical values of k_sigma
-	if not (cosmo.nonlinear_method == 0):
-	    k_sigma_problem = False
-	    for index_z in xrange(self.nzmax-1):
-	        if (k_sigma[index_z+1]<k_sigma[index_z]) or (k_sigma[index_z+1]>2.5):
-	            k_sigma[index_z+1] = 2.5
-	            k_sigma_problem = True
-	        #print("%s\t%s" % (k_sigma[index_z], self.z[index_z]))	
-	    if k_sigma_problem:
-	        warnings.warn("There were unphysical (decreasing in redshift or exploding) values of k_sigma (=cosmo.nonlinear_scale(...)). To proceed they were set to 2.5, the highest scale that seems to be stable.")	        
-
         # Define the alpha function, that will characterize the theoretical
         # uncertainty. Chosen to be 0.001 at low k, raise between 0.1 and 0.2
         # to self.theoretical_error
         alpha = np.zeros((self.nlmax, self.nzmax), 'float64')
         # self.theoretical_error = 0.1
         if self.theoretical_error != 0:
-#MArchi     for index_l in range(self.nlmax):
-                #k = self.l[index_l]/self.r[1:]
-                #alpha[index_l, 1:] = np.log(1.+k[:]/k_sigma[1:])/(
-                    #1.+np.log(1.+k[:]/k_sigma[1:]))*self.theoretical_error
-            for index_l in xrange(self.nlmax):
-             for index_z in xrange(1, self.nzmax):
-                k = self.l[index_l]/self.r[index_z]
-                alpha[index_l, index_z] = np.log(1.+k/k_sigma[index_z])/(
-                    1.+np.log(1.+k/k_sigma[index_z]))*self.theoretical_error
+            for index_l in range(self.nlmax):
+                k = self.l[index_l]/self.r[1:]
+                alpha[index_l, 1:] = np.log(1.+k[:]/k_sigma[1:])/(
+                    1.+np.log(1.+k[:]/k_sigma[1:]))*self.theoretical_error
 
         # recover the e_th_nu part of the error function
         e_th_nu = self.coefficient_f_nu*cosmo.Omega_nu/cosmo.Omega_m()
@@ -401,10 +329,9 @@ class euclid_lensing(Likelihood):
                     for Bin1 in range(self.nbin):
                         for Bin2 in range(self.nbin):
                             fid_file.write("%.8g\n" % Cl[nl, Bin1, Bin2])
-            print '\n'
-            warnings.warn(
-                "Writing fiducial model in %s, for %s likelihood\n" % (
-                    self.data_directory+'/'+self.fiducial_file, self.name))
+            print '\n\n /|\    Writing fiducial model in {0}'.format(
+                fid_file_path)
+            print '/_o_\ for {0} likelihood'.format(self.name)
             return 1j
 
         # Now that the fiducial model is stored, we add the El to both Cl and
@@ -469,31 +396,24 @@ class euclid_lensing(Likelihood):
 
         chi2 = 0.
 
+        # chi2 computation in presence of theoretical error
+        # (in absence of it, computation more straightforward, see below)
         # TODO parallelize this
-        for index, ell in enumerate(ells):
+        if (self.theoretical_error > 0):
 
-	    if self.use_lmax_lincut:
-                CutBin = -1
-                for zBin in xrange(self.nbin):
-                    if (ell<l_lincut_mean[zBin]):
-                        CutBin = zBin
-                        det_theory = np.linalg.det(Cov_theory[index, CutBin:, CutBin:])
-                        det_observ = np.linalg.det(Cov_observ[index, CutBin:, CutBin:])
-                        break
-                if (CutBin==-1):
-                    break
-	    else:
+            for index, ell in enumerate(ells):
+
                 det_theory = np.linalg.det(Cov_theory[index, :, :])
                 det_observ = np.linalg.det(Cov_observ[index, :, :])
 
-            if (self.theoretical_error > 0):
                 det_cross_err = 0
                 for i in range(self.nbin):
-                    newCov = np.copy(Cov_theory[index,:,:]) #MArchi#newCov = np.copy(Cov_theory)
-                    newCov[:, i] = Cov_error[index,:, i] #MArchi#newCov[:, i] = Cov_error[:, i]
+                    newCov = np.copy(Cov_theory)
+                    newCov[:, i] = Cov_error[:, i]
                     det_cross_err += np.linalg.det(newCov)
 
-                # Newton method
+                # Newton method to minimise chi2 over nuisance parameter epsilon_l
+                # (only when using theoretical error scheme of 1210.2194)
                 # Find starting point for the method:
                 start = 0
                 step = 0.001*det_theory/det_cross_err
@@ -505,27 +425,19 @@ class euclid_lensing(Likelihood):
                     vector = np.array([epsilon_l-step,
                                        epsilon_l,
                                        epsilon_l+step])
-                    #print vector.shape
                 # Computing the function on three neighbouring points
                     function_vector = np.zeros(3, 'float64')
                     for k in range(3):
                         Cov_theory_plus_error = Cov_theory+vector[k]*Cov_error
-                        det_theory_plus_error = np.linalg.det(Cov_theory_plus_error[index,:,:]) #MArchi#det_theory_plus_error = np.linalg.det(Cov_theory_plus_error)
+                        det_theory_plus_error = np.linalg.det(
+                            Cov_theory_plus_error)
                         det_theory_plus_error_cross_obs = 0
                         for i in range(self.nbin):
-                            newCov = np.copy(Cov_theory_plus_error[index,:,:])#MArchi#newCov = np.copy(Cov_theory_plus_error)
-                            newCov[:, i] = Cov_observ[index,:, i]#MArchi#newCov[:, i] = Cov_observ[:, i]
+                            newCov = np.copy(Cov_theory_plus_error)
+                            newCov[:, i] = Cov_observ[:, i]
                             det_theory_plus_error_cross_obs += np.linalg.det(
                                 newCov)
-			try:
-                        	function_vector[k] = (2.*ell+1.)*self.fsky*(det_theory_plus_error_cross_obs/det_theory_plus_error + math.log(det_theory_plus_error/det_observ) - self.nbin ) + dof*vector[k]**2
-			except ValueError:
-				warnings.warn("Euclid_lensing: Could not evaluate chi2 including theoretical error with the current parameters. The corresponding chi2 is now set to nan!")
-				break
-				break
-				break
-				chi2 = np.nan
-
+                        function_vector[k] = (2.*ell+1.)*self.fsky*(det_theory_plus_error_cross_obs/det_theory_plus_error + math.log(det_theory_plus_error/det_observ) - self.nbin ) + dof*vector[k]**2
 
                     # Computing first
                     first_d    = (function_vector[2]-function_vector[0]) / (vector[2]-vector[0])
@@ -535,38 +447,40 @@ class euclid_lensing(Likelihood):
                     epsilon_l = vector[1] - first_d/second_d
                     error = abs(function_vector[1] - old_chi2)
                     old_chi2 = function_vector[1]
-            # End Newton
+                # End Newton
 
                 Cov_theory_plus_error = Cov_theory + epsilon_l * Cov_error
-                det_theory_plus_error = np.linalg.det(Cov_theory_plus_error[index,:,:]) #MArchi#det_theory_plus_error = np.linalg.det(Cov_theory_plus_error)
+                det_theory_plus_error = np.linalg.det(Cov_theory_plus_error)
 
                 det_theory_plus_error_cross_obs = 0
                 for i in range(self.nbin):
-                    newCov = np.copy(Cov_theory_plus_error[index,:,:]) #MArchi#newCov = np.copy(Cov_theory_plus_error) 
-                    newCov[:, i] = Cov_observ[index,:, i] #MArchi#newCov[:, i] = Cov_observ[:, i]
+                    newCov = np.copy(Cov_theory_plus_error)
+                    newCov[:, i] = Cov_observ[:, i]
                     det_theory_plus_error_cross_obs += np.linalg.det(newCov)
 
                 chi2 += (2.*ell+1.)*self.fsky*(det_theory_plus_error_cross_obs/det_theory_plus_error + math.log(det_theory_plus_error/det_observ) - self.nbin ) + dof*epsilon_l**2
 
 
-            else:
-		if self.use_lmax_lincut:
-                    det_cross = 0.
-                    for i in xrange(0,self.nbin-CutBin):
-                        newCov = np.copy(Cov_theory[index, CutBin:, CutBin:])
-                        newCov[:, i] = Cov_observ[index, CutBin:, CutBin+i]
-                        det_cross += np.linalg.det(newCov)
-		else:
-                    det_cross = 0.
-                    for i in xrange(self.nbin):
-                        newCov = np.copy(Cov_theory[index, :, :])
-                        newCov[:, i] = Cov_observ[index, :, i]
-                        det_cross += np.linalg.det(newCov)
+        # chi2 computation in absence of theoretical error (vectorized)
+        else:
 
-		if self.use_lmax_lincut:
-                    chi2 += (2.*ell+1.)*self.fsky*(det_cross/det_theory + math.log(det_theory/det_observ) - self.nbin+CutBin)
-                else:
-                    chi2 += (2.*ell+1.)*self.fsky*(det_cross/det_theory + math.log(det_theory/det_observ) - self.nbin)
+            det_theory = np.zeros(len(ells), 'float64')
+            det_observ = np.zeros(len(ells), 'float64')
+            det_cross_term = np.zeros((self.nbin, len(ells)), 'float64')
+            det_cross = np.zeros(len(ells), 'float64')
+
+            det_theory[:] = np.linalg.det(Cov_theory[:, :, :])
+            det_observ[:] = np.linalg.det(Cov_observ[:, :, :])
+
+            for i in xrange(self.nbin):
+                newCov = np.copy(Cov_theory)
+                newCov[:,:, i] = Cov_observ[:,:, i]
+                det_cross_term[i,:] = np.linalg.det(newCov[:,:,:])
+
+            det_cross = np.sum(det_cross_term,axis=0)
+
+            for index, ell in enumerate(ells):
+                chi2 += (2.*ell+1.)*self.fsky*(det_cross[index]/det_theory[index] + math.log(det_theory[index]/det_observ[index]) - self.nbin)
 
         # Finally adding a gaussian prior on the epsilon nuisance parameter, if
         # present
@@ -576,6 +490,6 @@ class euclid_lensing(Likelihood):
             chi2 += epsilon**2
 
         #end = time.time()
-        #print "time needed in s:",(end-start)
+        #print "Time in s:",end-start
 
         return -chi2/2.

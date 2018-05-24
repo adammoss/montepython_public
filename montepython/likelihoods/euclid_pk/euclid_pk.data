@@ -3,71 +3,34 @@
 # and IST-Forecasting subgroup on galaxy clustering
 # Those specifications can be found in the googledoc document
 # prepared by the Euclid IST - Splinter Group 3
-# File update by Tim Sprenger to use old number counts and
-# new nuisance parameter sigma_NL, a nonlinear cutoff option
-# and a use_halofit flag
 
 euclid_pk.data_directory = data.path['data']
 euclid_pk.fiducial_file  = "euclid_pk_fiducial.dat"
 
 # Uncomment the line with epsilon to use the theoretical error
-# sigma_NL (1405.1452v2: 4-10 Mpc^-1, mean 7 Mpc^-1)
-# bias parameters (beta, amplitude:0 and scaling:1, =1 means no deviation to fit model)
-euclid_pk.use_nuisance = ['sigma_NL','beta_0^Euclid','beta_1^Euclid']
-#euclid_pk.use_nuisance = ['sigma_NL']
 #euclid_pk.use_nuisance = ['P_shot']
+#euclid_pk.use_nuisance = ['P_shot','epsilon']
 
-# redshift range (hard coded, do not change!)
 # number of bins of the survey
-euclid_pk.nbin  = 16
-# range of redshifts covered by survey (bin centers!).
-euclid_pk.zmin = 0.5
+euclid_pk.nbin  = 14
+# range of redshifts covered by survey.
+euclid_pk.zmin = 0.7
 euclid_pk.zmax  = 2.0
 # sky coverage
 euclid_pk.fsky  = 0.3636
-# precision on the mu variable (~9)
+# precision on the mu variable
 euclid_pk.mu_size = 9
 
 # number of equally spaced bins in log(k) space
 euclid_pk.k_size = 100
 
-# lower integration boundary for k (in 1/Mpc)
-euclid_pk.kmin = 0.02
-# higher integration boundary for k (in h/Mpc)
-# can use e.g. 0.2 for conservative or 10 for realistic
-# for realistic the theoretical error takes over quickly
-euclid_pk.kmax = 10.
-# use z-scaling of kmax via pow(1+z,2/(2+n_s))
-euclid_pk.use_zscaling = False
+# integration boundaries for k (in 1/Mpc)
+euclid_pk.kmin = 0.001
+euclid_pk.kmax = 0.2
 
-# use halofit method
-euclid_pk.use_halofit = True
+# precision of the halofit method (set to zero by default)
+euclid_pk.theoretical_error = 0
+euclid_pk.coefficient_f_nu = 0
 
-# theoretical error (exp(lg(k)) 0.33%(0.01h/Mpc)->1%(0.3h/Mpc)->10%(10h/Mpc))
-euclid_pk.UseTheoError = True
-euclid_pk.k_CorrLength_hMpc = 0.05
-euclid_pk.z_CorrLength = 1.0
-euclid_pk.bias_accuracy = 0.025
-
-# obsolete neutrino error
-#euclid_pk.use_nuisance = ['epsilon']
-#euclid_pk.coefficient_f_nu = 0
-
-# efficiency
-euclid_pk.efficiency = 1.0
-
-# neutrino bias correction according to Raccanelli et al. 1704.07837 (should we cite Castorina et al. 1311.1212 instead?)
-# CAUTION: this option does not correctly account for the effect of neutrinos on the growth factor in the RSD term! use option below!
-euclid_pk.use_neutrino_bias = False
-# if a fiducial model with neutrino bias correction is used
-euclid_pk.use_fiducial_neutrino_bias = False
-
-# apply the correction instead to the power spectrum, i.e. use P_{cdm+baryons} instead of P_m
-# should not be used with the neutrino bias correction
-# CAUTION: this is not consistent! It uses the linear transfer functions to modify the non-linear power spectrum
-euclid_pk.use_cdm_plus_baryons_pk = False
-# if a fiducial model with P_{cdm+b} is used
-euclid_pk.use_fiducial_cdm_plus_baryons_pk = False
-
-# use linear power spectrum for RSD correction
-euclid_pk.use_linear_rsd = True
+# efficiency (not used in current version)
+#euclid_pk.efficiency = 1.0
