@@ -1032,7 +1032,7 @@ def compute_fisher_step(data, command_line, cosmo, center, step_matrix, loglike_
             # Assume symmetric likelihood and use opposite step if so.
             # I.e. both steps (+/-) will be the same and will return the same -loglkl.
             if diff_1[2]:
-                step_array[index] = diff_1[2]/norm**0.5
+                step_array[index] = diff_1[2]
             # If symmetric step is required use diff_1[0] to determine size of step.
             # Only step_index_1=0 goes through the iteration cycle in this case.
             # If diff_1[2] is defined, will instead use that value.
