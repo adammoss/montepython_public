@@ -672,38 +672,38 @@ def chain(cosmo, data, command_line):
             # slave chain behavior
             else:
                 # Start of slave superupdate routine
+                if command_line.superupdate:
+                    # If acceptance rate deviates too much from the target acceptance
+                    # rate we want to resume adapting the jumping factor. This line
+                    # will force the slave chains to check if the jumping factor
+                    # has been updated
+                    if abs(np.mean(ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
+                        stop_c = False
 
-                # If acceptance rate deviates too much from the target acceptance
-                # rate we want to resume adapting the jumping factor. This line
-                # will force the slave chains to check if the jumping factor
-                # has been updated
-                if abs(np.mean(ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
-                    stop_c = False
-
-		# Update the jumping factor every 5 steps in superupdate
-		if not k % 5 and k > command_line.superupdate and command_line.superupdate and (not stop_c or (stop_c and k % command_line.update)):
-		    try:
-                        jump_file = open(command_line.folder + '/jumping_factor.txt','r')
-                        # If there is a # in the file, the master has stopped adapting c
-                        for line in jump_file:
-                            if line.find('#') == -1:
-                                jump_file.seek(0)
-                                jump_value = jump_file.read()
-                                data.jumping_factor = float(jump_value)
-                            else:
-                                jump_file.seek(0)
-                                jump_value = jump_file.read().replace('# ','')
-                                if not stop_c or (stop_c and not float(jump_value) == data.jumping_factor):
+		    # Update the jumping factor every 5 steps in superupdate
+		    if not k % 5 and k > command_line.superupdate and command_line.superupdate and (not stop_c or (stop_c and k % command_line.update)):
+		        try:
+                            jump_file = open(command_line.folder + '/jumping_factor.txt','r')
+                            # If there is a # in the file, the master has stopped adapting c
+                            for line in jump_file:
+                                if line.find('#') == -1:
+                                    jump_file.seek(0)
+                                    jump_value = jump_file.read()
                                     data.jumping_factor = float(jump_value)
-                                    stop_c = True
-                                    data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
-                                    if not command_line.silent:
-                                        print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(ar))
-                        jump_file.close()
-		    except:
-                        if not command_line.silent:
-                            print 'Reading jumping_factor file failed'
-			pass
+                                else:
+                                    jump_file.seek(0)
+                                    jump_value = jump_file.read().replace('# ','')
+                                    if not stop_c or (stop_c and not float(jump_value) == data.jumping_factor):
+                                        data.jumping_factor = float(jump_value)
+                                        stop_c = True
+                                        data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
+                                        if not command_line.silent:
+                                            print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(ar))
+                            jump_file.close()
+		        except:
+                            if not command_line.silent:
+                                print 'Reading jumping_factor file failed'
+			    pass
                 # End of slave superupdate routine
 
                 # Start of slave update routine
