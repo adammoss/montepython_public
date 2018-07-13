@@ -1,16 +1,9 @@
 ########################################################
-# Euclid_lensing likelihood
+# ska1_lensing likelihood
 ########################################################
-# written by Benjamin Audren
-# (adapted from J Lesgourgues's old COSMOS likelihood for CosmoMC)
-#
-# Modified by S. Clesse in March 2016 to add an optional form of n(z)
-# motivated by ground based exp. (Van Waerbeke et al., 2013)
-# See google doc document prepared by the Euclid IST - Splinter 2
-#
-# Modified by J. Lesgourgues in March 2016 to vectorise and speed up
-#
-# Modified by Tim Sprenger in May 2017 to include z-dependent lmax
+# Copied from Euclid_lensing 05.2017
+# Tim Sprenger: changed galaxy_distribution and photo_z_distribution
+# to match ska1 specifications from 1601.03947
 
 from montepython.likelihood_class import Likelihood
 import io_mp
@@ -23,7 +16,7 @@ import numpy as np
 import math
 import warnings
 
-class euclid_lensing(Likelihood):
+class ska1_lensing(Likelihood):
 
     def __init__(self, path, data, command_line):
 
@@ -70,7 +63,7 @@ class euclid_lensing(Likelihood):
         # Create the array that will contain the z boundaries for each bin. The
         # first value is already correctly set to 0.
         self.z_bin_edge = np.zeros(self.nbin+1, 'float64')
-	
+
 	total_count = 0.
         for Bin in xrange(self.nbin-1):
             bin_count = 0.
@@ -86,6 +79,18 @@ class euclid_lensing(Likelihood):
 
         # Fill array of discrete z values
         self.z = np.linspace(0, self.zmax, num=self.nzmax)
+
+	# check normalizations:
+        #print("n_tot = %s" % (n_tot))
+	#int_nz = self.nzmax
+	#int_z = np.linspace(0, self.zmax, num=int_nz)
+	#DDD = np.zeros(int_nz, 'float64')
+	#for nz in xrange(self.nzmax):
+	#    #for nz2 in xrange(int_nz):
+	#    #    DDD[nz2] = self.photo_z_distribution(self.z[nz], int_z[nz2],False)
+        #    DDD = self.photo_z_distribution(self.z[nz], int_z)
+        #    D_tot = scipy.integrate.trapz(DDD,int_z)
+	#    print("%s\t%s\t%s" % (self.z[nz], self.galaxy_distribution(self.z[nz]), D_tot ))
 
         # Fill distribution for each bin (convolving with photo_z distribution)
         self.eta_z = np.zeros((self.nzmax, self.nbin), 'float64')
@@ -147,48 +152,71 @@ class euclid_lensing(Likelihood):
         If the array flag is set to True, z is then interpretated as an array,
         and not as a single value.
 
-        Modified by S. Clesse in March 2016 to add an optional form of n(z) motivated by ground based exp. (Van Waerbeke et al., 2013)
-        See google doc document prepared by the Euclid IST - Splinter 2
+	Replaced by Tim Sprenger due to switch from euclid to ska
         """
 
-        zmean = 0.9
-        z0 = zmean/1.412
+        z0 = self.par_zm/self.par_a
 
         if not array:
-            galaxy_dist = z**2*math.exp(-(z/z0)**(1.5))
-        elif self.nofz_method==1:
-            return z**2*np.exp(-(z/z0)**(1.5))
+            galaxy_dist = z**(self.par_b)*math.exp(-(z/z0)**(self.par_c))
         else:
-            return self.a1*np.exp(-(z-0.7)**2/self.b1**2.)+self.c1*np.exp(-(z-1.2)**2/self.d1**2.)
-
+             return z**(self.par_b)*np.exp(-(z/z0)**(self.par_c))
 
         return galaxy_dist
 
     def photo_z_distribution(self, z, zph, array=True):
-        """
-        Photo z distribution
+		"""
+		Photo z distribution
 
-        If the array flag is set to True, z is then interpretated as an array,
-        and not as a single value.
-        """
+		If the array flag is set to True, zph is then interpretated as an array,
+		and not as a single value.
 
-        # Standard error on dz/(1+z)
-        sigma_ph = 0.05
+		Replaced by Tim Sprenger due to switch from euclid to ska
+		"""
 
-        # Note: you must normalize it yourself to one if you want to get nice
-        # plots of the galaxy distribution function in each bin (otherwise, the
-        # spectra will remain correct, but each D_i(x) will loot strangely
-        # normalized when compared to the original D(z)
-        if not array:
-            photo_z_dist = math.exp(-0.5*(
-                (z-zph)/sigma_ph/(1.+z))**2)/sigma_ph/(1.+z)/math.sqrt(
-                2.*math.pi)
-        else:
-            photo_z_dist = np.exp(-0.5*(
-                (z-zph)/sigma_ph/(1.+z))**2)/sigma_ph/(1.+z)/math.sqrt(
-                2.*math.pi)
+		# Note: you must normalize it yourself to one if you want to get nice
+		# plots of the galaxy distribution function in each bin (otherwise, the
+		# spectra will remain correct, but each D_i(x) will loot strangely
+		# normalized when compared to the original D(z)
+		if not array:
+			if (z<=self.z_spec):
+				photo_z_dist =  (1.-self.f_spec)*math.exp(
+					-0.5*((z-zph)/self.sigma_phot/(1.+z))**2)/self.sigma_phot/(
+					1.+z)/math.sqrt(2.*math.pi)
+				if (z==zph):
+					photo_z_dist += self.f_spec/self.zmax*(self.nzmax-1.)
+					if (z==0.):
+						photo_z_dist += self.f_spec/self.zmax*(self.nzmax-1.)
+			elif (z<=self.z_phot):
+				photo_z_dist = math.exp(
+					-0.5*((z-zph)/self.sigma_phot/(1.+z))**2)/self.sigma_phot/(
+					1.+z)/math.sqrt(2.*math.pi)
+			else:
+				photo_z_dist = math.exp(
+					-0.5*((z-zph)/self.sigma_noz/(1.+z))**2)/self.sigma_noz/(
+					1.+z)/math.sqrt(2.*math.pi)
+		else:
+			if (z<=self.z_spec):
+				photo_z_dist =  (1.-self.f_spec)*np.exp(
+					-0.5*((z-zph)/self.sigma_phot/(1.+z))**2)/self.sigma_phot/(
+					1.+z)/math.sqrt(2.*math.pi)
+				for index_z in xrange(len(zph)):
+					if (z==zph[index_z]):
+						photo_z_dist[index_z] += self.f_spec/self.zmax*(self.nzmax-1.)
+						if (z==0.):
+							photo_z_dist[index_z] += self.f_spec/self.zmax*(self.nzmax-1.)
+						break
+			elif (z<=self.z_phot):
+				photo_z_dist = np.exp(
+					-0.5*((z-zph)/self.sigma_phot/(1.+z))**2)/self.sigma_phot/(
+					1.+z)/math.sqrt(2.*math.pi)
+			else:
+				photo_z_dist = np.exp(
+					-0.5*((z-zph)/self.sigma_noz/(1.+z))**2)/self.sigma_noz/(
+					1.+z)/math.sqrt(2.*math.pi)
+				
 
-        return photo_z_dist
+		return photo_z_dist
 
     def loglkl(self, cosmo, data):
 
@@ -208,8 +236,8 @@ class euclid_lensing(Likelihood):
         self.eta_r = self.eta_z*(self.dzdr[:, np.newaxis]/self.eta_norm)
 
         # Compute function g_i(r), that depends on r and the bin
-        # g_i(r) = 2r(1+z(r)) int_r^+\infty drs eta_r(rs) (rs-r)/rs
-        # The integration starts from r.
+        # g_i(r) = 2r(1+z(r)) int_0^+\infty drs eta_r(rs) (rs-r)/rs
+        # TODO is the integration from 0 or r ?
         g = np.zeros((self.nzmax, self.nbin), 'float64')
         for Bin in xrange(self.nbin):
             for nr in xrange(1, self.nzmax-1):
@@ -296,7 +324,6 @@ class euclid_lensing(Likelihood):
         else:
             k_sigma = cosmo.nonlinear_scale(self.z, self.nzmax)
 
-	# replace unphysical values of k_sigma
 	if not (cosmo.nonlinear_method == 0):
 	    k_sigma_problem = False
 	    for index_z in xrange(self.nzmax-1):
@@ -520,7 +547,7 @@ class euclid_lensing(Likelihood):
 			try:
                         	function_vector[k] = (2.*ell+1.)*self.fsky*(det_theory_plus_error_cross_obs/det_theory_plus_error + math.log(det_theory_plus_error/det_observ) - self.nbin ) + dof*vector[k]**2
 			except ValueError:
-				warnings.warn("Euclid_lensing: Could not evaluate chi2 including theoretical error with the current parameters. The corresponding chi2 is now set to nan!")
+				warnings.warn("ska1_lensing: Could not evaluate chi2 including theoretical error with the current parameters. The corresponding chi2 is now set to nan!")
 				break
 				break
 				break
