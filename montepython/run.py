@@ -113,7 +113,7 @@ def mpi_run(custom_command=""):
                 regexp = re.match(".*__(\w*).txt", data.out_name)
                 suffix = regexp.groups()[0]
                 status = suffix
-            elif command_line.method == "MN":
+            elif command_line.method == "NS":
                 status = 1
             elif command_line.method == "PC":
                 status = 1

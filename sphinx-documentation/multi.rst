@@ -70,11 +70,11 @@ If everything went ok, you should be able to run :code:`import pymultinest` in a
 Basic usage and parameters
 --------------------------
 
-The MultiNest sampling is invoked with the command line option :code:`-m MN`.
+The MultiNest sampling is invoked with the command line option :code:`-m NS`.
 As in the MCMC case, the parameter file is read and the sampling is launched.
-The output files are created inside a subfolder :code:`MN` inside the chain
+The output files are created inside a subfolder :code:`NS` inside the chain
 folder. This will create the expected :code:`log.param` file inside the chain's
-root folder, and the expected raw MultiNest files in the :code:`MN` subfolder
+root folder, and the expected raw MultiNest files in the :code:`NS` subfolder
 (see MultiNest's :code:`README`), along with two more files: :code:`[chain
 name].paramnames`, which contains the ordering of the parameters in the MultiNest
 chain files (not necessarily the ordering in which they appear in the
@@ -86,7 +86,7 @@ arguments and their values (see below).
    If the sampling has been interrupted, simply run it again and MultiNest
    should be able to restart where it finished. If you intend to start a new
    sampling with different parameters for MultiNest, it is safer to delete the
-   :code:`MN` subfolder (otherwise, the behaviour is not well defined).
+   :code:`NS` subfolder (otherwise, the behaviour is not well defined).
 
 .. NOTE::
    MultiNest can benefit greatly from being run in parallel with MPI. If it has
@@ -97,13 +97,13 @@ arguments and their values (see below).
    for MPICH, etc.).
 
 Once the sampling has finished, the output of it can be analised as in the MCMC
-case with :code:`MontePython.py -info [chain_folder]/MN` (notice that one must
-specify the :code:`MN` subfolder). This will create a chain file in the chain
+case with :code:`MontePython.py -info [chain_folder]/NS` (notice that one must
+specify the :code:`NS` subfolder). This will create a chain file in the chain
 root folder containing the (accepted) points of MultiNest, and it
 will be automatically analysed as a MCMC chain, producing the expected files
 and plots.
 
-The MultiNest parameters are added after the :code:`-m MN` flag in the command
+The MultiNest parameters are added after the :code:`-m NS` flag in the command
 line. They are described in the next section (more thorough descriptions are to
 be looked for within the MultiNest documentation).
 
@@ -136,9 +136,9 @@ and are set in every run by command line options as
 
 .. code::
 
-    --MN_[PyMultiNest name] [value]
+    --NS_[PyMultiNest name] [value]
 
-E.g. to set the number of "live points" to 100, one should add to the command :code:`python MontePython.py [...] -m MN` the option
+E.g. to set the number of "live points" to 100, one should add to the command :code:`python MontePython.py [...] -m NS` the option
 
 .. code::
 

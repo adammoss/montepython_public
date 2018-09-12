@@ -377,7 +377,7 @@ def create_parser():
             presented in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
         <**>-m<**> : str
             <++>sampling method<++>, by default 'MH' for Metropolis-Hastings,
-            can be set to 'MN' for MultiNest (using Multinest wrapper
+            can be set to 'NS' for MultiNest (using Multinest wrapper
             PyMultiNest), 'PC' for PolyChord (using PolyChord wrapper
             PyPolyChord), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
             to emcee algorithm), and finally 'IS' for importance sampling.
@@ -560,7 +560,7 @@ def create_parser():
             Useful e.g. if you run at the bestfit point with -f 0 (flag)<++>
 
         For MultiNest, PolyChord and Cosmo Hammer arguments, see
-        :mod:`MultiNest`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
+        :mod:`nested_sampling`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
 
     **info**
 
@@ -716,7 +716,7 @@ def create_parser():
     # -- sampling method (OPTIONAL)
     runparser.add_argument('-m', '--method', help=helpdict['m'],
                            dest='method', default='MH',
-                           choices=['MH', 'MN', 'PC', 'CH', 'IS', 'Der', 'Fisher'])
+                           choices=['MH', 'NS', 'PC', 'CH', 'IS', 'Der', 'Fisher'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
                            dest='update', default=50)
@@ -809,15 +809,15 @@ def create_parser():
     # MultiNest arguments (all OPTIONAL and ignored if not "-m=MN")
     # The default values of -1 mean to take the PyMultiNest default values
     try:
-        from MultiNest import MN_prefix, MN_user_arguments
-        MNparser = runparser.add_argument_group(
+        from nested_sampling import NS_prefix, NS_user_arguments
+        NSparser = runparser.add_argument_group(
             title="MultiNest",
             description="Run the MCMC chains using MultiNest"
             )
-        for arg in MN_user_arguments:
-            MNparser.add_argument('--'+MN_prefix+arg,
+        for arg in NS_user_arguments:
+            NSparser.add_argument('--'+NS_prefix+arg,
                                   default=-1,
-                                  **MN_user_arguments[arg])
+                                  **NS_user_arguments[arg])
     except ImportError:
         # Not defined if not installed
         pass

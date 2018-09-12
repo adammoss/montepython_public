@@ -482,7 +482,7 @@ class Test08MultiNestBehaviour(TestMontePython):
         self.folder = os.path.join('tests', 'test_%s' % self.date)
         self.custom_command = (
             'run -N 1 -p test_gaussian.param -o %s' % self.folder +
-            ' -m MN --MN_n_live_points 30 --MN_max_iter 10')
+            ' -m NS --NS_n_live_points 30 --NS_max_iter 10')
         self.cosmo, self.data, self.command_line, _ = initialise(
             self.custom_command)
 
@@ -495,7 +495,7 @@ class Test08MultiNestBehaviour(TestMontePython):
     def test_behaviour(self):
         """Check MultiNest global behaviour"""
         self.assertTrue(os.path.exists(
-            os.path.join(self.folder, 'MN')))
+            os.path.join(self.folder, 'NS')))
         sampler.run(self.cosmo, self.data, self.command_line)
 
 class Test09PolyChordBehaviour(TestMontePython):

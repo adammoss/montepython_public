@@ -32,7 +32,7 @@ def run(cosmo, data, command_line):
     Depending on the choice of sampler, dispatch the appropriate information
 
     The :mod:`mcmc` module is used as previously, except the call to
-    :func:`mcmc.chain`, or :func:`MultiNest.run` is now within
+    :func:`mcmc.chain`, or :func:`nested_sampling.run` is now within
     this function, instead of from within :mod:`MontePython`.
 
     In the long term, this function should contain any potential hybrid scheme.
@@ -43,8 +43,8 @@ def run(cosmo, data, command_line):
         import mcmc
         mcmc.chain(cosmo, data, command_line)
         data.out.close()
-    elif command_line.method == 'MN':
-        import MultiNest as mn
+    elif command_line.method == 'NS':
+        import nested_sampling as mn
         mn.run(cosmo, data, command_line)
     elif command_line.method == 'PC':
         import PolyChord as pc

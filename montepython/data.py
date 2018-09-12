@@ -171,7 +171,7 @@ class Data(object):
         self.PC_param_names = []
         self.PC_arguments = {}
         """
-        Dictionary containing the parameters needed by the PyMultiNest sampler.
+        Dictionary containing the parameters needed by the PyPolyChord sampler.
         It is filled just before the run of the sampler.  Those parameters not
         defined will be set to the default value of PyPolyChord.
 

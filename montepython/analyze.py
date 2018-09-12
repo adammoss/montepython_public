@@ -81,7 +81,7 @@ def analyze(command_line):
         # After this step, info.files will contain all chains.
         status = prepare(item, info)
         # If the preparation step generated new files (for instance,
-        # translating from MN or CH to Markov Chains) this routine should stop
+        # translating from NS or CH to Markov Chains) this routine should stop
         # now.
         if not status:
             return
@@ -172,12 +172,12 @@ def prepare(files, info):
         with CosmoMC format
 
     .. note::
-        New in version 2.0.0: if you ask to analyze a MultiNest
-        sub-folder (i.e. something that ends in `MN` with capital letters), the
-        analyze module will translate the output from MultiNest to
+        New in version 2.0.0: if you ask to analyze a Nested Sampling
+        sub-folder (i.e. something that ends in `NS` with capital letters), the
+        analyze module will translate the output from Nested Sampling to
         standard chains for Monte Python, and stops. You can then run the
         `-- info` flag on the whole folder. **This procedure is not necessary
-        if the run was complete, but only if the MultiNest run was killed
+        if the run was complete, but only if the Nested Sampling run was killed
         before completion**.
 
     Parameters
@@ -193,8 +193,8 @@ def prepare(files, info):
     # If so, call the module's own routine through the clean conversion
     # function, which will translate the output of this other sampling into
     # MCMC chains that can then be analyzed.
-    modules = ['MultiNest', 'PolyChord', 'cosmo_hammer']
-    tags = ['MN', 'PC', 'CH']
+    modules = ['nested_sampling', 'PolyChord', 'cosmo_hammer']
+    tags = ['NS', 'PC', 'CH']
     for module_name, tag in zip(modules, tags):
         action_done = clean_conversion(module_name, tag, files[0])
         if action_done:
