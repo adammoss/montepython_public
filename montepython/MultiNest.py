@@ -1,5 +1,5 @@
 """
-.. module:: nested_sampling
+.. module:: MultiNest
     :synopsis: Interface the MultiNest program with Monte Python
 
 This implementation relies heavily on the existing Python wrapper for
@@ -8,7 +8,7 @@ this address <https://github.com/JohannesBuchner/PyMultiNest>`_ .
 
 The main routine, :func:`run`, truly interfaces the two codes. It takes for
 input the cosmological module, data and command line. It then defines
-internally two functions, :func:`prior() <nested_sampling.prior>` and
+internally two functions, :func:`prior() <MultiNest.prior>` and
 :func:`loglike` that will serve as input for the run function of PyMultiNest.
 
 .. moduleauthor:: Jesus Torrado <torradocacho@lorentz.leidenuniv.nl>

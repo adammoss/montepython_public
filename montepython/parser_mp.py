@@ -560,7 +560,7 @@ def create_parser():
             Useful e.g. if you run at the bestfit point with -f 0 (flag)<++>
 
         For MultiNest, PolyChord and Cosmo Hammer arguments, see
-        :mod:`nested_sampling`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
+        :mod:`MultiNest`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
 
     **info**
 
@@ -809,7 +809,7 @@ def create_parser():
     # MultiNest arguments (all OPTIONAL and ignored if not "-m=MN")
     # The default values of -1 mean to take the PyMultiNest default values
     try:
-        from nested_sampling import NS_prefix, NS_user_arguments
+        from MultiNest import NS_prefix, NS_user_arguments
         NSparser = runparser.add_argument_group(
             title="MultiNest",
             description="Run the MCMC chains using MultiNest"
