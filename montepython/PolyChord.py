@@ -1,6 +1,6 @@
 """
 .. module:: PolyChord
-    :synopsis: Interface the PolyChord program with Monte Python
+    :synopsis: Interface the PolyChord program with MontePython
 
 This implementation relies heavily on the existing Python wrapper for
 PolyChord, called PyPolyChord, which comes with the PolyChord code.
