@@ -1632,7 +1632,7 @@ def extract_parameter_names(info):
                         rescales.append(rescale)
 
                         # Given the scale, decide for the pretty tex name
-                        number = 1./scale
+                        number = 1./(scale*rescale)
                         tex_names.append(
                             io_mp.get_tex_name(name, number=number))
 
