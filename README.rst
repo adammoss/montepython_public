@@ -210,7 +210,7 @@ Bibtex entry
 ------------
 
 When using *Monte Python* in a publication, please acknowledge the code by citing
-the following paper. If you used *Class*, *MultiNest* or *Cosmo Hammer*,
+the following paper. If you used *Class*, *MultiNest*, *PolyChord* or *Cosmo Hammer*,
 you should also cite the original works.
 
 .. code::
