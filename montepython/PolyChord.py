@@ -234,9 +234,16 @@ def initialise(cosmo, data, command_line):
     # -- Automatic arguments
     data.PC_arguments['file_root'] = chain_name
     data.PC_arguments['base_dir'] = PC_folder
-    data.PC_arguments['grade_dims'] = [nslow, nfast]
-    data.PC_arguments['grade_frac'] = [0.75,0.25]
-    data.PC_arguments['num_repeats'] = nslow * 2
+    data.PC_arguments['grade_dims'] = []
+    data.PC_arguments['grade_frac'] = []
+    if nslow:
+        data.PC_arguments['grade_dims'].append(nslow)
+        data.PC_arguments['grade_frac'].append(0.25)
+    if nfast:
+        data.PC_arguments['grade_dims'].append(nfast)
+        data.PC_arguments['grade_frac'].append(0.75)
+
+    data.PC_arguments['num_repeats'] = data.PC_arguments['grade_dims'][0] * 2
 
     # -- User-defined arguments
     for arg in PC_user_arguments:
