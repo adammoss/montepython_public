@@ -238,10 +238,10 @@ def initialise(cosmo, data, command_line):
     data.PC_arguments['grade_frac'] = []
     if nslow:
         data.PC_arguments['grade_dims'].append(nslow)
-        data.PC_arguments['grade_frac'].append(0.25)
+        data.PC_arguments['grade_frac'].append(0.75)
     if nfast:
         data.PC_arguments['grade_dims'].append(nfast)
-        data.PC_arguments['grade_frac'].append(0.75)
+        data.PC_arguments['grade_frac'].append(0.25)
 
     data.PC_arguments['num_repeats'] = data.PC_arguments['grade_dims'][0] * 2
 
