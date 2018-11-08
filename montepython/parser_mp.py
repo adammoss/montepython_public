@@ -487,10 +487,15 @@ def create_parser():
             ask your script to use the job number as :code:`i`.<++>
         <**>-r<**> : str
             <++>restart from last point in chain<++>, to avoid the burn-in
-            stage (*OPT*).
-
-            At the beginning of the run, the previous chain will be deleted,
-            and its content transfered to the beginning of the new chain.<++>
+            stage or increase sample size (*OPT*). You must pass the lowest
+            index chains file, e.g. -r chains/test_run/1969-10-05_10000__1.txt .
+            MontePython will then create copies of all chains index 1 through
+            M (number of MPI processes) with new names including -N more steps
+            1969-10-05_20000__1.txt etc. Once the chains have been copied
+            the old chains can be moved to a backup folder or deleted. Note
+            they will be automatically deleted at the completion of the run
+            (if the desired number of steps passed with -N is reached). The
+            old chains should not be included as a part of the analysis.<++>
         <**>-b<**> : str
             <++>start a new chain from the bestfit file<++> computed with
             analyze.  (*OPT*)<++>
@@ -795,7 +800,7 @@ def create_parser():
 
     ###############
     # MCMC restart from chain or best fit file
-    runparser.add_argument('-r', help=helpdict['r'],
+    runparser.add_argument('-r', '--restart', help=helpdict['r'],
                            type=existing_file, dest='restart')
     runparser.add_argument('-b', '--bestfit', dest='bf', help=helpdict['b'],
                            type=existing_file)
