@@ -230,6 +230,7 @@ def chain(cosmo, data, command_line):
     if not command_line.silent:
         outputs.append(sys.stdout)
 
+    use_mpi = False
     # check for MPI
     try:
         from mpi4py import MPI
@@ -238,6 +239,7 @@ def chain(cosmo, data, command_line):
         # suppress duplicate output from slaves
         if rank:
             command_line.quiet = True
+        use_mpi = True
     except ImportError:
         # set all chains to master if no MPI
         rank = 0
@@ -246,11 +248,21 @@ def chain(cosmo, data, command_line):
     # Workaround in order to have one master chain and several slave chains even when
     # communication fails between MPI chains. It could malfunction on some hardware.
     # TODO: Would like to merge with MPI initialization above and make robust and logical
+    # TODO: Or if keeping current scheme, store value and delete jumping_factor.txt
+    # TODO: automatically if --parallel-chains is enabled
     if command_line.superupdate and data.jumping_factor:
         try:
             jump_file = open(command_line.folder + '/jumping_factor.txt','r')
-            if command_line.restart is None:
+            #if command_line.restart is None:
+            if not use_mpi and command_line.parallel_chains:
                 rank = 1
+                warnings.warn('MPI not in use, flag --parallel-chains enabled, '
+                              'superupdate enabled, and a jumping_factor.txt file detected. '
+                              'If relaunching in the same folder or restarting a run this '
+                              'will cause all chains to be assigned as slaves. In this case '
+                              'instead note the value in jumping_factor.txt, delete the '
+                              'file, and pass the value with flag -f <value>. This warning '
+                              'may then appear again, but you can safely disregard it.')
             else:
                 # For restart runs we want to save the input jumping factor
                 # as starting jumping factor, but continue from the jumping

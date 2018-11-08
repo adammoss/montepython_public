@@ -557,6 +557,18 @@ def create_parser():
         <**>--display-each-chi2<**> : bool
             <++>Shows the effective chi2 from each likelihood and the total.<++>
             Useful e.g. if you run at the bestfit point with -f 0 (flag)<++>
+        <**>--parallel-chains<**> : bool
+            <++>Option for when running parallel without MPI<++>.
+            Informs the code you are running parallel chains. This
+            information is useful if superupdate is enabled. Will
+            use only one process to adapt the jumping factor.
+            If relaunching in the same folder or restarting a run
+            and the file jumping_factor.txt already exists it will
+            cause all chains to be assigned as slaves. In this case
+            instead note the value in jumping_factor.txt, delete the
+            file, and pass the value with flag -f <value>. A warning
+            may still appear, but you can safely disregard it.
+            <++>
 
         For Nested Sampling and Cosmo Hammer arguments, see
         :mod:`nested_sampling` and :mod:`cosmo_hammer`.
@@ -777,6 +789,9 @@ def create_parser():
     # display option
     runparser.add_argument('--display-each-chi2', help=helpdict['display-each-chi2'],
                            dest='display_each_chi2', action='store_true')
+    # -- parallel chains without MPI (OPTIONAL)
+    runparser.add_argument('--parallel-chains', help=helpdict['parallel-chains'],
+                           action='store_true')
 
     ###############
     # MCMC restart from chain or best fit file
