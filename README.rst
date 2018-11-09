@@ -18,7 +18,7 @@ If you are searching for specific examples of a work session, please refer to
 the pdf documentation. See also the MontePython 3 paper for details on the code,
 as well as a summary of features as of v3.0. This includes an overview of all
 likelihoods currently implemented, with some details on those likelihoods, such as
-adatasets, last updated, type and relevant papers to cite when using the likelihood.
+datasets, last updated, type and relevant papers to cite when using the likelihood.
 
 
 
@@ -28,7 +28,7 @@ Prerequisites
 * You need the python program **version 2.7** or above, but less than 3.0.
   Note that lower versions of python will work, down to 2.6 (tested), if you
   add manually two extra packages (
-  `ordereddict <http://code.activestate.com/recipes/576693/>`_ and 
+  `ordereddict <http://code.activestate.com/recipes/576693/>`_ and
   `argparse <https://pypi.python.org/pypi/argparse/1.2.1>`_).
 
 * Your python of choice must have `numpy` (version >= 1.4.1) and `cython`. The
@@ -87,7 +87,7 @@ The Class part
 --------------
 
 Go to your class directory, and do **make clean**, then **make**. This builds the
-`libclass.a`, needed for the next step. From there, 
+`libclass.a`, needed for the next step. From there,
 
 .. code::
 
@@ -114,8 +114,8 @@ The Planck likelihood part
 
 The release of the Planck data comes with a likelihood program, called
 Clik, that one can recover from the `ESA website
-<http://www.sciops.esa.int/index.php?project=planck&page=Planck_Legacy_Archive>`_,
-along with the data. Download all `tar.gz` files, extract them to the
+<https://pla.esac.esa.int/pla/#cosmology>`_,
+along with the data. Download all `tgz` files, extract them to the
 place of your convenience.
 
 The Planck Likelihood Code (**plc**) is based on a library called
@@ -211,9 +211,24 @@ Details and Examples
 Please refer to the pdf or online documentation for further details. The `wiki
 <https://github.com/baudren/montepython_public/wiki>`_ contains additional
 details on installation. The `forum
-<https://github.com/baudren/montepython_public/issues>`_ also contains a
+<https://github.com/brinckmann/montepython_public/issues>`_ also contains a
 collection of already answered questions, and can be used to discuss the code.
+The `course page of Julien Lesgourgues<https://lesgourg.github.io/courses.html>`_
+contains *Monte Python* (and *Class*) lectures, examples and exercises.
 
+Want to contribute?
+------------------
+
+*Monte Python* is developed and maintained by volunteer workers and we are always
+happy for new people to contribute. Do not hesitate to contact one of the authors
+if you believe you have something to add, this can be e.g. new likelihoods, new
+samplers, improvements to the plotting, bug fixes, or ideas for how to improve
+the code. Additionally, everyone is encouraged to assist in resolving issues on
+the forum, so do not hesitate to reply if you think you can help.
+
+In particular, if you would like to have your likelihood added to the public
+github page, please make sure it is well documented and add all relevant
+information to the .data file, e.g. authors and references.
 
 Bibtex entry
 ------------
@@ -224,6 +239,11 @@ you should also cite the original works. Please also cite the relevant papers fo
 each likelihood used: as of v3.0 we have a list of references for all likelihoods
 in the first of the papers below. Otherwise, this information can often be found
 in the .data file of the likelihood folder.
+
+In order to encourage people to both develop and share likelihoods with the com-
+munity, to the benefit of all users, we optionally encourage users to cite the
+paper in which the *Monte Python* likelihood was first used, in addition to the
+papers in which data and/or likelihoods were published.
 
 .. code::
 
@@ -253,4 +273,3 @@ in the .data file of the likelihood folder.
           reportNumber   = "CERN-PH-TH-2012-290, LAPTH-048-12",
           SLACcitation   = "%%CITATION = ARXIV:1210.7183;%%",
     }
-
