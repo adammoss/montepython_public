@@ -1791,7 +1791,7 @@ class Likelihood_mpk(Likelihood):
             self.zerowindowfxnsubtractdatnorm = float(line.split()[0])
             for i in range(self.n_size):
                 line = datafile.readline()
-            self.zerowindowfxnsubtractdat[i] = float(line.split()[0])
+                self.zerowindowfxnsubtractdat[i] = float(line.split()[0])
             datafile.close()
 
         # initialize array of values for the nuisance parameters a1,a2
