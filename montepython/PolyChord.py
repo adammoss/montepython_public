@@ -12,8 +12,8 @@ internally two functions, :func:`prior() <PolyChord.prior>` and
 
 .. moduleauthor:: Will Handley <wh260@cam.ac.uk>
 """
-from PyPolyChord import run_polychord as polychord_run
-from PyPolyChord.settings import PolyChordSettings as PC_Settings
+from pypolychord import run_polychord as polychord_run
+from pypolychord.settings import PolyChordSettings as PC_Settings
 import numpy as np
 import os
 from copy import copy
@@ -346,7 +346,7 @@ def run(cosmo, data, command_line):
         data.update_cosmo_arguments()
 
         # Compute likelihood
-        logl = sampler.compute_lkl(cosmo, data)
+        logl = sampler.compute_lkl(cosmo, data)[0,0]
 
         # Compute derived parameters and pass them back
         phi = [0.0] * nDerived
