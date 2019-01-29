@@ -26,9 +26,16 @@ import sampler
 # PolyChord subfolder and name separator
 PC_subfolder    = 'PC'
 
-name_paramnames = '.paramnames'
-name_arguments  = '.arguments'
-name_stats = '.stats'
+name_rejected   = '_dead-birth.txt'        # rejected points
+name_post       = '.txt'                   # accepted points
+name_stats      = '.stats'                 # summarized information, explained
+
+# New files
+name_paramnames = '.paramnames'            # in the PC/ subfolder
+name_arguments  = '.arguments'             # in the PC/ subfolder
+name_chain_acc  = 'chain_PC__accepted.txt' # in the chain root folder
+name_chain_rej  = 'chain_PC__rejected.txt' # in the chain root folder
+# Log.param name (ideally, we should import this one from somewhere else)
 name_logparam = 'log.param'
 
 # PolyChord option prefix
@@ -366,3 +373,92 @@ def run(cosmo, data, command_line):
     warnings.warn('The sampling with PolyChord is done.\n' +
                   'You can now analyse the output calling Monte Python ' +
                   ' with the -info flag in the chain_name/PC subfolder,')
+
+def from_PC_output_to_chains(folder):
+    """
+    Translate the output of PolyChord into readable output for Monte Python
+
+    This routine will be called by the module :mod:`analyze`.
+
+    If mode separation has been performed (i.e., multimodal=True), it creates
+    'mode_#' subfolders containing a chain file with the corresponding samples
+    and a 'log.param' file in which the starting point is the best fit of the
+    nested sampling, and the same for the sigma. The minimum and maximum value
+    are cropped to the extent of the modes in the case of the parameters used
+    for the mode separation, and preserved in the rest.
+
+    The mono-modal case is treated as a special case of the multi-modal one.
+
+    """
+    chain_name = [a for a in folder.split(os.path.sep) if a][-2]
+    base_name = os.path.join(folder, chain_name)
+
+    # Read the arguments of the PC run
+    # This file is intended to be machine generated: no "#" ignored or tests
+    # done
+    PC_arguments = {}
+    with open(base_name+name_arguments, 'r') as afile:
+        for line in afile:
+            arg   = line.split('=')[0].strip()
+            value = line.split('=')[1].strip()
+            arg_type = (PC_user_arguments[arg]['type']
+                        if arg in PC_user_arguments else
+                        PC_auto_arguments[arg]['type'])
+            value = arg_type(value)
+            if arg == 'clustering_params':
+                value = [a.strip() for a in value.split()]
+            PC_arguments[arg] = value
+    multimodal = PC_arguments.get('multimodal')
+    # Read parameters order
+    PC_param_names = np.loadtxt(base_name+name_paramnames, dtype='str').tolist()
+    # In multimodal case, if there were no clustering params specified, ALL are
+    if multimodal and not PC_arguments.get('clustering_params'):
+        PC_arguments['clustering_params'] = PC_param_names
+
+    # Extract the necessary information from the log.param file
+    # Including line numbers of the parameters
+    with open(os.path.join(folder, '..', name_logparam), 'r') as log_file:
+        log_lines = log_file.readlines()
+    # Number of the lines to be changed
+    param_names = []
+    param_lines = {}
+    param_data  = {}
+    pre, pos = 'data.parameters[', ']'
+    for i, line in enumerate(log_lines):
+        if pre in line:
+            if line.strip()[0] == '#':
+                continue
+
+            # These lines allow PolyChord to deal with fixed nuisance parameters 
+            sigma = float(line.split(',')[3].strip())
+            if sigma == 0.0:
+                #If derived parameter, keep it, else discard it:                                 
+                paramtype = line.split(',')[5].strip()[1:-2]
+                if paramtype != 'derived':
+                    continue
+
+            param_name = line.split('=')[0][line.find(pre)+len(pre):
+                                            line.find(pos)]
+            param_name = param_name.replace('"','').replace("'",'').strip()
+            param_names.append(param_name)
+            param_data[param_name] = [a.strip() for a in
+                                      line.split('=')[1].strip('[]').split(',')]
+            param_lines[param_name] = i
+
+    # Create the mapping from PC ordering to log.param ordering
+    columns_reorder = [PC_param_names.index(param) for param in param_names]
+
+    # Open the 'stats.dat' file to see what happened and retrieve some info
+    stats_file = open(base_name+name_stats, 'r')
+    lines = stats_file.readlines()
+    stats_file.close()
+    for line in lines:
+        if 'log(Z)       ='  in line:
+            global_logZ, global_logZ_err = [float(a.strip()) for a in
+                                            line.split('=')[1].split('+/-')]
+
+    # Prepare the accepted-points file -- modes are separated by 2 line breaks
+    accepted_name = base_name + name_post
+    data = np.loadtxt(accepted_name)
+    data[:, 1]  = data[:, 1] / 2.
+    np.savetxt(os.path.join(folder, '..', name_chain_acc), data, fmt='%.6e')
