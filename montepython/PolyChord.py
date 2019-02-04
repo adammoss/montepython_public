@@ -5,6 +5,10 @@
 This implementation relies heavily on the existing Python wrapper for
 PolyChord, called PyPolyChord, which comes with the PolyChord code.
 
+To install PolyChord, download it from
+`its GitHub repo <https://github.com/PolyChord/PolyChordLite>`_
+and follow `these instructions <https://github.com/PolyChord/PolyChordLite#python-likelihoods-pypolychord>`_.
+
 The main routine, :func:`run`, truly interfaces the two codes. It takes for
 input the cosmological module, data and command line. It then defines
 internally two functions, :func:`prior() <PolyChord.prior>` and

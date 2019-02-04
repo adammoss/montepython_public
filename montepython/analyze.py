@@ -1441,6 +1441,9 @@ def clean_conversion(module_name, tag, folder):
     has_module = False
     subfolder_name = tag+"_subfolder"
     try:
+        # Don't try to import the wrong (unrequested) module, in case it's not installed
+        if not folder.lower().endswith(tag.lower()):
+            raise ImportError
         module = importlib.import_module(module_name)
         subfolder = getattr(module, subfolder_name)
         has_module = True
