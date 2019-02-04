@@ -3,7 +3,7 @@
 # and IST-Forecasting subgroup on galaxy clustering
 # Those specifications can be found in the googledoc document
 # prepared by the Euclid IST - Splinter Group 3
-# File update by Tim Sprenger to use old number counts and
+# File update by Tim Sprenger to use 
 # new nuisance parameter sigma_NL, a nonlinear cutoff option
 # and a use_halofit flag
 # derivation is described in arXiv:1801.08331
@@ -15,16 +15,14 @@ euclid_pk.fiducial_file  = "euclid_pk_fiducial.dat"
 # sigma_NL (1405.1452v2: 4-10 Mpc^-1, mean 7 Mpc^-1)
 # bias parameters (beta, amplitude:0 and scaling:1, =1 means no deviation to fit model)
 euclid_pk.use_nuisance = ['sigma_NL','beta_0^Euclid','beta_1^Euclid']
-#euclid_pk.use_nuisance = ['sigma_NL']
-# The use of P_shot is no longer recommended:
 #euclid_pk.use_nuisance = ['P_shot']
 
 # redshift range (hard coded, do not change!)
 # number of bins of the survey
-euclid_pk.nbin  = 16
+euclid_pk.nbin  = 13
 # range of redshifts covered by survey (bin centers!).
-euclid_pk.zmin = 0.5
-euclid_pk.zmax  = 2.0
+euclid_pk.zmin = 0.75
+euclid_pk.zmax  = 1.95
 # sky coverage
 euclid_pk.fsky  = 0.3636
 # precision on the mu variable (~9)
@@ -50,9 +48,6 @@ euclid_pk.UseTheoError = True
 euclid_pk.k_CorrLength_hMpc = 0.05
 euclid_pk.z_CorrLength = 1.0
 euclid_pk.bias_accuracy = 0.025
-
-# efficiency (smaller than 1 means less galaxies than expected are measured)
-euclid_pk.efficiency = 1.0
 
 # use linear power spectrum for RSD correction (recommended)
 euclid_pk.use_linear_rsd = True

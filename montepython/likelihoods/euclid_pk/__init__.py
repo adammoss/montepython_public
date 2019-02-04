@@ -73,10 +73,11 @@ class euclid_pk(Likelihood):
         ################
         # Noise spectrum
         ################
-	# TS; original settings (deleted unused settings), fsky
+	# TS; number counts from model 1 in Pozzetti et al. (1603.01453)
 
         self.n_g = np.zeros(self.nbin, 'float64')
 
+        """
         self.n_g = np.array([6844.945, 7129.45,
                              7249.912, 7261.722,
                              7203.825, 7103.047,
@@ -86,6 +87,9 @@ class euclid_pk(Likelihood):
                              2838.767, 2229.282,
                              1732.706, 1333.091])
         self.n_g = self.n_g * self.fsky * 41253. * self.efficiency
+        """
+        self.n_g = np.array([4825,4112,3449,2861,2357,1933,1515,1140,861,654,499,382,295])
+        self.n_g = self.n_g * self.fsky * 41253. * self.dz
 
 	"""
 	# TS; Ntot output
