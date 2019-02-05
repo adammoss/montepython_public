@@ -1,0 +1,14 @@
+# Grab the clik version of the lowl TT commander likelihood
+
+# for the Planck 2015 release (baseline):
+Planck_lowl_TT.path_clik = os.path.join(data.path['clik'], '../plc_2.0/low_l/commander/commander_rc2_v1.1_l2_29_B.clik')
+
+# note concerning the Planck 2015 likelihood:
+# This likelihood has a nuisance parameter A_planck that should be declared in
+# your input parameter file.
+# Usually this likelihood is used in combination with the highl likelihood,
+# which imposes a gaussian prior on this nuisance parameter.
+# If you run this likelihood alone (without the highl one), you need to
+# impose the gaussian prior here. In that case, uncomment the two lines:
+#Planck_lowl_TT.A_planck_prior_center            = 1
+#Planck_lowl_TT.A_planck_prior_variance          = 0.0025
