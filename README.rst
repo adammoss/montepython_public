@@ -29,11 +29,11 @@ to cite when using the likelihood. In the future, the overview of likelihoods
 will be maintained on the official `Monte Python website
 <https://brinckmann.github.io/montepython_public/>`_.
 
-You can find installation details below and on the `archived Monte Python 2 wiki
+You can find installation details below and on the archived `Monte Python 2 wiki
 <https://github.com/baudren/montepython_public/wiki>`_. The `Monte Python 3 forum
 <https://github.com/brinckmann/montepython_public/issues>`_ contains a
 collection of already answered questions, and can be used to discuss the code.
-Also refer to the `archived Monte Python 2 forum
+Also refer to the archived `Monte Python 2 forum
 <https://github.com/baudren/montepython_public/issues>`_ for additional
 previously answered questions, but please post all new issues on the
 `Monte Python 3 forum <https://github.com/brinckmann/montepython_public/issues>`_.
@@ -41,7 +41,7 @@ previously answered questions, but please post all new issues on the
 The official `Monte Python website
 <https://brinckmann.github.io/montepython_public/>`_, the
 `course page of Julien Lesgourgues <https://lesgourg.github.io/courses.html>`_,
-and the `hi_class website <https:/miguelzuma.github.io/hi_class_public>`_ contain *Monte Python*
+and the `hi_class website <https://miguelzuma.github.io/hi_class_public>`_ contain *Monte Python*
 (and *Class*) lectures, examples and exercises.
 
 
