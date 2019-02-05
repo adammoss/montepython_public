@@ -19,17 +19,17 @@ Details and Examples
 
 If you are searching for further details or specific examples of a work session,
 please refer to the online documentation. See also the `Monte Python 3 paper
-<https://arxiv.org/abs/1804.07261>`_ for details on the code, as well as a
+<https://arxiv.org/abs/1804.07261>`_ for details on the code, including a
 summary of features as of v3.0.
 
-Note the `Monte Python 3 paper <https://arxiv.org/abs/1804.07261>`_ includes an
+Note the `Monte Python 3 paper <https://arxiv.org/abs/1804.07261>`_ contains an
 overview of all likelihoods currently implemented in the code, with some details
 on those likelihoods, such as datasets, last updated, type and relevant papers
 to cite when using the likelihood. In the future, the overview of likelihoods
 will be maintained on the official `Monte Python website
 <https://brinckmann.github.io/montepython_public/>`_.
 
-You can find installation details below and on the `archved Monte Python 2 wiki
+You can find installation details below and on the `archived Monte Python 2 wiki
 <https://github.com/baudren/montepython_public/wiki>`_. The `Monte Python 3 forum
 <https://github.com/brinckmann/montepython_public/issues>`_ contains a
 collection of already answered questions, and can be used to discuss the code.
@@ -41,7 +41,7 @@ previously answered questions, but please post all new issues on the
 The official `Monte Python website
 <https://brinckmann.github.io/montepython_public/>`_, the
 `course page of Julien Lesgourgues <https://lesgourg.github.io/courses.html>`_,
-and the `hi_Class website <www.hiclass-code.net>`_ contain *Monte Python*
+and the `hi_class website <https:/miguelzuma.github.io/hi_class_public>`_ contain *Monte Python*
 (and *Class*) lectures, examples and exercises.
 
 
@@ -65,8 +65,8 @@ Prerequisites
 
 * You need the python program **version 2.7** or above, but less than 3.0.
   Note that lower versions of python will work, down to 2.6 (tested), if you
-  add manually two extra packages (
-  `ordereddict <http://code.activestate.com/recipes/576693/>`_ and
+  add manually two extra packages
+  (`ordereddict <http://code.activestate.com/recipes/576693/>`_ and
   `argparse <https://pypi.python.org/pypi/argparse/1.2.1>`_).
 
 * Your python of choice must have `numpy` (version >= 1.4.1) and `cython`. The
@@ -248,7 +248,7 @@ Bibtex entry
 ------------
 
 When using *Monte Python* in a publication, please acknowledge the code by citing
-the following paper. If you used *Class*, *MultiNest*, *PolyChord* or *Cosmo Hammer*,
+the following papers. If you used *Class*, *MultiNest*, *PolyChord* or *Cosmo Hammer*,
 you should also cite the original works.
 
 Please also cite the relevant papers for each likelihood used: as of v3.0 we have a
@@ -257,10 +257,10 @@ future the list will be maintained on the official `Monte Python website
 <https://brinckmann.github.io/montepython_public/>`_. Otherwise, this information can
 often be found in the .data file of the likelihood folder.
 
-In order to encourage people to both develop and share likelihoods with the com-
-munity, to the benefit of all users, we optionally encourage users to cite the
-paper in which the *Monte Python* likelihood was first used, in addition to the
-papers in which data and/or likelihoods were published.
+In order to encourage people to both develop and share likelihoods with the community,
+to the benefit of all users, we optionally encourage users to cite the paper in which
+the *Monte Python* likelihood was first used, in addition to the papers in which data
+and/or likelihoods were published.
 
 .. code::
 
