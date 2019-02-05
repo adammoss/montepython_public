@@ -77,28 +77,24 @@ class euclid_pk(Likelihood):
 
         self.n_g = np.zeros(self.nbin, 'float64')
 
-        """
-        self.n_g = np.array([6844.945, 7129.45,
-                             7249.912, 7261.722,
-                             7203.825, 7103.047,
-                             6977.571, 6839.546,
-                             6696.957, 5496.988,
-                             4459.240, 3577.143,
-                             2838.767, 2229.282,
-                             1732.706, 1333.091])
-        self.n_g = self.n_g * self.fsky * 41253. * self.efficiency
-        """
+        #self.n_g = np.array([6844.945, 7129.45,
+        #                     7249.912, 7261.722,
+        #                     7203.825, 7103.047,
+        #                     6977.571, 6839.546,
+        #                     6696.957, 5496.988,
+        #                     4459.240, 3577.143,
+        #                     2838.767, 2229.282,
+        #                     1732.706, 1333.091])
+        #self.n_g = self.n_g * self.fsky * 41253. * self.efficiency
         self.n_g = np.array([4825,4112,3449,2861,2357,1933,1515,1140,861,654,499,382,295])
         self.n_g = self.n_g * self.fsky * 41253. * self.dz
 
-	"""
 	# TS; Ntot output
-	print("\nEuclid: Number of detected galaxies in each redshift bin:")
-	for index_z in xrange(self.nbin):
-		print("z-bin[" + str(self.z_mean[index_z]-self.dz/2.) + "," + str(self.z_mean[index_z]+self.dz/2.) + "]: \tN = %.4g" % (self.n_g[index_z]) + " ,\t b = %.4g" % (self.b[index_z]))
-	N_tot = np.sum(self.n_g)
-	print("Total number of detected galaxies: N = %.4g\n" % (N_tot))
-	"""
+	#print("\nEuclid: Number of detected galaxies in each redshift bin:")
+	#for index_z in xrange(self.nbin):
+	#	print("z-bin[" + str(self.z_mean[index_z]-self.dz/2.) + "," + str(self.z_mean[index_z]+self.dz/2.) + "]: \tN = %.4g" % (self.n_g[index_z]) + " ,\t b = %.4g" % (self.b[index_z]))
+	#N_tot = np.sum(self.n_g)
+	#print("Total number of detected galaxies: N = %.4g\n" % (N_tot))
 
         # If the file exists, initialize the fiducial values, the spectrum will
         # be read first, with k_size values of k and nbin values of z. Then,
@@ -352,9 +348,9 @@ class euclid_pk(Likelihood):
         	if 'P_shot' in self.use_nuisance:
 			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2)*(data.mcmc_parameters['P_shot']['current']*data.mcmc_parameters['P_shot']['scale'] + self.V_fid[index_z]/self.n_g[index_z])
         	else:
-			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2)*(self.V_fid[index_z]/self.n_g[index_z])	
+			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2)*(self.V_fid[index_z]/self.n_g[index_z])
 
-        # finally compute chi2, for each z_mean	
+        # finally compute chi2, for each z_mean
 	if self.use_zscaling:
 		# TS; reformulated loops to include z-dependent kmax, mu -> mu_fid
         	chi2 = 0.0
@@ -366,7 +362,7 @@ class euclid_pk(Likelihood):
 		for index_z in xrange(self.nbin):
 			# uncomment printers to show chi2 contribution from single bins
 			#printer1 = chi2*delta_mu
-			# TS; uncomment to display max. kmin (used to infer kmin~0.02): 
+			# TS; uncomment to display max. kmin (used to infer kmin~0.02):
 			#kmin: #print("z=" + str(self.z_mean[index_z]) + " kmin=" + str(34.56/r[2*index_z+1]) + "\tor " + str(6.283/(r[2*index_z+2]-r[2*index_z])))
 			for index_k in xrange(1,self.k_size):
 				if ((self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[self.k_size-index_k]) > -1.e-6):

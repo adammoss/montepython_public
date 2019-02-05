@@ -41,7 +41,7 @@ previously answered questions, but please post all new issues on the
 The official `Monte Python website
 <https://brinckmann.github.io/montepython_public/>`_, the
 `course page of Julien Lesgourgues <https://lesgourg.github.io/courses.html>`_,
-and the `hi_class website <https://miguelzuma.github.io/hi_class_public>`_ contain *Monte Python*
+and the `hi_class website <http://miguelzuma.github.io/hi_class_public>`_ contain *Monte Python*
 (and *Class*) lectures, examples and exercises.
 
 
