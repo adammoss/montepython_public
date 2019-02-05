@@ -12,11 +12,13 @@ test_MH_IS:
 	nosetests tests.test_montepython:Test06MetropolisHastingsImportanceSampling
 test_CH:
 	nosetests tests.test_montepython:Test07CosmoHammerBehaviour
-test_NS:
-	nosetests tests.test_montepython:Test08NestedSamplingBehaviour
+test_MN:
+	nosetests tests.test_montepython:Test08MultiNestBehaviour
+test_PC:
+	nosetests tests.test_montepython:Test09PolyChordBehaviour
 
 short_tests: test_command_line test_setup test_conf test_CH
-long_tests: test_wrapper test_data test_MH_IS test_NS
+long_tests: test_wrapper test_data test_MH_IS test_MN test_PC
 
 doctests:
 	python montepython/data.py

@@ -37,7 +37,8 @@ Contents:
    installation
    getting_started
    example
-   nested
+   multi
+   poly 
    hammer
    likelihoods
    documentation

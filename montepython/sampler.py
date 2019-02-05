@@ -5,7 +5,7 @@
 .. moduleauthor:: Surhudm More <>
 
 This module defines one key function, :func:`run`, that distributes the work to
-the desired actual sampler (Metropolis Hastings, or Nested Sampling so far).
+the desired actual sampler (Metropolis Hastings, MultiNest, or PolyChord so far).
 
 It also defines a serie of helper functions, that aim to be generically used by
 all different sampler methods:
@@ -32,7 +32,7 @@ def run(cosmo, data, command_line):
     Depending on the choice of sampler, dispatch the appropriate information
 
     The :mod:`mcmc` module is used as previously, except the call to
-    :func:`mcmc.chain`, or :func:`nested_sampling.run` is now within
+    :func:`mcmc.chain`, or :func:`MultiNest.run` is now within
     this function, instead of from within :mod:`MontePython`.
 
     In the long term, this function should contain any potential hybrid scheme.
@@ -44,8 +44,11 @@ def run(cosmo, data, command_line):
         mcmc.chain(cosmo, data, command_line)
         data.out.close()
     elif command_line.method == 'NS':
-        import nested_sampling as ns
-        ns.run(cosmo, data, command_line)
+        import MultiNest as mn
+        mn.run(cosmo, data, command_line)
+    elif command_line.method == 'PC':
+        import PolyChord as pc
+        pc.run(cosmo, data, command_line)
     elif command_line.method == 'CH':
         import cosmo_hammer as hammer
         hammer.run(cosmo, data, command_line)
@@ -622,7 +625,7 @@ def check_flat_bound_priors(parameters, names):
     """
     Ensure that all varying parameters are bound and flat
 
-    It is a necessary condition to use the code with Nested Sampling or the
+    It is a necessary condition to use the code with MultiNest, PolyChord or the
     Cosmo Hammer.
     """
     is_flat = all(parameters[name]['prior'].prior_type == 'flat'

@@ -234,7 +234,8 @@ Bibtex entry
 ------------
 
 When using *Monte Python* in a publication, please acknowledge the code by citing
-the following papers. If you used *Class*, *Nested Sampling* or *Cosmo Hammer*,
+the following paper. If you used *Class*, *MultiNest*, *PolyChord* or *Cosmo Hammer*,
+you should also cite the original works.
 you should also cite the original works. Please also cite the relevant papers for
 each likelihood used: as of v3.0 we have a list of references for all likelihoods
 in the first of the papers below. Otherwise, this information can often be found

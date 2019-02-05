@@ -473,9 +473,9 @@ class Test07CosmoHammerBehaviour(TestMontePython):
                 self.data.lkl[experiment], 'computeLikelihood'))
 
 
-class Test08NestedSamplingBehaviour(TestMontePython):
+class Test08MultiNestBehaviour(TestMontePython):
     """
-    Check if Nested Sampling works
+    Check if MultiNest works
     """
     def setUp(self):
         self.date = str(datetime.date.today())
@@ -493,9 +493,34 @@ class Test08NestedSamplingBehaviour(TestMontePython):
         del self.cosmo, self.data, self.command_line
 
     def test_behaviour(self):
-        """Check Nested Sampling global behaviour"""
+        """Check MultiNest global behaviour"""
         self.assertTrue(os.path.exists(
             os.path.join(self.folder, 'NS')))
+        sampler.run(self.cosmo, self.data, self.command_line)
+
+class Test09PolyChordBehaviour(TestMontePython):
+    """
+    Check if PolyChord works
+    """
+    def setUp(self):
+        self.date = str(datetime.date.today())
+        self.folder = os.path.join('tests', 'test_%s' % self.date)
+        self.custom_command = (
+            'run -N 1 -p test_gaussian.param -o %s' % self.folder +
+            ' -m PC --PC_n_live_points 30 --PC_max_iter 10')
+        self.cosmo, self.data, self.command_line, _ = initialise(
+            self.custom_command)
+
+    def tearDown(self):
+        shutil.rmtree(self.folder)
+        self.cosmo.struct_cleanup()
+        self.cosmo.empty()
+        del self.cosmo, self.data, self.command_line
+
+    def test_behaviour(self):
+        """Check PolyChord global behaviour"""
+        self.assertTrue(os.path.exists(
+            os.path.join(self.folder, 'PC')))
         sampler.run(self.cosmo, self.data, self.command_line)
 
 

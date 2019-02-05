@@ -1,0 +1,41 @@
+Running PolyChord version 1.15
+
+##################
+#For the cluster #
+##################
+
+As a test, using base2015_ns.param, which requires planck likelihood. Already installed globally, in:
+
+    /lustren/hpcwork/dh573265/plc-2.0/bin/clik_profile.zsh
+
+I use gcc compilers (they work better with MultiNest and MontePython), but they are not the default. To switch:
+
+    module unload intel
+    module unload openmpi
+    module load gcc
+    module load openmpi
+    module load python
+
+To launch a script on the cluster, use
+
+    bsub -P rwth0113 < montepython_polychord/pctest.sh
+
+To monitor the job
+
+    bjobs
+
+If you want to kill the job
+
+    bkill #JOBID
+
+The paths in the script might  need to be updated (except for the Planck likelihood, that one is fine). When submitting the job, it normally runs without giving any error messages, but does not write anything to the output files. When running front-end (directly in the command line, without submitting the job), I get a segfault after a few hours.
+
+#############
+# For Wotan #
+#############
+
+The Planck likelihood can be found at:
+
+    /home/ballardini/planck/plc-2.0v2/bin/clik_profile.sh
+
+I run with the default compilers, no need to submit the job, can be launched directly in terminal. Normally it runs for a few hours and then produces a segfault.

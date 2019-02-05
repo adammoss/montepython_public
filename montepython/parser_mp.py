@@ -377,8 +377,9 @@ def create_parser():
             presented in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
         <**>-m<**> : str
             <++>sampling method<++>, by default 'MH' for Metropolis-Hastings,
-            can be set to 'NS' for Nested Sampling (using Multinest wrapper
-            PyMultiNest), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
+            can be set to 'NS' for MultiNest (using Multinest wrapper
+            PyMultiNest), 'PC' for PolyChord (using PolyChord wrapper
+            PyPolyChord), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
             to emcee algorithm), and finally 'IS' for importance sampling.
 
             Note that when running with Importance sampling, you need to
@@ -575,8 +576,8 @@ def create_parser():
             may still appear, but you can safely disregard it.
             <++>
 
-        For Nested Sampling and Cosmo Hammer arguments, see
-        :mod:`nested_sampling` and :mod:`cosmo_hammer`.
+        For MultiNest, PolyChord and Cosmo Hammer arguments, see
+        :mod:`MultiNest`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
 
     **info**
 
@@ -732,7 +733,7 @@ def create_parser():
     # -- sampling method (OPTIONAL)
     runparser.add_argument('-m', '--method', help=helpdict['m'],
                            dest='method', default='MH',
-                           choices=['MH', 'NS', 'CH', 'IS', 'Der', 'Fisher'])
+                           choices=['MH', 'NS', 'PC', 'CH', 'IS', 'Der', 'Fisher'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
                            dest='update', default=50)
@@ -825,10 +826,10 @@ def create_parser():
         help=helpdict['IS-starting-folder'], type=str, default='', nargs='+')
 
     ###############
-    # MultiNest arguments (all OPTIONAL and ignored if not "-m=NS")
+    # MultiNest arguments (all OPTIONAL and ignored if not "-m=MN")
     # The default values of -1 mean to take the PyMultiNest default values
     try:
-        from nested_sampling import NS_prefix, NS_user_arguments
+        from MultiNest import NS_prefix, NS_user_arguments
         NSparser = runparser.add_argument_group(
             title="MultiNest",
             description="Run the MCMC chains using MultiNest"
@@ -837,6 +838,23 @@ def create_parser():
             NSparser.add_argument('--'+NS_prefix+arg,
                                   default=-1,
                                   **NS_user_arguments[arg])
+    except ImportError:
+        # Not defined if not installed
+        pass
+
+    ###############
+    # PolyChord arguments (all OPTIONAL and ignored if not "-m=PC")
+    # The default values of -1 mean to take the PyPolyChord default values
+    try:
+        from PolyChord import PC_prefix, PC_user_arguments
+        PCparser = runparser.add_argument_group(
+            title="PolyChord",
+            description="Run the MCMC chains using PolyChord"
+            )
+        for arg in PC_user_arguments:
+            PCparser.add_argument('--'+PC_prefix+arg,
+                                  default=-1,
+                                  **PC_user_arguments[arg])
     except ImportError:
         # Not defined if not installed
         pass
