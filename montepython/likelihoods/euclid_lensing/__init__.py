@@ -70,7 +70,7 @@ class euclid_lensing(Likelihood):
         # Create the array that will contain the z boundaries for each bin. The
         # first value is already correctly set to 0.
         self.z_bin_edge = np.zeros(self.nbin+1, 'float64')
-	
+
 	total_count = 0.
         for Bin in xrange(self.nbin-1):
             bin_count = 0.
@@ -303,9 +303,9 @@ class euclid_lensing(Likelihood):
 	        if (k_sigma[index_z+1]<k_sigma[index_z]) or (k_sigma[index_z+1]>2.5):
 	            k_sigma[index_z+1] = 2.5
 	            k_sigma_problem = True
-	        #print("%s\t%s" % (k_sigma[index_z], self.z[index_z]))	
+	        #print("%s\t%s" % (k_sigma[index_z], self.z[index_z]))
 	    if k_sigma_problem:
-	        warnings.warn("There were unphysical (decreasing in redshift or exploding) values of k_sigma (=cosmo.nonlinear_scale(...)). To proceed they were set to 2.5, the highest scale that seems to be stable.")	        
+	        warnings.warn("There were unphysical (decreasing in redshift or exploding) values of k_sigma (=cosmo.nonlinear_scale(...)). To proceed they were set to 2.5, the highest scale that seems to be stable.")
 
         # Define the alpha function, that will characterize the theoretical
         # uncertainty. Chosen to be 0.001 at low k, raise between 0.1 and 0.2
@@ -542,7 +542,7 @@ class euclid_lensing(Likelihood):
 
                 det_theory_plus_error_cross_obs = 0
                 for i in range(self.nbin):
-                    newCov = np.copy(Cov_theory_plus_error[index,:,:]) #MArchi#newCov = np.copy(Cov_theory_plus_error) 
+                    newCov = np.copy(Cov_theory_plus_error[index,:,:]) #MArchi#newCov = np.copy(Cov_theory_plus_error)
                     newCov[:, i] = Cov_observ[index,:, i] #MArchi#newCov[:, i] = Cov_observ[:, i]
                     det_theory_plus_error_cross_obs += np.linalg.det(newCov)
 
