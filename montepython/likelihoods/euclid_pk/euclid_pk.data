@@ -50,6 +50,8 @@ euclid_pk.kmin = 0.02
 euclid_pk.kmax = 0.2
 #euclid_pk.kmax = 10.
 # use z-scaling of kmax via pow(1+z,2/(2+n_s))
+# True corresponds to the "conservative" setup and
+# False to the "realistic" setup of Sprenger at al. 1801.08331.
 euclid_pk.use_zscaling = True
 
 # use halofit method
