@@ -1,5 +1,6 @@
-# The current version of the likelihood is by T. Sprenger,
-# M. Archidiacono, T. Brinckmann, S. Clesse, J. Lesgourgues
+# Euclid galaxy clustering likelihood
+# The current version of the likelihood is by Tim Sprenger
+# plus M. Archidiacono, T. Brinckmann, S. Clesse, J. Lesgourgues
 # and is described in detail in Sprenger et al. 1801.08331
 
 # This likelihood is based on an earlier Euclid P(k) likelihood
@@ -52,8 +53,8 @@ euclid_pk.kmax = 0.2
 euclid_pk.use_zscaling = True
 
 # use halofit method
-# note halofit will be used regardless if the parameter file
-# or any other likelihoods specify halofit
+# note even if False halofit will be used if the .param
+# file or any other likelihood specifies halofit
 euclid_pk.use_halofit = True
 
 # theoretical uncertainty (exp(lg(k)) 0.33%(0.01h/Mpc)->1%(0.3h/Mpc)->10%(10h/Mpc))
