@@ -22,8 +22,8 @@ fake_planck_realistic.l_max              = 3000
 fake_planck_realistic.f_sky              = 0.57
 
 # do you want to include Bmodes (Gaussian approximation)?
-core_m5.Bmodes = False
-core_m5.delensing = False
+fake_planck_realistic.Bmodes = False
+fake_planck_realistic.delensing = False
 
 # do you want to use noise from file?
 fake_planck_realistic.noise_from_file = True
@@ -47,4 +47,4 @@ fake_planck_realistic.noise_file = 'noise_fake_planck_realistic_two.dat'
 fake_planck_realistic.LensingExtraction = True
 fake_planck_realistic.neglect_TD = True
 fake_planck_realistic.unlensed_clTTTEEE = False
-core_m5.ExcludeTTTEEE = False
+fake_planck_realistic.ExcludeTTTEEE = False
