@@ -1799,7 +1799,11 @@ def remove_bad_points(info):
             if info.markovian and not info.update:
                 with open(chain_file, 'r') as f:
                     for line in ifilter(iscomment,f):
-                        start = int(line.split()[2])
+                        if info.only_markovian or ('update proposal' in line):
+                            start = int(line.split()[2])
+                        else:
+                            pass
+
                 markovian = start
 
             # Remove burn-in, defined as all points until the likelhood reaches min_minus_lkl+LOG_LKL_CUTOFF

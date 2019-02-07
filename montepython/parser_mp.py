@@ -660,8 +660,12 @@ def create_parser():
             `top`.<++>
         <**>--keep-non-markovian<**> : bool
             <++>Use this flag to keep the non-markovian part of the chains produced
-            at the beginning of runs with --update mode (default: False)<++>
-            This option is only relevant when the chains were produced with --update (*OPT*) (flag)<++>
+            at the beginning of runs with --update and --superupdate mode (default: False)<++>
+            This option is only relevant when the chains were produced with --update or --superupdate (*OPT*) (flag)<++>
+        <**>--keep-only-markovian<**> : bool
+            <++>Use this flag to keep only the truly markovian part of the chains produced
+             with --superupdate mode, where the jumping factor has stopped adapting (default: False)<++>
+            This option is only relevant when the chains were produced with --superupdate (*OPT*) (flag)<++>
         <**>--keep-fraction<**> : float
             <++>after burn-in removal, analyze only last fraction of each chain. (default: 1)<++>
             (between 0 and 1). Normally one would not use this for runs with --update mode,
@@ -927,6 +931,9 @@ def create_parser():
     # -- also analyze the non-markovian part of the chains
     infoparser.add_argument('--keep-non-markovian', help=helpdict['keep-non-markovian'],
                             dest='markovian', action='store_false')
+    # -- force only analyzing the markovian part of the chains
+    infoparser.add_argument('--keep-only-markovian', help=helpdict['keep-only-markovian'],
+                            dest='only_markovian', action='store_true')
     # -- fraction of chains to be analyzed after burn-in removal (defaulting to 1.0)
     infoparser.add_argument('--keep-fraction', help=helpdict['keep-fraction'],
                             type=float, dest='keep_fraction', default=1.0)
