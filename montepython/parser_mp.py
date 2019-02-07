@@ -830,7 +830,7 @@ def create_parser():
         help=helpdict['IS-starting-folder'], type=str, default='', nargs='+')
 
     ###############
-    # MultiNest arguments (all OPTIONAL and ignored if not "-m=MN")
+    # MultiNest arguments (all OPTIONAL and ignored if not "-m=NS")
     # The default values of -1 mean to take the PyMultiNest default values
     try:
         from MultiNest import NS_prefix, NS_user_arguments
@@ -845,6 +845,9 @@ def create_parser():
     except ImportError:
         # Not defined if not installed
         pass
+    except:
+        warnings.warn('PyMultiNest detected but MultiNest likely not installed correctly.'
+                      'You can safely ignore this if not running with option -m NS')
 
     ###############
     # PolyChord arguments (all OPTIONAL and ignored if not "-m=PC")
@@ -862,6 +865,9 @@ def create_parser():
     except ImportError:
         # Not defined if not installed
         pass
+    except:
+        warnings.warn('PyPolyChord detected but PolyChord likely not installed correctly.'
+                      'You can safely ignore this if not running with option -m PC')
 
     ###############
     # CosmoHammer arguments (all OPTIONAL and ignored if not "-m=CH")
@@ -878,6 +884,9 @@ def create_parser():
     except ImportError:
         # Not defined if not installed
         pass
+    except:
+        warnings.warn('CosmoHammer detected but emcee likely not installed correctly.'
+                      'You can safely ignore this if not running with option -m CH')
 
     ###############
     # Information
