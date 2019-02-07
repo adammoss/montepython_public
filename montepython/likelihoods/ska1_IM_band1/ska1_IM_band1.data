@@ -47,6 +47,8 @@ ska1_IM_band1.kmin = 0.02
 ska1_IM_band1.kmax = 0.2
 #ska1_IM_band1.kmax = 10.
 # use z-scaling of kmax via pow(1+z,2/(2+n_s))
+# True corresponds to the "conservative" setup and
+# False to the "realistic" setup of Sprenger at al. 1801.08331.
 ska1_IM_band1.use_zscaling = True
 
 # use halofit method
