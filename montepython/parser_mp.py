@@ -830,10 +830,27 @@ def create_parser():
         help=helpdict['IS-starting-folder'], type=str, default='', nargs='+')
 
     ###############
+    # We need the following so the run does not crash if one of the external
+    # samplers is not correctly installed despite not being used
+    from contextlib import contextmanager
+    import sys, os
+
+    @contextmanager
+    def suppress_stdout():
+        with open(os.devnull, "w") as devnull:
+            old_stdout = sys.stdout
+            sys.stdout = devnull
+            try:
+                yield
+            finally:
+                sys.stdout = old_stdout
+
+    ###############
     # MultiNest arguments (all OPTIONAL and ignored if not "-m=NS")
     # The default values of -1 mean to take the PyMultiNest default values
     try:
-        from MultiNest import NS_prefix, NS_user_arguments
+        with suppress_stdout():
+            from MultiNest import NS_prefix, NS_user_arguments
         NSparser = runparser.add_argument_group(
             title="MultiNest",
             description="Run the MCMC chains using MultiNest"
@@ -846,14 +863,15 @@ def create_parser():
         # Not defined if not installed
         pass
     except:
-        warnings.warn('PyMultiNest detected but MultiNest likely not installed correctly.'
+        warnings.warn('PyMultiNest detected but MultiNest likely not installed correctly. '
                       'You can safely ignore this if not running with option -m NS')
 
     ###############
     # PolyChord arguments (all OPTIONAL and ignored if not "-m=PC")
     # The default values of -1 mean to take the PyPolyChord default values
     try:
-        from PolyChord import PC_prefix, PC_user_arguments
+        with suppress_stdout():
+             from PolyChord import PC_prefix, PC_user_arguments
         PCparser = runparser.add_argument_group(
             title="PolyChord",
             description="Run the MCMC chains using PolyChord"
@@ -866,14 +884,15 @@ def create_parser():
         # Not defined if not installed
         pass
     except:
-        warnings.warn('PyPolyChord detected but PolyChord likely not installed correctly.'
+        warnings.warn('PyPolyChord detected but PolyChord likely not installed correctly. '
                       'You can safely ignore this if not running with option -m PC')
 
     ###############
     # CosmoHammer arguments (all OPTIONAL and ignored if not "-m=CH")
     # The default values of -1 mean to take the CosmoHammer default values
     try:
-        from cosmo_hammer import CH_prefix, CH_user_arguments
+        with suppress_stdout():
+            from cosmo_hammer import CH_prefix, CH_user_arguments
         CHparser = runparser.add_argument_group(
             title="CosmoHammer",
             description="Run the MCMC chains using the CosmoHammer framework")
@@ -885,7 +904,7 @@ def create_parser():
         # Not defined if not installed
         pass
     except:
-        warnings.warn('CosmoHammer detected but emcee likely not installed correctly.'
+        warnings.warn('CosmoHammer detected but emcee likely not installed correctly. '
                       'You can safely ignore this if not running with option -m CH')
 
     ###############
