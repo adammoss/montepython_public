@@ -4,6 +4,11 @@
 # but with a fair estimate of the Planck noise spectrum
 # for the full Planck mission.
 
+# Full sky and l_max = 50 for combining with cmb_s4_highl and
+# fake_planck_realistic_highl_fsky0p17 as in
+# Brinckmann, Hooper et al. 1808.05955
+# Should not be combined with other lowl or highl likelihoods!
+
 # This likelihood is based on the fake_planck_bluebook
 # likelihood, modified by T. Brinckmann and S. Clesse
 # adding extra options implemented for the core_m5 papers,
@@ -12,27 +17,27 @@
 # Updated noise spectra from Brinckmann, Hooper et al. 1808.05955
 
 # Where to read/write fiducial model
-fake_planck_realistic.data_directory     = data.path['data']
-fake_planck_realistic.fiducial_file      = 'fake_planck_realistic_fiducial.dat'
+fake_planck_realistic_lowl.data_directory     = data.path['data']
+fake_planck_realistic_lowl.fiducial_file      = 'fake_planck_realistic_lowl_fiducial.dat'
 
 # Experimental sensitivity
-# l_max_TT = 3000, l_max_EE = 3000, l_max_pp = 3000
-# Note the noise explodes much before, see figure 1
-# of Brinckmann, Hooper et al. 1808.05955
-fake_planck_realistic.l_min              = 2
-fake_planck_realistic.l_max              = 3000
-fake_planck_realistic.f_sky              = 0.57
+# l_max_TT = 50, l_max_EE = 50, l_max_pp = 50
+# l_max = 50 for combining with cmb_s4_highl
+# and fake_planck_realistic_highl_fsky0p17
+fake_planck_realistic_lowl.l_min              = 2
+fake_planck_realistic_lowl.l_max              = 50
+fake_planck_realistic_lowl.f_sky              = 0.57
 
 # Do you want to include Bmodes (Gaussian approximation)?
-fake_planck_realistic.Bmodes = False
-fake_planck_realistic.delensing = False
+fake_planck_realistic_lowl.Bmodes = False
+fake_planck_realistic_lowl.delensing = False
 
 # Do you want to use noise from file?
-fake_planck_realistic.noise_from_file = True
+fake_planck_realistic_lowl.noise_from_file = True
 
 # Noise file used for CORE-M5 papers, Sprenger et al. 2018.
 # By A. Challinor. See data file for details.
-#fake_planck_realistic.noise_file = 'fake_planck_realistic.dat'
+#fake_planck_realistic_lowl.noise_file = 'fake_planck_realistic.dat'
 
 # As we cannot easily model the noise associated with
 # foregrounds for the 217 GHz channel, we instead prefer
@@ -43,10 +48,10 @@ fake_planck_realistic.noise_from_file = True
 # sigma_P = 10.9 11.4, (18.5) in  muK per pixel
 # Minimum variance noise estimate using these settings
 # from Brinckmann, Hooper et al. 1808.05955
-fake_planck_realistic.noise_file = 'noise_fake_planck_realistic_two.dat'
+fake_planck_realistic_lowl.noise_file = 'noise_fake_planck_realistic_two.dat'
 
 # Do you want to include lensing extraction?
-fake_planck_realistic.LensingExtraction = True
-fake_planck_realistic.neglect_TD = True
-fake_planck_realistic.unlensed_clTTTEEE = False
-fake_planck_realistic.ExcludeTTTEEE = False
+fake_planck_realistic_lowl.LensingExtraction = True
+fake_planck_realistic_lowl.neglect_TD = True
+fake_planck_realistic_lowl.unlensed_clTTTEEE = False
+fake_planck_realistic_lowl.ExcludeTTTEEE = False
