@@ -3,6 +3,7 @@
 # fake_planck_realistic_lowl and fake_planck_realistic_highl_fsky0p17
 # OR litebird_lowl and litebird_highl_fsky0p3
 # OR core_m5_lowl and core_m5_highl_fsky0p3
+# as in Brinckmann, Hooper et al. 1808.05955
 
 # This likelihood is based on the core_m5 likelihood, which
 # in turn builds on the fake planck bluebook likelihood with
