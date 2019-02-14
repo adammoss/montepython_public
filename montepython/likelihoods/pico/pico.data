@@ -1,0 +1,52 @@
+# PICO likelihood from Brinckmann, Hooper et al. 1808.05955
+
+# This likelihood is based on the core_m5 likelihood, which
+# in turn builds on the fake planck bluebook likelihood with
+# modifications by T. Brinckmann and S. Clesse to include B-modes and
+# the CMB lensing potential. It is possible to use the lensing
+# auto- or cross-correlations alone, in combination with temperature
+# and polarization, or for delensing the temperature and polarization
+# spectra (e.g. if both lensing and B-mode polarization is desired)
+
+# Experimental configuration based on Sutin et al. 1808.01368 and
+# Young et al. 1808.01369 with values taken from
+# https://zzz.physics.umn.edu/ipsig/baseline
+# See Brinckmann, Hooper et al. 1808.05955 for details
+
+# Where to read/write fiducial model
+pico.data_directory     = data.path['data']
+pico.fiducial_file      = 'pico_fiducial.dat'
+
+# Experimental sensitivity
+pico.l_min              = 2
+# for l_max use same as core-m5
+pico.l_max              = 3000
+# table says 100%, which means 70% after removing galactic plane
+pico.f_sky              = 0.70
+pico.num_channels       = 8
+
+# Angular resolution
+# theta_fwhm must be in in arcmin
+# channel GHz [62.2, 74.6, 89.6, 107.5, 129.0, 154.8, 185.8, 222.9]
+pico.theta_fwhm = [12.8, 10.7, 9.5, 7.9, 7.4, 6.2, 4.3, 3.6]
+
+# Resolution for Temperature and Polarisation
+# sigma's must be in muK.arcmin
+pico.sigma_P = [3.9, 3.2, 2.0, 1.7, 1.6, 1.4, 2.6, 3.1]
+pico.sigma_T = list(np.array([3.9, 3.2, 2.0, 1.7, 1.6, 1.4, 2.6, 3.1])/(2.**0.5))
+
+# Do you want to include Bmodes (Gaussian approximation)?
+pico.Bmodes = False
+pico.delensing = False
+pico.delensing_file = 'noise_pico.dat'
+
+# Do you want to include lensing extraction?
+pico.LensingExtraction = True
+pico.neglect_TD = True
+pico.unlensed_clTTTEEE = False
+pico.ExcludeTTTEEE = False
+
+# Noise spectrum from Brinckmann, Hooper et al. 1808.05955
+# using minimum variance noise estimate for the above settings
+# note with this likelihood the following noise file is not temporary
+pico.temporary_Nldd_file = 'noise_pico.dat'

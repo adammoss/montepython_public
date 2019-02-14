@@ -1,0 +1,82 @@
+# SKA1 galaxy clustering likelihood by Tim Sprenger
+# plus M. Archidiacono, T. Brinckmann, S. Clesse, J. Lesgourgues
+# described in detail in Sprenger et al. 1801.08331
+
+# This likelihood is based on an earlier Euclid P(k) likelihood
+# by Audren & Lesgourgues described in Audren et al. 1210.2194
+
+# data directory and fiducial file
+ska1_pk.data_directory = data.path['data']
+ska1_pk.fiducial_file  = "ska1_pk_fiducial.dat"
+
+# nuisance parameters
+# sigma_NL is the nonlinear dispersion scale of RSD
+# from Bull et al. 1405.1452: 4-10 Mpc^-1, mean 7 Mpc^-1
+# bias parameters (beta, amplitude:0 and z-scaling:1, =1 means no deviation to fit model)
+# see Sprenger et al. 1801.08331 for details
+ska1_pk.use_nuisance = ['sigma_NL','beta_0^SKA1','beta_1^SKA1']
+
+# number of bins of the survey (step width ~0.1)
+ska1_pk.nbin  = 5
+
+# range of redshifts covered by survey (SKA1 System BaselineV2 Description: Dewdney et al. 2016)
+# 0-0.49 corresponds to band 2 (950-1760MHz)
+ska1_pk.zmin = 0.001
+ska1_pk.zmax  = 0.5
+
+# sky coverage in deg^2 (1412.4700v2)
+ska1_pk.skycov  = 5000.
+
+# precision on the mu variable (~9)
+ska1_pk.mu_size = 9
+
+# number of equally spaced bins in log(k) space
+ska1_pk.k_size = 100
+
+# lower integration boundary for k (in 1/Mpc)
+# 0.02 ~ smallest of 2pi/(10deg*r_par(z)) and 2pi/(delta_r_par(z))
+ska1_pk.kmin = 0.02
+# higher integration boundary for k (in h/Mpc)
+# A cut-off of 0.2 corresponds to the "conservative" setup and a
+# value of 10 the "realistic" setup of Sprenger at al. 1801.08331.
+# Note that for realistic the theoretical error takes over quickly.
+# A large cut-off should *not* be used if UseTheoError = False
+ska1_pk.kmax = 0.2
+#ska1_pk.kmax = 10.
+# use z-scaling of kmax via pow(1+z,2/(2+n_s))
+# True corresponds to the "conservative" setup and
+# False to the "realistic" setup of Sprenger at al. 1801.08331.
+ska1_pk.use_zscaling = True
+
+# use halofit method
+# note even if False halofit will be used if the .param
+# file or any other likelihood specifies halofit
+ska1_pk.use_halofit = True
+
+# theoretical error (exp(lg(k)) 0.33%(0.01h/Mpc)->1%(0.3h/Mpc)->10%(10h/Mpc))
+# see Sprenger et al. 1801.08331 for details
+ska1_pk.UseTheoError = True
+ska1_pk.k_CorrLength_hMpc = 0.05
+ska1_pk.z_CorrLength = 1.0
+ska1_pk.bias_accuracy = 0.025
+
+# c-values for number counts and bias (1412.4700v2, numbers: 1509.07562v2)
+ska1_pk.c1 = 5.450
+ska1_pk.c2 = 1.310
+ska1_pk.c3 = 14.394
+ska1_pk.c4 = 0.616
+ska1_pk.c5 = 1.017
+
+# measurement errors: (found to be negligible but kept for generality)
+
+# rest frequency of line in MHz
+ska1_pk.nu0 = 1420.405752
+
+# channel bandwidth in MHz (band 2: 64000 channels)
+ska1_pk.delta_nu = 0.0127
+
+# Baseline in km for ang. res. (max. baseline 150km: SKA1 System BaselineV2 Description: Dewdney et al. 2016, center ~5km)
+ska1_pk.Baseline = 5.
+
+# use linear power spectrum for RSD correction
+ska1_pk.use_linear_rsd = True

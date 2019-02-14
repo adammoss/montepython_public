@@ -172,12 +172,12 @@ def prepare(files, info):
         with CosmoMC format
 
     .. note::
-        New in version 2.0.0: if you ask to analyze a Nested Sampling
+        New in version 2.0.0: if you ask to analyze a MultiNest
         sub-folder (i.e. something that ends in `NS` with capital letters), the
-        analyze module will translate the output from Nested Sampling to
+        analyze module will translate the output from MultiNest to
         standard chains for Monte Python, and stops. You can then run the
         `-- info` flag on the whole folder. **This procedure is not necessary
-        if the run was complete, but only if the Nested Sampling run was killed
+        if the run was complete, but only if the MultiNest run was killed
         before completion**.
 
     Parameters
@@ -189,12 +189,12 @@ def prepare(files, info):
         Used to store the result
 
     """
-    # First test if the folder is a Nested Sampling or CosmoHammer folder. If
-    # so, call the module's own routine through the clean conversion function,
-    # which will translate the output of this other sampling into MCMC chains
-    # that can then be analyzed.
-    modules = ['nested_sampling', 'cosmo_hammer']
-    tags = ['NS', 'CH']
+    # First test if the folder is a MultiNest, PolyChord or CosmoHammer folder.
+    # If so, call the module's own routine through the clean conversion
+    # function, which will translate the output of this other sampling into
+    # MCMC chains that can then be analyzed.
+    modules = ['MultiNest', 'PolyChord', 'cosmo_hammer']
+    tags = ['NS', 'PC', 'CH']
     for module_name, tag in zip(modules, tags):
         action_done = clean_conversion(module_name, tag, files[0])
         if action_done:
@@ -1441,6 +1441,9 @@ def clean_conversion(module_name, tag, folder):
     has_module = False
     subfolder_name = tag+"_subfolder"
     try:
+        # Don't try to import the wrong (unrequested) module, in case it's not installed
+        if not folder.lower().endswith(tag.lower()):
+            raise ImportError
         module = importlib.import_module(module_name)
         subfolder = getattr(module, subfolder_name)
         has_module = True
@@ -1796,7 +1799,11 @@ def remove_bad_points(info):
             if info.markovian and not info.update:
                 with open(chain_file, 'r') as f:
                     for line in ifilter(iscomment,f):
-                        start = int(line.split()[2])
+                        if info.only_markovian or ('update proposal' in line):
+                            start = int(line.split()[2])
+                        else:
+                            pass
+
                 markovian = start
 
             # Remove burn-in, defined as all points until the likelhood reaches min_minus_lkl+LOG_LKL_CUTOFF

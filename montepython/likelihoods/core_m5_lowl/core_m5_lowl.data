@@ -1,0 +1,62 @@
+# CORE M5 is modelled as in the CORE papers for the M5 ESA proposal:
+# Di Valentino et al. 1612.00021 and Finelli et al. 1612.08270
+
+# Full sky and l_max = 50 for combining with cmb_s4_highl and
+# core_m5_highl_fsky0p3 as in Brinckmann, Hooper et al. 1808.05955
+# Should not be combined with other lowl or highl likelihoods!
+
+# This likelihood builds on the fake planck bluebook likelihood,
+# modified by T. Brinckmann and S. Clesse to include B-modes and
+# the CMB lensing potential. It is possible to use the lensing
+# auto- or cross-correlations alone, in combination with temperature
+# and polarization, or for delensing the temperature and polarization
+# spectra (e.g. if both lensing and B-mode polarization is desired)
+
+# Updated noise file using minimum variance noise estimate
+# from Brinckmann, Hooper et al. 1808.05955
+
+# Where to read/write fiducial model
+core_m5_lowl.data_directory     = data.path['data']
+core_m5_lowl.fiducial_file      = 'core_m5_lowl_fiducial.dat'
+
+# Experimental sensitivity
+# l_max_TT = 50, l_max_EE = 50, l_max_pp = 50
+# l_max = 50 for combining with cmb_s4_highl and core_m5_highl_fsky0p3
+core_m5_lowl.l_min              = 2
+core_m5_lowl.l_max              = 50
+core_m5_lowl.f_sky              = 0.70
+core_m5_lowl.num_channels       = 6
+
+# Angular resolution
+# theta_fwhm must be in in arcmin
+# channel GHz [130, 145, 160, 175, 195, 220]
+core_m5_lowl.theta_fwhm = [8.51, 7.68, 7.01, 6.45, 5.84, 5.23]
+
+# Resolution for Temperature and Polarisation
+# sigma's must be in muK.arcmin
+core_m5_lowl.sigma_T = [3.9, 3.6, 3.7, 3.6, 3.5, 3.8]
+core_m5_lowl.sigma_P = [5.5, 5.1, 5.2, 5.1, 4.9, 5.4]
+
+# Do you want to include Bmodes (Gaussian approximation)?
+core_m5_lowl.Bmodes = False
+core_m5_lowl.delensing = False
+# Original noise spectrum from the CORE-M5 papers
+#core_m5_lowl.delensing_file = 'delensing_core_m5.dat'
+# Updated noise spectrum from Brinckmann, Hooper et al. 1808.05955
+core_m5_lowl.delensing_file = 'noise_core_m5.dat'
+
+# Do you want to include lensing extraction?
+core_m5_lowl.LensingExtraction = True
+core_m5_lowl.neglect_TD = True
+core_m5_lowl.unlensed_clTTTEEE = False
+core_m5_lowl.ExcludeTTTEEE = False
+
+# Original noise spectrum from the CORE-M5 papers
+# Di Valentino et al. 1612.00021 and Finelli et al. 1612.08270
+# note with this likelihood the following noise file is not temporary
+#core_m5_lowl.temporary_Nldd_file = 'delensing_core_m5.dat'
+
+# Updated noise spectrum from Brinckmann, Hooper et al. 1808.05955
+# using minimum variance noise estimate for the above settings
+# note with this likelihood the following noise file is not temporary
+core_m5_lowl.temporary_Nldd_file = 'noise_core_m5.dat'

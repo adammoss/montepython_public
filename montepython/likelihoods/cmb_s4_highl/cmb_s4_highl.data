@@ -1,0 +1,58 @@
+# CMB-S4 likelihood from Brinckmann, Hooper et al. 1808.05955
+# with l_min = 51 for combining with a satellite mission, e.g.
+# fake_planck_realistic_lowl and fake_planck_realistic_highl_fsky0p17
+# OR litebird_lowl and litebird_highl_fsky0p3
+# OR core_m5_lowl and core_m5_highl_fsky0p3
+# as in Brinckmann, Hooper et al. 1808.05955
+
+# This likelihood is based on the core_m5 likelihood, which
+# in turn builds on the fake planck bluebook likelihood with
+# modifications by T. Brinckmann and S. Clesse to include B-modes and
+# the CMB lensing potential. It is possible to use the lensing
+# auto- or cross-correlations alone, in combination with temperature
+# and polarization, or for delensing the temperature and polarization
+# spectra (e.g. if both lensing and B-mode polarization is desired)
+
+# Experimental configuration based on CMB-S4 science book (1610.02743)
+# See Brinckmann, Hooper et al. 1808.05955 for details
+
+# Where to read/write fiducial model
+cmb_s4_highl.data_directory     = data.path['data']
+cmb_s4_highl.fiducial_file      = 'cmb_s4_highl_fiducial.dat'
+
+# Experimental sensitivity
+# l_max_TT = 3000, l_max_EE = 3000, l_max_pp = 3000
+# i.e. no highl polarisation from kSZ or highl lensing
+# l_min = 51 for combining with satellite mission
+cmb_s4_highl.l_min              = 51
+cmb_s4_highl.l_max              = 3000
+cmb_s4_highl.f_sky              = 0.40
+cmb_s4_highl.num_channels       = 1
+
+# Angular resolution
+# theta_fwhm must be in in arcmin
+# possible channels GHz [30, 40, 85, 95, 145, 155, 215, 270]
+# single channel forecast setup, 150 GHz
+cmb_s4_highl.theta_fwhm = [3.0]
+
+# Resolution for Temperature and Polarisation
+# sigma's must be in muK.arcmin
+cmb_s4_highl.sigma_T = [1.0]
+cmb_s4_highl.sigma_P = [1.41]
+
+# Do you want to include Bmodes (Gaussian approximation)?
+cmb_s4_highl.Bmodes = False
+cmb_s4_highl.delensing = False
+# minimum variance estimator noise file by D.C. Hooper and T. Brinckmann
+cmb_s4_highl.delensing_file = 'noise_cmb_s4.dat'
+
+# Do you want to include lensing extraction?
+cmb_s4_highl.LensingExtraction = True
+cmb_s4_highl.neglect_TD = True
+cmb_s4_highl.unlensed_clTTTEEE = False
+cmb_s4_highl.ExcludeTTTEEE = False
+
+# Noise spectrum from Brinckmann, Hooper et al. 1808.05955
+# using minimum variance noise estimate for the above settings
+# note with this likelihood the following noise file is not temporary
+cmb_s4_highl.temporary_Nldd_file = 'noise_cmb_s4.dat'

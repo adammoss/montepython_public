@@ -1,0 +1,12 @@
+# Supernovae likelihood using the Pantheon sample
+# based on Scolnic et al. 1710.00845
+# likelihood by Rodrigo von Martens
+
+# The likelihood is based on the JLA likelihood
+# updated for the Pantheon sample
+
+Pantheon.data_directory = os.path.join(data.path['data'], 'Pantheon')
+Pantheon.settings       = 'pantheon.dataset'
+Pantheon.conflicting_experiments = ['JLA_simple', 'JLA']
+
+Pantheon.use_nuisance = ['M']

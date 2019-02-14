@@ -28,7 +28,7 @@ def build(bld):
     source = oo_source,
     target = 'wmap_c_obj')
 
-  wmap_src = ['wlik_wmap.f90']+[osp.join(bld.env.wmap_src,vv) for vv in 'WMAP_7yr_options.F90 WMAP_7yr_util.f90 WMAP_7yr_gibbs.F90 WMAP_7yr_tt_pixlike.F90 WMAP_7yr_tt_beam_ptsrc_chisq.f90 WMAP_7yr_teeebb_pixlike.F90 WMAP_7yr_tetbeebbeb_pixlike.F90 WMAP_7yr_likelihood.F90'.split()]
+  wmap_src = ['wlik_wmap.f90']+[osp.join(bld.env.wmap_src,vv) for vv in 'WMAP_9yr_options.F90 WMAP_9yr_util.f90 WMAP_9yr_gibbs.F90 WMAP_9yr_tt_pixlike.F90 WMAP_9yr_tt_beam_ptsrc_chisq.f90 WMAP_9yr_teeebb_pixlike.F90 WMAP_9yr_tetbeebbeb_pixlike.F90 WMAP_9yr_likelihood.F90'.split()]
   bld.objects(
      features = 'fc',
      source = wmap_src,

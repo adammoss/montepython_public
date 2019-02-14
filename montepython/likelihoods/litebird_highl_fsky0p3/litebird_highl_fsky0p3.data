@@ -1,0 +1,73 @@
+# LiteBIRD likelihood following approach of the CORE-M5 papers
+# for the M5 ESA proposal: Di Valentino et al. 1612.00021 and
+# Finelli et al. 1612.08270.
+
+# Partial sky and l_min = 51 for combining with cmb_s4_highl and
+# litebird_lowl as in Brinckmann, Hooper et al. 1808.05955
+# Should not be combined with other lowl or highl likelihoods!
+
+# This likelihood builds on the fake planck bluebook likelihood,
+# modified by T. Brinckmann and S. Clesse to include B-modes and
+# the CMB lensing potential. It is possible to use the lensing
+# auto- or cross-correlations alone, in combination with temperature
+# and polarization, or for delensing the temperature and polarization
+# spectra (e.g. if both lensing and B-mode polarization is desired)
+
+# Noise spectrum using minimum variance noise estimate
+# from Brinckmann, Hooper et al. 1808.05955 based on
+# LiteBIRD mission paper Suzuki et al. 1801.06987
+
+# Where to read/write fiducial model
+litebird_highl_fsky0p3.data_directory     = data.path['data']
+litebird_highl_fsky0p3.fiducial_file      = 'litebird_highl_fsky0p3_fiducial.dat'
+
+# Experimental sensitivity
+# l_max_TT = 1350, l_max_EE = 1350, l_max_pp = 1350
+# Note the noise explodes much before, see figure 1
+# of Brinckmann, Hooper et al. 1808.05955
+# l_min = 51 and f_sky = 0.3 for combining with cmb_s4_highl and litebird_lowl
+litebird_highl_fsky0p3.l_min              = 51
+litebird_highl_fsky0p3.l_max              = 1350
+litebird_highl_fsky0p3.f_sky              = 0.30
+#litebird_highl_fsky0p3.num_channels       = 7
+litebird_highl_fsky0p3.num_channels       = 1
+
+# Angular resolution
+# theta_fwhm must be in in arcmin
+# channels in GHz [78, 88.5, 100, 118.9, 140, 166, 195]
+# CORE-M5 used 7 channels
+#litebird_highl_fsky0p3.theta_fwhm = [55.0, 49.0, 43.0, 36.0, 31.0, 26.0, 22.0]
+# LiteBIRD mission paper indicated one channel in GHz [140]
+# FWHM taken from LiteBIRD settings in CORE-M5 papers
+# (1612.00021 and 1612.08270) for this channel
+litebird_highl_fsky0p3.theta_fwhm = [31.0]
+
+# Resolution for Temperature and Polarisation
+# sigma's must be in muK.arcmin
+# CORE inflation paper used
+# litebird_highl_fsky0p3.sigma_T = [8.8, 7.1, 8.5, 6.7, 5.3, 5.0, 3.6]
+# litebird_highl_fsky0p3.sigma_P = [12.5, 10.0, 12.0, 9.5, 7.5, 7.0, 5.0]
+# CORE cosmological parameters paper used
+#litebird_highl_fsky0p3.sigma_T = [12.5, 10.0, 12.0, 9.5, 7.5, 7.0, 5.0]
+#litebird_highl_fsky0p3.sigma_P = list(np.array([12.5, 10.0, 12.0, 9.5, 7.5, 7.0, 5.0])*2**0.5)
+# LiteBIRD mission paper settings (1801.06987)
+litebird_highl_fsky0p3.sigma_T = [4.1]
+litebird_highl_fsky0p3.sigma_P = [4.1*2.**0.5]
+
+# Do you want to include Bmodes (Gaussian approximation)?
+# setup for CORE-M5 papers used Bmodes and no lensing extraction
+litebird_highl_fsky0p3.Bmodes = False
+litebird_highl_fsky0p3.delensing = False
+# minimum variance estimator noise file by D.C. Hooper and T. Brinckmann
+litebird_highl_fsky0p3.delensing_file = 'noise_litebird.dat'
+
+# Do you want to include lensing extraction?
+litebird_highl_fsky0p3.LensingExtraction = True
+litebird_highl_fsky0p3.neglect_TD = True
+litebird_highl_fsky0p3.unlensed_clTTTEEE = False
+litebird_highl_fsky0p3.ExcludeTTTEEE = False
+
+# Noise spectrum from Brinckmann, Hooper et al. 1808.05955
+# using minimum variance noise estimate for the above settings
+# note with this likelihood the following noise file is not temporary
+litebird_highl_fsky0p3.temporary_Nldd_file = 'noise_litebird.dat'

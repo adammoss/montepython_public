@@ -1,0 +1,94 @@
+# SKA1 21cm intensity mapping likelihood by Tim Sprenger
+# plus M. Archidiacono, T. Brinckmann, S. Clesse, J. Lesgourgues
+# described in detail in Sprenger et al. 1801.08331
+
+# This likelihood is based on an earlier Euclid P(k) likelihood
+# by Audren & Lesgourgues described in Audren et al. 1210.2194
+
+# data directory and fiducial file
+ska1_IM_band2.data_directory = data.path['data']
+ska1_IM_band2.fiducial_file  = "ska1_IM_band2_fiducial.dat"
+
+# nuisance parameters
+# sigma_NL is the nonlinear dispersion scale of RSD
+# from Bull et al. 1405.1452: 4-10 Mpc^-1, mean 7 Mpc^-1
+# bias parameters (beta, amplitude:0 and z-scaling:1, =1 means no deviation to fit model)
+# Omega_HI as a function of redshift, alpha_HI controls redshift dependence
+# see Sprenger et al. 1801.08331 for details
+ska1_IM_band2.use_nuisance = ['sigma_NL','beta_0^IM','beta_1^IM','Omega_HI0','alpha_HI']
+#ska1_IM_band2.use_nuisance = ['sigma_NL','beta_0^IM','beta_1^IM']
+
+# number of bins of the survey (step width ~0.1)
+ska1_IM_band2.nbin  = 4
+
+# range of redshifts covered by survey (band 1: 350-1050 MHz)
+# remove ~50 MHz edges for foreground cleaning (1409.8667v1)
+# edges not mean of bins!
+ska1_IM_band2.zmin = 0.05
+ska1_IM_band2.zmax = 0.45
+
+# sky coverage in deg^2 (1609.00019v1)
+ska1_IM_band2.fsky  = 0.58
+
+# precision on the mu variable (~11)
+ska1_IM_band2.mu_size = 11
+
+# number of equally spaced bins in log(k) space
+ska1_IM_band2.k_size = 100
+
+# lower integration boundary for k (in 1/Mpc)
+# 0.02 ~ smallest of 2pi/(10deg*r_par(z)) and 2pi/(delta_r_par(z))
+ska1_IM_band2.kmin = 0.02
+# higher integration boundary for k (in h/Mpc)
+# A cut-off of 0.2 corresponds to the "conservative" setup and a
+# value of 10 the "realistic" setup of Sprenger at al. 1801.08331.
+# Note that for realistic the theoretical error takes over quickly.
+# A large cut-off should *not* be used if UseTheoError = False
+ska1_IM_band2.kmax = 0.2
+#ska1_IM_band2.kmax = 10.
+# use z-scaling of kmax via pow(1+z,2/(2+n_s))
+# True corresponds to the "conservative" setup and
+# False to the "realistic" setup of Sprenger at al. 1801.08331.
+ska1_IM_band2.use_zscaling = True
+
+# use halofit method
+# note even if False halofit will be used if the .param
+# file or any other likelihood specifies halofit
+ska1_IM_band2.use_halofit = True
+
+# theoretical error (exp(lg(k)) 0.33%(0.01h/Mpc)->1%(0.3h/Mpc)->10%(10h/Mpc))
+# see Sprenger et al. 1801.08331 for details
+ska1_IM_band2.UseTheoError = True
+ska1_IM_band2.k_CorrLength_hMpc = 0.05
+ska1_IM_band2.z_CorrLength = 1.0
+ska1_IM_band2.bias_accuracy = 0.025
+
+# rest frequency of line in MHz
+ska1_IM_band2.nu0 = 1420.405752
+
+# channel bandwidth in MHz (band 2: 64000 channels)
+ska1_IM_band2.delta_nu = 0.0127
+
+# diameter of dish in meters
+ska1_IM_band2.Diameter = 15.
+
+# number of dishes
+ska1_IM_band2.N_dish = 200
+
+# total observation time in hours
+ska1_IM_band2.t_tot = 10000.
+
+# instrument noise temperature in mK
+ska1_IM_band2.T_inst = 15500.
+
+# HI bias parameters (1609.00019v1) will be multiplied by bias nuisance
+ska1_IM_band2.b_0 = 0.904
+ska1_IM_band2.b_1 = 0.135
+ska1_IM_band2.b_2 = 1.696
+
+# Omega_HI parameters (1609.00019v1) if not specified by nuisance 'Omega_HI,0' and 'alpha_HI'
+ska1_IM_band2.Om_0 = 0.0004
+ska1_IM_band2.Om_1 = 0.6
+
+# Use linear P(k) for RSD correction
+ska1_IM_band2.use_linear_rsd = True

@@ -1,3 +1,38 @@
+v3.1.0  + Added PolyChord sampler (Handley, Hobson, Lasenby 1502.01856)
+	  thanks to Will Handley and Deanna C. Hooper (for usage, see
+	  the description of option "-m PC" in "run --help", the
+	  PolyChord help files, and montepython/PolyChord.py)
+	+ Updated likelihoods euclid_pk and euclid_lensing to version of 1801.08331
+	+ Added 21cm intensity mapping likelihoods ska1_IM_band1 and ska1_IM_band2 from 1801.08331
+	+ Added cosmic shear likelihoods ska1_lensing and ska2_lensing from 1801.08331
+	+ Added galaxy clustering likelihoods ska1_pk and ska2_pk from 1801.08331
+	+ Added CMB likelihoods cmb_s4 and pico from 1808.05955
+	+ Updated CMB likelihoods core_m5, litebird and fake_planck_realistic for 1808.05955
+	+ Added CMB-S4 + CMB satellite combination likelihood cmb_s4_highl from 1808.05955
+	+ Added litebird_lowl, litebird_highl_fsky0p3 from 1808.05955
+	+ Added core_m5_lowl, core_m5_highl_fsky0p3 from 1808.05955
+	+ Added fake_planck_realistic_lowl, fake_planck_realistic_highl_fsky0p17 from 1808.05955
+	+ Pantheon likelihood added courtesy of Rodrigo von Martens
+	+ wrapper_wmap updated with workaround for WMAP v5.0 likelihood by S. More
+	+ Bugfixes affecting convergence rate of superupdate
+	+ Reverted default behavior of analyze to pre v3.0 where analyze would
+	  remove the part of the chain before the latest covmat update
+	+ added option "--keep-only-markovian" corresponding to v3.1 behavior,
+	  which also removes the part of the chain where the jumping factor was
+	  changed (see "info --help" for details)
+---------------------------------------------------------------------
+v3.0.1  + (detailed changelog missing) bugfixes
+	+ Some new likelihoods (see folder montepython/likelihoods/)
+---------------------------------------------------------------------
+v3.0.0  + (detailed changelog missing) main features summarized
+	+ superupdate metropolis-hastings sampling (see description
+	  of option "--superupdate SUPERUPDATE" in "run --help").
+	  Automatically adjust jumping factor to improve convergence rate
+	+ Fisher matrix computation (see description of option
+	  "--fisher" in "run --help") useful for producing starting covmat
+	+ Many new likelihoods (see folder montepython/likelihoods/)
+	+ Improved plotting (see options with "info --help")
+---------------------------------------------------------------------
 v2.2.1  + to avoid I/O bug, only max(R-1) written in chains during update
 ---------------------------------------------------------------------
 v2.2.0  + Automatic update of the proposal density's covariance matrix, with

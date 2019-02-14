@@ -230,6 +230,7 @@ def chain(cosmo, data, command_line):
     if not command_line.silent:
         outputs.append(sys.stdout)
 
+    use_mpi = False
     # check for MPI
     try:
         from mpi4py import MPI
@@ -238,6 +239,7 @@ def chain(cosmo, data, command_line):
         # suppress duplicate output from slaves
         if rank:
             command_line.quiet = True
+        use_mpi = True
     except ImportError:
         # set all chains to master if no MPI
         rank = 0
@@ -246,11 +248,21 @@ def chain(cosmo, data, command_line):
     # Workaround in order to have one master chain and several slave chains even when
     # communication fails between MPI chains. It could malfunction on some hardware.
     # TODO: Would like to merge with MPI initialization above and make robust and logical
+    # TODO: Or if keeping current scheme, store value and delete jumping_factor.txt
+    # TODO: automatically if --parallel-chains is enabled
     if command_line.superupdate and data.jumping_factor:
         try:
             jump_file = open(command_line.folder + '/jumping_factor.txt','r')
-            if command_line.restart is None:
+            #if command_line.restart is None:
+            if not use_mpi and command_line.parallel_chains:
                 rank = 1
+                warnings.warn('MPI not in use, flag --parallel-chains enabled, '
+                              'superupdate enabled, and a jumping_factor.txt file detected. '
+                              'If relaunching in the same folder or restarting a run this '
+                              'will cause all chains to be assigned as slaves. In this case '
+                              'instead note the value in jumping_factor.txt, delete the '
+                              'file, and pass the value with flag -f <value>. This warning '
+                              'may then appear again, but you can safely disregard it.')
             else:
                 # For restart runs we want to save the input jumping factor
                 # as starting jumping factor, but continue from the jumping
@@ -405,6 +417,8 @@ def chain(cosmo, data, command_line):
         R_minus_one = np.array([100.,100.]) # 100 to make sure max(R-1) value is high if computation failed
         # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
         ar = np.zeros(command_line.superupdate)
+        # Store acceptance rate of last 5*SU*(N_slow + f_fast * N_fast) steps
+        backup_ar = np.zeros(5*command_line.superupdate)
         # Make sure update is enabled
         if command_line.update == 0:
             if not rank and not command_line.silent:
@@ -522,6 +536,7 @@ def chain(cosmo, data, command_line):
                     if input_covmat != None:
 			info_command_line.want_covmat = False
 
+                # This is in order to allow for more frequent R-1 computation with superupdate
                 compute_R_minus_one = False
                 if command_line.superupdate:
                     if not (k+10) % command_line.superupdate:
@@ -552,13 +567,15 @@ def chain(cosmo, data, command_line):
 
                     # If acceptance rate deviates too much from the target acceptance
                     # rate we want to resume adapting the jumping factor
-                    if abs(np.mean(ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
+                    # T. Brinckmann 02/2019: use mean a.r. over the last 5*len(ar) steps
+                    # instead or the over last len(ar), which is more stable
+                    if abs(np.mean(backup_ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
                         stop_c = False
 
                     # Start adapting the jumping factor after command_line.superupdate steps if R-1 < 10
                     # The lower R-1 criterium is an arbitrary choice to keep from updating when the R-1
                     # calculation fails (i.e. returns only zeros).
-                    if (k > updated_steps + command_line.superupdate) and 0.01 < (max(R_minus_one) < 10) and not stop_c:
+                    if (k > updated_steps + command_line.superupdate) and 0.01 < (max(R_minus_one) < 10.) and not stop_c:
                         c = data.jumping_factor**2/len(parameter_names)
                         # To avoid getting trapped in local minima, the jumping factor should
                         # not go below 0.1 (arbitrary) times the starting jumping factor.
@@ -572,11 +589,13 @@ def chain(cosmo, data, command_line):
                             # points, while ensuring the parameter space is properly sampled.
                             # The convergence criterium is by default (26+/-1)%, so the adaptation
                             # will stop when the code reaches an acceptance rate of at least 25%.
-                            if (max(R_minus_one) < 0.4) and (abs(np.mean(ar) - command_line.superupdate_ar) < command_line.superupdate_ar_tol) and (abs(np.mean(c_array)/c_array[(k-1) % (command_line.superupdate)] - 1) < 0.01):
+                            # T. Brinckmann 02/2019: use mean a.r. over the last 5*len(ar) steps
+                            # instead or the over last len(ar), which is more stable
+                            if (max(R_minus_one) < 0.4) and (abs(np.mean(backup_ar) - command_line.superupdate_ar) < command_line.superupdate_ar_tol) and (abs(np.mean(c_array)/c_array[(k-1) % (command_line.superupdate)] - 1) < 0.01):
                                 stop_c = True
-                                data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
+                                data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(backup_ar)))
                                 if not command_line.silent:
-                                    print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(ar))
+                                    print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(backup_ar))
                                 jump_file = open(command_line.folder + '/jumping_factor.txt','w')
                                 jump_file.write('# '+str(data.jumping_factor))
                                 jump_file.close()
@@ -672,38 +691,39 @@ def chain(cosmo, data, command_line):
             # slave chain behavior
             else:
                 # Start of slave superupdate routine
+                if command_line.superupdate:
+                    # If acceptance rate deviates too much from the target acceptance
+                    # rate we want to resume adapting the jumping factor. This line
+                    # will force the slave chains to check if the jumping factor
+                    # has been updated
+                    if abs(np.mean(backup_ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
+                        stop_c = False
 
-                # If acceptance rate deviates too much from the target acceptance
-                # rate we want to resume adapting the jumping factor. This line
-                # will force the slave chains to check if the jumping factor
-                # has been updated
-                if abs(np.mean(ar) - command_line.superupdate_ar) > 5.*command_line.superupdate_ar_tol:
-                    stop_c = False
-
-		# Update the jumping factor every 5 steps in superupdate
-		if not k % 5 and k > command_line.superupdate and command_line.superupdate and (not stop_c or (stop_c and k % command_line.update)):
-		    try:
-                        jump_file = open(command_line.folder + '/jumping_factor.txt','r')
-                        # If there is a # in the file, the master has stopped adapting c
-                        for line in jump_file:
-                            if line.find('#') == -1:
-                                jump_file.seek(0)
-                                jump_value = jump_file.read()
-                                data.jumping_factor = float(jump_value)
-                            else:
-                                jump_file.seek(0)
-                                jump_value = jump_file.read().replace('# ','')
-                                if not stop_c or (stop_c and not float(jump_value) == data.jumping_factor):
+		    # Update the jumping factor every 5 steps in superupdate
+		    if not k % 5 and k > command_line.superupdate and command_line.superupdate and (not stop_c or (stop_c and k % command_line.update)):
+		        try:
+                            jump_file = open(command_line.folder + '/jumping_factor.txt','r')
+                            # If there is a # in the file, the master has stopped adapting c
+                            for line in jump_file:
+                                if line.find('#') == -1:
+                                    jump_file.seek(0)
+                                    jump_value = jump_file.read()
                                     data.jumping_factor = float(jump_value)
-                                    stop_c = True
-                                    data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(ar)))
-                                    if not command_line.silent:
-                                        print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(ar))
-                        jump_file.close()
-		    except:
-                        if not command_line.silent:
-                            print 'Reading jumping_factor file failed'
-			pass
+                                else:
+                                    jump_file.seek(0)
+                                    jump_value = jump_file.read().replace('# ','')
+                                    #if not stop_c or (stop_c and not float(jump_value) == data.jumping_factor):
+                                    if not float(jump_value) == data.jumping_factor:
+                                        data.jumping_factor = float(jump_value)
+                                        stop_c = True
+                                        data.out.write('# After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate %f \n' % (int(acc),data.jumping_factor,np.mean(backup_ar)))
+                                        if not command_line.silent:
+                                            print 'After %d accepted steps: stop adapting the jumping factor at a value of %f with a local acceptance rate of %f \n' % (int(acc), data.jumping_factor,np.mean(backup_ar))
+                            jump_file.close()
+		        except:
+                            if not command_line.silent:
+                                print 'Reading jumping_factor file failed'
+			    pass
                 # End of slave superupdate routine
 
                 # Start of slave update routine
@@ -745,9 +765,9 @@ def chain(cosmo, data, command_line):
         else:  # reject step
             rej += 1
             if command_line.superupdate:
-	        ar[k%(command_line.superupdate)] = 0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+	        ar[k%len(ar)] = 0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
             elif command_line.adaptive:
-                ar[k%100] = 0 # Local acceptance rate of last 100 steps
+                ar[k%len(ar)] = 0 # Local acceptance rate of last 100 steps
             N += 1
             k += 1
             continue
@@ -778,16 +798,20 @@ def chain(cosmo, data, command_line):
             acc += 1.0
             N = 1  # Reset the multiplicity
             if command_line.superupdate:
-	        ar[k%(command_line.superupdate)]=1 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+	        ar[k%len(ar)] = 1 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
             elif command_line.adaptive:
-                ar[k%100] = 1 # Local acceptance rate of last 100 steps
+                ar[k%len(ar)] = 1 # Local acceptance rate of last 100 steps
         else:  # reject step
             rej += 1.0
             N += 1  # Increase multiplicity of last accepted point
             if command_line.superupdate:
-	        ar[k%(command_line.superupdate)]=0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
+	        ar[k%len(ar)] = 0 # Local acceptance rate of last SU*(N_slow + f_fast * N_fast) steps
             elif command_line.adaptive:
-                ar[k%100] = 0 # Local acceptance rate of last 100 steps
+                ar[k%len(ar)] = 0 # Local acceptance rate of last 100 steps
+
+        # Store a.r. for last 5 x SU*(N_slow + f_fast * N_fast) steps
+        if command_line.superupdate:
+            backup_ar[k%len(backup_ar)] = ar[k%len(ar)]
 
         # Regularly (option to set in parameter file), close and reopen the
         # buffer to force to write on file.

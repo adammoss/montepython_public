@@ -1,0 +1,79 @@
+# SKA1 cosmic shear likelihood by Tim Sprenger
+# plus M. Archidiacono, T. Brinckmann, S. Clesse, J. Lesgourgues
+# described in detail in Sprenger et al. 1801.08331
+
+# This likelihood is based on an earlier Euclid lensing likelihood
+# by Audren & Lesgourgues described in Audren et al. 1210.2194
+
+# ska1 specifications from 1601.03947 (p.7)
+
+# data directory and fiducial file
+ska1_lensing.data_directory = data.path['data']
+ska1_lensing.fiducial_file  = "ska1_lensing_fiducial.dat"
+
+# min, max and stepsize of l values used to compute C_l
+# if set sufficiently high this lmax is only used in the
+# analysis if use_lmax_lincut = False
+ska1_lensing.lmin = 5
+ska1_lensing.lmax = 5000
+ska1_lensing.dlnl = 0.2
+
+# Use linear cutoff infered from kmax_hMpc in h/Mpc at z=0
+# this can be scaled in redshift via pow(1+z,2/(2+n_s))
+# A cut-off of 0.5 corresponds to the "conservative" setup and a
+# value of 2.0 the "realistic" setup of Sprenger at al. 1801.08331
+ska1_lensing.use_lmax_lincut = True
+ska1_lensing.use_zscaling = True
+ska1_lensing.kmax_hMpc = 0.5
+#ska1_lensing.kmax_hMpc = 2.0
+
+# number of discrete z values in selection function file
+ska1_lensing.nzmax = 151
+
+# number of bins of the survey
+ska1_lensing.nbin  = 10
+# maximum redshift covered by survey
+ska1_lensing.zmax  = 3.5
+# sky coverage
+ska1_lensing.fsky  = 0.1212
+# precision with which bin edges are computed (~0.001)
+ska1_lensing.dz    = 0.001
+
+# (k_min, k_max) in h/Mpc for Cl computing
+# if set sufficiently high this kmax is only used in the
+# analysis if use_lmax_lincut = False
+# this k_max could be very high (e.g. 40) if you use
+# a theoretical_error > 0 or use_lmax_lincut = True
+ska1_lensing.k_min_h_by_Mpc = 0.001
+ska1_lensing.k_max_h_by_Mpc = 40.
+
+# Normalization of theoretical error
+ska1_lensing.theoretical_error = 0
+
+# non-linear correction
+# note even if False halofit will be used if the .param
+# file or any other likelihood specifies halofit
+ska1_lensing.use_halofit = True
+
+# Uncomment this line to use the theoretical error nuisance parameter of 1210.2194
+#ska1_lensing.use_nuisance = ['epsilon']
+# theoretical error parameters of 1210.2194
+ska1_lensing.coefficient_f_nu = 0
+
+# noise computation
+ska1_lensing.rms_shear = 0.3
+# number of galaxies per square arcminutes
+ska1_lensing.gal_per_sqarcmn = 2.7
+
+# computation of n(z):
+ska1_lensing.par_zm = 1.1
+ska1_lensing.par_a = 1.4142
+ska1_lensing.par_b = 2.
+ska1_lensing.par_c = 1.25
+
+# computation of error function
+ska1_lensing.f_spec = 0.15
+ska1_lensing.z_spec = 0.6
+ska1_lensing.sigma_phot = 0.05
+ska1_lensing.z_phot = 2.0
+ska1_lensing.sigma_noz = 0.3

@@ -12,7 +12,8 @@ import scipy.interpolate
 # and to make all volumes comoving
 # In addition a new linear cutoff function and the nonlinear velocity dispersion sigma_NL have been added
 # The theoretical error has been rescaled
-# The possibility of bias nuisance was added
+
+# Now P_cb instead of P_m is used and only linear quantities are used for RSD
 
 
 class euclid_pk(Likelihood):
@@ -35,17 +36,6 @@ class euclid_pk(Likelihood):
         self.fid_values_exist = False
         if os.path.exists(fid_file_path):
             self.fid_values_exist = True
-        # TB; request transfer functions for bias correction
-        if self.use_neutrino_bias or self.use_cdm_plus_baryons_pk or (self.fid_values_exist is False and (self.use_fiducial_neutrino_bias or self.use_fiducial_cdm_plus_baryons_pk)):
-            self.need_cosmo_arguments(data, {'output': 'mPk, dTk'})
-            if self.use_neutrino_bias and self.use_cdm_plus_baryons_pk:
-                raise io_mp.ConfigurationError('Check settings for euclid_pk in the .data file: '
-                                               'you should not set both \'use_neutrino bias\''
-                                               'and \'use_cdm_plus_baryons_pk\' to True')
-            if self.use_fiducial_neutrino_bias and self.use_fiducial_cdm_plus_baryons_pk:
-                raise io_mp.ConfigurationError('Check settings for euclid_pk in the .data file: '
-                                               'you should not set both \'use_fiducial_neutrino bias\''
-                                               'and \'use_fiducial_cdm_plus_baryons_pk\' to True')
 
         #################
         # find number of galaxies for each mean redshift value
@@ -83,28 +73,28 @@ class euclid_pk(Likelihood):
         ################
         # Noise spectrum
         ################
-	# TS; original settings (deleted unused settings), fsky
+	# TS; number counts from model 1 in Pozzetti et al. (1603.01453)
 
         self.n_g = np.zeros(self.nbin, 'float64')
 
-        self.n_g = np.array([6844.945, 7129.45,
-                             7249.912, 7261.722,
-                             7203.825, 7103.047,
-                             6977.571, 6839.546,
-                             6696.957, 5496.988,
-                             4459.240, 3577.143,
-                             2838.767, 2229.282,
-                             1732.706, 1333.091])
-        self.n_g = self.n_g * self.fsky * 41253. * self.efficiency
+        #self.n_g = np.array([6844.945, 7129.45,
+        #                     7249.912, 7261.722,
+        #                     7203.825, 7103.047,
+        #                     6977.571, 6839.546,
+        #                     6696.957, 5496.988,
+        #                     4459.240, 3577.143,
+        #                     2838.767, 2229.282,
+        #                     1732.706, 1333.091])
+        #self.n_g = self.n_g * self.fsky * 41253. * self.efficiency
+        self.n_g = np.array([4825,4112,3449,2861,2357,1933,1515,1140,861,654,499,382,295])
+        self.n_g = self.n_g * self.fsky * 41253. * self.dz
 
-	"""
 	# TS; Ntot output
-	print("\nEuclid: Number of detected galaxies in each redshift bin:")
-	for index_z in xrange(self.nbin):
-		print("z-bin[" + str(self.z_mean[index_z]-self.dz/2.) + "," + str(self.z_mean[index_z]+self.dz/2.) + "]: \tN = %.4g" % (self.n_g[index_z]) + " ,\t b = %.4g" % (self.b[index_z]))
-	N_tot = np.sum(self.n_g)
-	print("Total number of detected galaxies: N = %.4g\n" % (N_tot))
-	"""
+	#print("\nEuclid: Number of detected galaxies in each redshift bin:")
+	#for index_z in xrange(self.nbin):
+	#	print("z-bin[" + str(self.z_mean[index_z]-self.dz/2.) + "," + str(self.z_mean[index_z]+self.dz/2.) + "]: \tN = %.4g" % (self.n_g[index_z]) + " ,\t b = %.4g" % (self.b[index_z]))
+	#N_tot = np.sum(self.n_g)
+	#print("Total number of detected galaxies: N = %.4g\n" % (N_tot))
 
         # If the file exists, initialize the fiducial values, the spectrum will
         # be read first, with k_size values of k and nbin values of z. Then,
@@ -149,21 +139,6 @@ class euclid_pk(Likelihood):
                     line = fid_file.readline()
 		#TS; load fiducial sigma_NL
 		self.sigma_NL_fid = float(line)
-                #TB; load scale-dependent bias, if needed
-                if self.use_fiducial_neutrino_bias or self.use_fiducial_cdm_plus_baryons_pk:
-                    try:
-                        self.b_array_fid = np.zeros([self.k_size,self.nbin], dtype='float64')
-                        for index_k in xrange(self.k_size):
-                            line = fid_file.readline()
-                            line = line.split()
-                            for index_z in range(self.nbin):
-                                line[index_z] = float(line[index_z])
-
-                            self.b_array_fid[index_k,:] = np.array(line,dtype='float64')
-                    except:
-                        raise io_mp.ConfigurationError('There appears to be a problem with the fiducial file. Probably '
-                                                       'it was created with a different number of nuisance parameters, '
-                                                       'different k_size, nbin, or without use_neutrino_bias=True')
         # Else the file will be created in the loglkl() function.
         return
 
@@ -214,38 +189,6 @@ class euclid_pk(Likelihood):
 	else:
             b = np.sqrt(1.+self.z_mean)
 
-        if self.use_neutrino_bias or self.use_cdm_plus_baryons_pk or (self.fid_values_exist is False and (self.use_fiducial_neutrino_bias or self.use_fiducial_cdm_plus_baryons_pk)):
-            # TB; Following the approach of Raccanelli et al. 1704.07837,
-            # (should we cite Castorina et al. 1311.1212 instead?),
-            # we correct for the scale dependence of neutrinos on the bias
-
-            # Get the values for Omega_b, Omega_nu, Omega_cdm at z=0
-            Omega_b = cosmo.Omega_b()
-            Omega_nu = cosmo.Omega_nu
-            Omega_cdm = cosmo.Omega_m() - Omega_b - Omega_nu # technically includes e.g. dcdm
-
-            b_array = np.zeros([self.k_size,self.nbin])
-            for index_z in xrange(self.nbin):
-                # For each redshift bin we get the transfer functions
-                transfer_function = cosmo.get_transfer(self.z_mean[index_z])
-                T_cdm = transfer_function['d_cdm']
-                T_b = transfer_function['d_b']
-                T_nu = transfer_function['d_ncdm[0]']
-                T_cdm_b = (Omega_cdm * T_cdm + Omega_b * T_b)/(Omega_cdm + Omega_b)
-                T_m = (Omega_cdm * T_cdm + Omega_b * T_b + Omega_nu * T_nu)/(Omega_cdm + Omega_b + Omega_nu)
-
-                # Rescale bias by the ratio of the transfer functions T_{cdm+baryons}/T_{cdm+baryons+neutrinos}
-                # Interpolate bias expression at desired k values
-                # the bias is now an array of self.k_size values per z bin
-                k_transfer = transfer_function['k (h/Mpc)'] * 0.6693 # hardcoded rescaling, with h value used for k_cut below
-                b_temp = T_cdm_b/T_m * b[index_z]
-                b_interp = scipy.interpolate.interp1d(k_transfer,b_temp,fill_value='extrapolate')
-                b_array[:,index_z] = b_interp(self.k_fid)
-            # Overwrite bias when not creating the fiducial
-            if self.fid_values_exist is True:
-                if self.use_neutrino_bias:
-                    b = b_array
-
         # Compute V_survey, for each given redshift bin,
         # which is the volume of a shell times the sky coverage:
 	# TS; no more need for self., now comoving, exact integral solution
@@ -285,12 +228,6 @@ class euclid_pk(Likelihood):
                     fid_file.write('%.8g %.8g %.8g\n' % (sigma_r[index_z], V_survey[index_z], b[index_z]))
 		# TS; save fiducial sigma_NL
 		fid_file.write('%.8g\n' % sigma_NL)
-                # TB; save fiducial scale-dependent bias, if needed
-                if self.use_fiducial_neutrino_bias or self.use_fiducial_cdm_plus_baryons_pk:
-                    for index_k in xrange(self.k_size):
-                        for index_z in xrange(self.nbin-1):
-                            fid_file.write('%.8g ' % b_array[index_k,index_z])
-                        fid_file.write('%.8g \n' % b_array[index_k,self.nbin-1])
             print '\n'
             warnings.warn(
                 "Writing fiducial model in %s, for %s likelihood\n" % (
@@ -307,19 +244,7 @@ class euclid_pk(Likelihood):
         # beta_fid(k_fid,z) = 1/2b(z) * d log(P_nl_fid(k_fid,z))/d log a
         #                   = -1/2b(z)* (1+z) d log(P_nl_fid(k_fid,z))/dz
 
-        # DEBUG: bias here
-        # NOTE: This is a bit of a sloppy implementation (use_cdm_plus_baryons_pk)
-        # What will happen is that the code will use the non-corrected bias in the
-        # beta term if use_cdm_plus_baryons_pk=True instead of use_neutrino_bias=True
-        # (or corresponding fiducial flags). The end result is that the neutrino bias
-        # correction is only applied to the first b^2 term in b^2 * (1 + beta * mu^2)
-        # (i.e. not the bias term in beta), and is therefore equivalent to writing
-        # P_{cdm+b} = P_m * (T_{cdm+b}/T_m)^2, with no correction on the bias term.
-        # TODO: cleaner implementation
-        if self.use_fiducial_neutrino_bias:
-            beta_fid = -0.5/self.b_array_fid*(1+self.z_mean)*np.log(
-                self.pk_nl_fid[:, 2::2]/self.pk_nl_fid[:, :-2:2])/self.dz
-        elif self.use_linear_rsd:
+        if self.use_linear_rsd:
             beta_fid = -0.5/self.b_fid*(1+self.z_mean)*np.log(
                 self.pk_lin_fid[:, 2::2]/self.pk_lin_fid[:, :-2:2])/self.dz
         else:
@@ -329,21 +254,13 @@ class euclid_pk(Likelihood):
         # Compute the tilde P_fid(k_ref,z,mu) = H_fid(z)/D_A_fid(z)**2 ( 1 + beta_fid(k_fid,z)mu^2)^2 P_nl_fid(k_fid,z)exp ( -k_fid^2 mu^2 sigma_r_fid^2)
         self.tilde_P_fid = np.zeros((self.k_size, self.nbin, self.mu_size),
                                     'float64')
-        # DEBUG: bias here
-        if self.use_fiducial_neutrino_bias or self.use_fiducial_cdm_plus_baryons_pk:
-            self.tilde_P_fid = self.H_fid[na, 1::2, na]/(
-                self.D_A_fid[na, 1::2, na])**2*self.b_array_fid[:, :, na]**2*(
-                    1. + beta_fid[:, :, na] * self.mu_fid[na, na, :]**2)**2 * (
-                self.pk_nl_fid[:, 1::2, na]) * np.exp(
-                    -self.k_fid[:, na, na]**2 * self.mu_fid[na, na, :]**2 *
-                    (self.sigma_r_fid[na, :, na]**2+self.sigma_NL_fid**2))
-        else:
-            self.tilde_P_fid = self.H_fid[na, 1::2, na]/(
-                self.D_A_fid[na, 1::2, na])**2*self.b_fid[na,:,na]**2*(
-                    1. + beta_fid[:, :, na] * self.mu_fid[na, na, :]**2)**2 * (
-                self.pk_nl_fid[:, 1::2, na]) * np.exp(
-                    -self.k_fid[:, na, na]**2 * self.mu_fid[na, na, :]**2 *
-                    (self.sigma_r_fid[na, :, na]**2+self.sigma_NL_fid**2))
+
+        self.tilde_P_fid = self.H_fid[na, 1::2, na]/(
+            self.D_A_fid[na, 1::2, na])**2*self.b_fid[na,:,na]**2*(
+                1. + beta_fid[:, :, na] * self.mu_fid[na, na, :]**2)**2 * (
+            self.pk_nl_fid[:, 1::2, na]) * np.exp(
+                -self.k_fid[:, na, na]**2 * self.mu_fid[na, na, :]**2 *
+                (self.sigma_r_fid[na, :, na]**2+self.sigma_NL_fid**2))
 
 
         ######################
@@ -379,16 +296,6 @@ class euclid_pk(Likelihood):
         if self.use_linear_rsd:
             pk_lin_th = cosmo.get_pk_cb_lin(self.k,self.z,self.k_size,2*self.nbin+1,self.mu_size)
 
-        # Recover the non_linear scale computed by halofit. If no scale was
-        # affected, set the scale to one, and make sure that the nuisance parameter
-        # epsilon is set to zero
-	# TS; added self to use it in integrand function
-        #self.k_sigma = np.zeros(2*self.nbin+1, 'float64')
-        #if (cosmo.nonlinear_method == 0):
-        #    self.k_sigma[:]=1.e6
-        #else :
-        #    self.k_sigma = cosmo.nonlinear_scale(self.z,2*self.nbin+1)
-
         # Define the alpha function, that will characterize the theoretical
         # uncertainty. (TS; = theoretical error envelope)
 	# TS; introduced new envelope (0:optimistic 1:pessimistic for ~2023), (for old envelope see commented)
@@ -405,9 +312,6 @@ class euclid_pk(Likelihood):
 	                self.alpha[index_k,index_z,index_mu] = th_a1*np.exp(th_c1*np.log10(self.k[index_k,2*index_z+1,index_mu]/k_z))
 	            else:
 	                self.alpha[index_k,index_z,index_mu] = th_a2*np.exp(th_c2*np.log10(self.k[index_k,2*index_z+1,index_mu]/k_z))
-	            #print('%s\t%s' % (self.k[index_k,2*index_z+1,index_mu]/k_z, self.alpha[index_k,index_z,index_mu]))
-                #alpha[:,index_z,index_mu] = np.log(1. + self.k[:,index_z,index_mu]/self.k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/self.k_sigma[index_z]))*self.theoretical_error
-
 
 	# TS; Define fractional theoretical error variance R/P^2
 	self.R_var = np.zeros((self.k_size,self.nbin,self.mu_size),'float64')
@@ -416,41 +320,25 @@ class euclid_pk(Likelihood):
 	        self.R_var[index_k,index_z,:] = self.V_fid[index_z]/(2.*np.pi)**2*self.k_CorrLength_hMpc*cosmo.h()/self.z_CorrLength*self.dz*self.k_fid[index_k]**2*self.alpha[index_k,index_z,:]**2
 
 
-	# TS; neutrino error obsolete since halofit update, so commented
-	# TS; removed many commented lines that included an older neutrino error
-
-        # recover the e_th part of the error function,
-        #e_th = self.coefficient_f_nu*cosmo.Omega_nu/cosmo.Omega_m()
-
-        #if 'epsilon' in self.use_nuisance:
-        #    for index_z in xrange(2*self.nbin+1):
-        #        for index_mu in xrange(self.mu_size):
-        #            pk_nl_th[:,index_z,index_mu] *= (1.+data.mcmc_parameters['epsilon']['current']*data.mcmc_parameters['epsilon']['scale']*np.log(1. + self.k[:,index_z,index_mu]/self.k_sigma[index_z]) / (1. + np.log(1.+ self.k[:,index_z,index_mu]/self.k_sigma[index_z])) * e_th)
+	# TS; neutrino error obsolete since halofit update; corresponding lines were deleted
 
         # Compute the beta function for nl,
         # beta(k,z) = 1/2b(z) * d log(P_nl_th (k,z))/d log a
         #           = -1/2b(z) *(1+z) d log(P_nl_th (k,z))/dz
-        # DEBUG: bias here
         beta_th = np.zeros((self.k_size,self.nbin,self.mu_size),'float64')
         for index_k in xrange(self.k_size):
             for index_z in xrange(self.nbin):
-                if self.use_neutrino_bias:
-                    beta_th[index_k,index_z,:] = -1./(2.*b_array[index_k,index_z]) * (1.+self.z_mean[index_z]) * np.log(pk_nl_th[index_k,2*index_z+2,:]/pk_nl_th[index_k,2*index_z,:])/(self.dz)
-                elif self.use_linear_rsd:
+                if self.use_linear_rsd:
                     beta_th[index_k,index_z,:] = -1./(2.*b[index_z]) * (1.+self.z_mean[index_z]) * np.log(pk_lin_th[index_k,2*index_z+2,:]/pk_lin_th[index_k,2*index_z,:])/(self.dz)
                 else:
                     beta_th[index_k,index_z,:] = -1./(2.*b[index_z]) * (1.+self.z_mean[index_z]) * np.log(pk_nl_th[index_k,2*index_z+2,:]/pk_nl_th[index_k,2*index_z,:])/(self.dz)
 
         # Compute \tilde P_th(k,mu,z) = H(z)/D_A(z)^2 * (1 + beta(z,k) mu^2)^2 P_nl_th(k,z) exp(-k^2 mu^2 (sigma_r^2+sigma_NL^2))
 	# TS; mu -> self.mu, added sigma_NL contribution
-        # DEBUG: bias here
         self.tilde_P_th = np.zeros( (self.k_size,self.nbin,self.mu_size), 'float64')
         for index_k in xrange(self.k_size):
             for index_z in xrange(self.nbin):
-                if self.use_neutrino_bias or self.use_cdm_plus_baryons_pk:
-                    self.tilde_P_th[index_k,index_z,:] = H[2*index_z+1]/(D_A[2*index_z+1]**2) * b_array[index_k,index_z]**2*(1. + beta_th[index_k,index_z,:]*self.mu[index_z,:]*self.mu[index_z,:])**2* pk_nl_th[index_k,2*index_z+1,:]*np.exp(-self.k[index_k,2*index_z+1,:]**2*self.mu[index_z,:]**2*(sigma_r[index_z]**2+sigma_NL**2))
-                else:
-                    self.tilde_P_th[index_k,index_z,:] = H[2*index_z+1]/(D_A[2*index_z+1]**2) * b[index_z]**2*(1. + beta_th[index_k,index_z,:]*self.mu[index_z,:]*self.mu[index_z,:])**2* pk_nl_th[index_k,2*index_z+1,:]*np.exp(-self.k[index_k,2*index_z+1,:]**2*self.mu[index_z,:]**2*(sigma_r[index_z]**2+sigma_NL**2))
+                self.tilde_P_th[index_k,index_z,:] = H[2*index_z+1]/(D_A[2*index_z+1]**2) * b[index_z]**2*(1. + beta_th[index_k,index_z,:]*self.mu[index_z,:]*self.mu[index_z,:])**2* pk_nl_th[index_k,2*index_z+1,:]*np.exp(-self.k[index_k,2*index_z+1,:]**2*self.mu[index_z,:]**2*(sigma_r[index_z]**2+sigma_NL**2))
 
         # Shot noise spectrum:
 	# TS; Removed necessity of specifying a nuisance P_shot (not used in standard)
@@ -462,23 +350,7 @@ class euclid_pk(Likelihood):
         	else:
 			self.P_shot[index_z] = self.H_fid[2*index_z+1]/(self.D_A_fid[2*index_z+1]**2)*(self.V_fid[index_z]/self.n_g[index_z])
 
-        #for index_z in xrange(self.nbin):
-        #  for index_k in xrange(self.k_size):
-        #    for index_mu in xrange(self.mu_size):
-        #      self.tilde_P_fid[index_k,index_z,index_mu] = self.tilde_P_th[index_k,index_z,index_mu]*(1.+2.*self.alpha[index_k,2*index_z+1,index_mu])
-
-        #index_mu = (self.mu_size-1)/2
-        #index_z = 0
-        #for index_k in xrange(1,self.k_size):
-        #  print self.k_fid[index_k],self.tilde_P_th[index_k,index_z,index_mu],self.P_shot[index_z],(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])*2.*pi/sqrt(self.k_fid[index_k]**3*self.V_survey[index_z]*self.nbin*log(self.kmax/self.kmin)),self.alpha[index_k,2.*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu]
-        #print
-        #print
-        #index_z = self.nbin-1
-        #for index_k in xrange(1,self.k_size):
-        #  print self.k_fid[index_k],self.tilde_P_th[index_k,index_z,index_mu],self.P_shot[index_z],(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])*2.*pi/sqrt(self.k_fid[index_k]**3*self.V_survey[index_z]*self.nbin*log(self.kmax/self.kmin)),self.alpha[index_k,2.*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu]
-        #exit()		
-
-        # finally compute chi2, for each z_mean	
+        # finally compute chi2, for each z_mean
 	if self.use_zscaling:
 		# TS; reformulated loops to include z-dependent kmax, mu -> mu_fid
         	chi2 = 0.0
@@ -490,7 +362,7 @@ class euclid_pk(Likelihood):
 		for index_z in xrange(self.nbin):
 			# uncomment printers to show chi2 contribution from single bins
 			#printer1 = chi2*delta_mu
-			# TS; uncomment to display max. kmin (used to infer kmin~0.02): 
+			# TS; uncomment to display max. kmin (used to infer kmin~0.02):
 			#kmin: #print("z=" + str(self.z_mean[index_z]) + " kmin=" + str(34.56/r[2*index_z+1]) + "\tor " + str(6.283/(r[2*index_z+2]-r[2*index_z])))
 			for index_k in xrange(1,self.k_size):
 				if ((self.k_cut(self.z_mean[index_z],cosmo.h(),cosmo.n_s())-self.k_fid[self.k_size-index_k]) > -1.e-6):
@@ -535,23 +407,19 @@ class euclid_pk(Likelihood):
                     # TS; mu -> mu_fid
                     chi2 += (mu_integrand_hi + mu_integrand_lo)/2.*(self.mu_fid[index_mu] - self.mu_fid[index_mu-1])
 
-        #if 'epsilon' in self.use_nuisance:
-        #    chi2 += (data.mcmc_parameters['epsilon']['current']*data.mcmc_parameters['epsilon']['scale'])**2
         if 'beta_0^Euclid' in self.use_nuisance:
             chi2 += ((data.mcmc_parameters['beta_0^Euclid']['current']*data.mcmc_parameters['beta_0^Euclid']['scale']-1.)/self.bias_accuracy)**2
             chi2 += ((data.mcmc_parameters['beta_1^Euclid']['current']*data.mcmc_parameters['beta_1^Euclid']['scale']-1.)/self.bias_accuracy)**2
 
         return - chi2/2.
 
-    # TS; V_fid, index_k: index->argument, rescaled theoretical error (see commented)
+    # TS; V_fid, index_k: index->argument, rescaled theoretical error
     # and added triggers to avoid computation of zero theoretical error
     def integrand(self,index_k,index_z,index_mu):
         if not self.UseTheoError:
             return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2))
-        #return self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[index_k,2*index_z+1,index_mu]*self.tilde_P_th[index_k,index_z,index_mu])**2*self.k_fid[index_k]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
         return (self.V_fid[index_z]/2.)*self.k_fid[index_k]**2/(2.*pi)**2*((self.tilde_P_th[index_k,index_z,index_mu] - self.tilde_P_fid[index_k,index_z,index_mu])**2/((self.tilde_P_th[index_k,index_z,index_mu] + self.P_shot[index_z])**2 + self.R_var[index_k,index_z,index_mu]*self.tilde_P_th[index_k,index_z,index_mu]**2))
     def array_integrand(self,index_z,index_mu):
         if not self.UseTheoError:
             return (self.V_fid[index_z]/2.)*self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2))
-        #return self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((2./self.V_fid[index_z])*(self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + (self.alpha[:,2*index_z+1,index_mu]*self.tilde_P_th[:,index_z,index_mu])**2*self.k_fid[:]**3/2./pi**2*self.nbin*log(self.k_cut(self.z_mean[index_z])/self.kmin)))
         return (self.V_fid[index_z]/2.)*self.k_fid[:]**2/(2.*pi)**2*((self.tilde_P_th[:,index_z,index_mu] - self.tilde_P_fid[:,index_z,index_mu])**2/((self.tilde_P_th[:,index_z,index_mu] + self.P_shot[index_z])**2 + self.R_var[:,index_z,index_mu]*self.tilde_P_th[:,index_z,index_mu]**2))

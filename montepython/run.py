@@ -115,6 +115,8 @@ def mpi_run(custom_command=""):
                 status = suffix
             elif command_line.method == "NS":
                 status = 1
+            elif command_line.method == "PC":
+                status = 1
             else:
                 warnings.warn(
                     "The method '%s' is not supported"%(command_line.method) +

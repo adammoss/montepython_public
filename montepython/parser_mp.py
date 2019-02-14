@@ -377,8 +377,9 @@ def create_parser():
             presented in http://arxiv.org/abs/1304.4473 by Antony Lewis.<++>
         <**>-m<**> : str
             <++>sampling method<++>, by default 'MH' for Metropolis-Hastings,
-            can be set to 'NS' for Nested Sampling (using Multinest wrapper
-            PyMultiNest), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
+            can be set to 'NS' for MultiNest (using Multinest wrapper
+            PyMultiNest), 'PC' for PolyChord (using PolyChord wrapper
+            PyPolyChord), 'CH' for Cosmo Hammer (using the Cosmo Hammer wrapper
             to emcee algorithm), and finally 'IS' for importance sampling.
 
             Note that when running with Importance sampling, you need to
@@ -487,10 +488,15 @@ def create_parser():
             ask your script to use the job number as :code:`i`.<++>
         <**>-r<**> : str
             <++>restart from last point in chain<++>, to avoid the burn-in
-            stage (*OPT*).
-
-            At the beginning of the run, the previous chain will be deleted,
-            and its content transfered to the beginning of the new chain.<++>
+            stage or increase sample size (*OPT*). You must pass the lowest
+            index chains file, e.g. -r chains/test_run/1969-10-05_10000__1.txt .
+            MontePython will then create copies of all chains index 1 through
+            M (number of MPI processes) with new names including -N more steps
+            1969-10-05_20000__1.txt etc. Once the chains have been copied
+            the old chains can be moved to a backup folder or deleted. Note
+            they will be automatically deleted at the completion of the run
+            (if the desired number of steps passed with -N is reached). The
+            old chains should not be included as a part of the analysis.<++>
         <**>-b<**> : str
             <++>start a new chain from the bestfit file<++> computed with
             analyze.  (*OPT*)<++>
@@ -557,9 +563,21 @@ def create_parser():
         <**>--display-each-chi2<**> : bool
             <++>Shows the effective chi2 from each likelihood and the total.<++>
             Useful e.g. if you run at the bestfit point with -f 0 (flag)<++>
+        <**>--parallel-chains<**> : bool
+            <++>Option for when running parallel without MPI<++>.
+            Informs the code you are running parallel chains. This
+            information is useful if superupdate is enabled. Will
+            use only one process to adapt the jumping factor.
+            If relaunching in the same folder or restarting a run
+            and the file jumping_factor.txt already exists it will
+            cause all chains to be assigned as slaves. In this case
+            instead note the value in jumping_factor.txt, delete the
+            file, and pass the value with flag -f <value>. A warning
+            may still appear, but you can safely disregard it.
+            <++>
 
-        For Nested Sampling and Cosmo Hammer arguments, see
-        :mod:`nested_sampling` and :mod:`cosmo_hammer`.
+        For MultiNest, PolyChord and Cosmo Hammer arguments, see
+        :mod:`MultiNest`, :mod:`PolyChord` and :mod:`cosmo_hammer`.
 
     **info**
 
@@ -642,8 +660,12 @@ def create_parser():
             `top`.<++>
         <**>--keep-non-markovian<**> : bool
             <++>Use this flag to keep the non-markovian part of the chains produced
-            at the beginning of runs with --update mode (default: False)<++>
-            This option is only relevant when the chains were produced with --update (*OPT*) (flag)<++>
+            at the beginning of runs with --update and --superupdate mode (default: False)<++>
+            This option is only relevant when the chains were produced with --update or --superupdate (*OPT*) (flag)<++>
+        <**>--keep-only-markovian<**> : bool
+            <++>Use this flag to keep only the truly markovian part of the chains produced
+             with --superupdate mode, where the jumping factor has stopped adapting (default: False)<++>
+            This option is only relevant when the chains were produced with --superupdate (*OPT*) (flag)<++>
         <**>--keep-fraction<**> : float
             <++>after burn-in removal, analyze only last fraction of each chain. (default: 1)<++>
             (between 0 and 1). Normally one would not use this for runs with --update mode,
@@ -715,7 +737,7 @@ def create_parser():
     # -- sampling method (OPTIONAL)
     runparser.add_argument('-m', '--method', help=helpdict['m'],
                            dest='method', default='MH',
-                           choices=['MH', 'NS', 'CH', 'IS', 'Der', 'Fisher'])
+                           choices=['MH', 'NS', 'PC', 'CH', 'IS', 'Der', 'Fisher'])
     # -- update Metropolis Hastings (OPTIONAL)
     runparser.add_argument('--update', help=helpdict['update'], type=int,
                            dest='update', default=50)
@@ -777,10 +799,13 @@ def create_parser():
     # display option
     runparser.add_argument('--display-each-chi2', help=helpdict['display-each-chi2'],
                            dest='display_each_chi2', action='store_true')
+    # -- parallel chains without MPI (OPTIONAL)
+    runparser.add_argument('--parallel-chains', help=helpdict['parallel-chains'],
+                           action='store_true')
 
     ###############
     # MCMC restart from chain or best fit file
-    runparser.add_argument('-r', help=helpdict['r'],
+    runparser.add_argument('-r', '--restart', help=helpdict['r'],
                            type=existing_file, dest='restart')
     runparser.add_argument('-b', '--bestfit', dest='bf', help=helpdict['b'],
                            type=existing_file)
@@ -805,10 +830,27 @@ def create_parser():
         help=helpdict['IS-starting-folder'], type=str, default='', nargs='+')
 
     ###############
+    # We need the following so the run does not crash if one of the external
+    # samplers is not correctly installed despite not being used
+    from contextlib import contextmanager
+    import sys, os
+
+    @contextmanager
+    def suppress_stdout():
+        with open(os.devnull, "w") as devnull:
+            old_stdout = sys.stdout
+            sys.stdout = devnull
+            try:
+                yield
+            finally:
+                sys.stdout = old_stdout
+
+    ###############
     # MultiNest arguments (all OPTIONAL and ignored if not "-m=NS")
     # The default values of -1 mean to take the PyMultiNest default values
     try:
-        from nested_sampling import NS_prefix, NS_user_arguments
+        with suppress_stdout():
+            from MultiNest import NS_prefix, NS_user_arguments
         NSparser = runparser.add_argument_group(
             title="MultiNest",
             description="Run the MCMC chains using MultiNest"
@@ -820,12 +862,37 @@ def create_parser():
     except ImportError:
         # Not defined if not installed
         pass
+    except:
+        warnings.warn('PyMultiNest detected but MultiNest likely not installed correctly. '
+                      'You can safely ignore this if not running with option -m NS')
+
+    ###############
+    # PolyChord arguments (all OPTIONAL and ignored if not "-m=PC")
+    # The default values of -1 mean to take the PyPolyChord default values
+    try:
+        with suppress_stdout():
+             from PolyChord import PC_prefix, PC_user_arguments
+        PCparser = runparser.add_argument_group(
+            title="PolyChord",
+            description="Run the MCMC chains using PolyChord"
+            )
+        for arg in PC_user_arguments:
+            PCparser.add_argument('--'+PC_prefix+arg,
+                                  default=-1,
+                                  **PC_user_arguments[arg])
+    except ImportError:
+        # Not defined if not installed
+        pass
+    except:
+        warnings.warn('PyPolyChord detected but PolyChord likely not installed correctly. '
+                      'You can safely ignore this if not running with option -m PC')
 
     ###############
     # CosmoHammer arguments (all OPTIONAL and ignored if not "-m=CH")
     # The default values of -1 mean to take the CosmoHammer default values
     try:
-        from cosmo_hammer import CH_prefix, CH_user_arguments
+        with suppress_stdout():
+            from cosmo_hammer import CH_prefix, CH_user_arguments
         CHparser = runparser.add_argument_group(
             title="CosmoHammer",
             description="Run the MCMC chains using the CosmoHammer framework")
@@ -836,6 +903,9 @@ def create_parser():
     except ImportError:
         # Not defined if not installed
         pass
+    except:
+        warnings.warn('CosmoHammer detected but emcee likely not installed correctly. '
+                      'You can safely ignore this if not running with option -m CH')
 
     ###############
     # Information
@@ -889,6 +959,9 @@ def create_parser():
     # -- also analyze the non-markovian part of the chains
     infoparser.add_argument('--keep-non-markovian', help=helpdict['keep-non-markovian'],
                             dest='markovian', action='store_false')
+    # -- force only analyzing the markovian part of the chains
+    infoparser.add_argument('--keep-only-markovian', help=helpdict['keep-only-markovian'],
+                            dest='only_markovian', action='store_true')
     # -- fraction of chains to be analyzed after burn-in removal (defaulting to 1.0)
     infoparser.add_argument('--keep-fraction', help=helpdict['keep-fraction'],
                             type=float, dest='keep_fraction', default=1.0)
