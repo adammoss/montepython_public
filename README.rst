@@ -1,8 +1,8 @@
-This version of MonetPython is modified to work with NeuralNest. This nested sampler can be invoked via
+This version of MontePython is modified to work with NeuralNest. The nested sampler can be invoked via
 
 .. code::
 
-    python montepython/MontePython.py run -o chains/nn_nested -p input/example.param -m NN --NN_sampler nested --NN_n_live_points 100
+    python montepython/MontePython.py run -o chains/test -p input/example.param -m NN --NN_sampler nested --NN_n_live_points 100
 
 Note the parameter file requires bounded parameters for nested sampling.
 
@@ -10,7 +10,7 @@ The MCMC sampler (in development) can be invoked by
 
 .. code::
 
-    python montepython/MontePython.py run -o chains/nn_mcmc -p input/example.param -m NN --NN_sampler mcmc --NN_bootstrap_fileroot chains/file
+    python montepython/MontePython.py run -o chains/test -p input/example.param -m NN --NN_sampler mcmc --NN_bootstrap_fileroot chains/file
 
 where bootstrap_fileroot gives the root directory of some initial chains used to train the network. This is similar to
 estimating the covariance matrix and using the Cholesky decomposition for the proposal directions.
