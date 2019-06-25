@@ -33,7 +33,7 @@ data.over_sampling=[1, 4]
 
 # Cosmological parameters list
 
-data.parameters['omega_b']      = [ 2.2253,   None, None,  0.028, 0.01, 'cosmo']
+data.parameters['omega_b']      = [ 0.022253,   None, None,  0.00028, 1, 'cosmo']
 data.parameters['omega_cdm']    = [0.11919,   None, None, 0.0027,    1, 'cosmo']
 data.parameters['100*theta_s']  = [ 1.0418,   None, None,   3e-4,    1, 'cosmo']
 data.parameters['ln10^{10}A_s'] = [ 3.0753,   None, None, 0.0029,    1, 'cosmo']
@@ -74,5 +74,5 @@ data.cosmo_arguments['P_k_max_h/Mpc'] = 1.
 
 #------ Mcmc parameters ----
 
-data.N=10
+data.N=10000
 data.write_step=5

@@ -66,6 +66,9 @@ def run(cosmo, data, command_line):
             data.out.close()
         except AttributeError:
             pass
+    elif command_line.method == 'NN':
+        import NeuralNest as nn
+        nn.run(cosmo, data, command_line)
     else:
         raise io_mp.ConfigurationError(
             "Sampling method %s not understood" % command_line.method)

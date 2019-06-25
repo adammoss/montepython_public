@@ -178,6 +178,10 @@ class Data(object):
         :rtype: dict
         """
 
+        # NeuralNest
+        self.NN_param_names = []
+        self.NN_arguments = {}
+
         # Initialise the experiments attribute
         self.experiments = []
 
